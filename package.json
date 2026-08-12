@@ -1,0 +1,45 @@
+{
+  "name": "isa-marathon",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ISA Tech Marathon Platform - Real-time marathon tracking system",
+  "scripts": {
+    "dev": "turbo dev",
+    "dev:web": "pnpm --filter @isa/public-web dev",
+    "dev:runner": "pnpm --filter @isa/runner-app dev",
+    "dev:spectator": "pnpm --filter @isa/spectator-app dev",
+    "dev:admin": "pnpm --filter @isa/admin-panel dev",
+    "dev:led": "pnpm --filter @isa/led-dashboard dev",
+    "dev:api": "pnpm --filter @isa/api-server dev",
+    "build": "turbo build",
+    "build:web": "pnpm --filter @isa/public-web build",
+    "build:runner": "pnpm --filter @isa/runner-app build",
+    "build:spectator": "pnpm --filter @isa/spectator-app build",
+    "build:admin": "pnpm --filter @isa/admin-panel build",
+    "build:led": "pnpm --filter @isa/led-dashboard build",
+    "build:api": "pnpm --filter @isa/api-server build",
+    "lint": "turbo lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "type-check": "turbo type-check",
+    "clean": "turbo clean",
+    "clean:all": "pnpm -r exec rm -rf dist node_modules && rm -rf node_modules",
+    "db:migrate": "pnpm --filter @isa/api-server db:migrate",
+    "db:seed": "pnpm --filter @isa/api-server db:seed",
+    "db:studio": "pnpm --filter @isa/api-server db:studio",
+    "db:reset": "pnpm --filter @isa/api-server db:reset",
+    "docker:up": "docker compose -f docker-compose.dev.yml up -d",
+    "docker:down": "docker compose -f docker-compose.dev.yml down",
+    "docker:logs": "docker compose -f docker-compose.dev.yml logs -f",
+    "setup": "pnpm install && pnpm docker:up && sleep 5 && pnpm db:migrate && pnpm db:seed"
+  },
+  "devDependencies": {
+    "@babel/core": "^8.0.1",
+    "prettier": "^3.4.0",
+    "turbo": "^2.3.0"
+  },
+  "packageManager": "pnpm@9.15.0",
+  "engines": {
+    "node": ">=22.0.0"
+  }
+}

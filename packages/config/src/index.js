@@ -1,0 +1,56 @@
+// ──────────────────────────────────────────────
+//  ISA MARATHON - SHARED CONFIGURATION
+// ──────────────────────────────────────────────
+export const CATEGORY_DISTANCES = {
+    RUN_3K: 3,
+    RUN_5K: 5,
+};
+export const CATEGORY_LABELS = {
+    RUN_3K: '3K Run',
+    RUN_5K: '5K Run',
+};
+export const GPS_CONFIG = {
+    UPDATE_INTERVAL_MS: 3000,
+    MAX_ACCURACY_METERS: 30,
+    OUTLIER_DISTANCE_METERS: 100,
+    FINISH_THRESHOLD_METERS: 20,
+    MIN_UPDATE_INTERVAL_MS: 2000,
+    BATCH_STORE_INTERVAL_MS: 5000,
+};
+export const LEADERBOARD_CONFIG = {
+    TOP_N: 10,
+    BROADCAST_INTERVAL_MS: 5000,
+    COMPANY_AGGREGATION_INTERVAL_MS: 5000,
+};
+export const GREEN_CONFIG = {
+    KM_PER_TREE: 1,
+    CO2_PER_TREE_KG_PER_YEAR: 22,
+};
+export const PAGINATION = {
+    DEFAULT_PAGE_SIZE: 50,
+    MAX_PAGE_SIZE: 200,
+};
+export const JWT_CONFIG = {
+    ACCESS_TOKEN_EXPIRY: '24h',
+    REFRESH_TOKEN_EXPIRY: '7d',
+};
+export const API_CONFIG = {
+    RATE_LIMIT_WINDOW_MS: 60000,
+    RATE_LIMIT_MAX_REQUESTS: 100,
+    MAX_UPLOAD_SIZE_MB: 10,
+};
+export const SOCKET_CONFIG = {
+    PING_INTERVAL: 25000,
+    PING_TIMEOUT: 20000,
+    MAX_HTTP_BUFFER_SIZE: 1e6,
+    RECONNECT_ATTEMPTS: 10,
+    RECONNECT_DELAY_MS: 3000,
+};
+export const SPONSOR_TIERS = ['PLATINUM', 'GOLD', 'SILVER', 'BRONZE'];
+export const LED_CONFIG = {
+    SPONSOR_ROTATION_INTERVAL_MS: 10000,
+    LEADERBOARD_CYCLE_INTERVAL_MS: 15000,
+    RECONNECT_ATTEMPTS: 10,
+    RECONNECT_DELAY_MS: 3000,
+};
+//# sourceMappingURL=index.js.map

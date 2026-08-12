@@ -1,0 +1,80 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: isa
+          POSTGRES_PASSWORD: isa_password
+          POSTGRES_DB: isa_marathon_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Setup env
+        run: cp .env.example .env.local
+
+      - name: Generate Prisma Client
+        run: pnpm --filter @isa/api-server exec prisma generate
+
+      - name: Push Prisma Schema
+        run: pnpm --filter @isa/api-server exec prisma db push --skip-generate
+        env:
+          DATABASE_URL: postgresql://isa:isa_password@localhost:5432/isa_marathon_test
+
+      - name: Build all
+        run: pnpm build
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+  deploy:
+    needs: test
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to production
+        run: |
+          ssh ${{ secrets.DEPLOY_HOST }} << 'EOF'
+            cd /opt/isa-marathon
+            git pull origin main
+            pnpm install --frozen-lockfile
+            pnpm build
+            pm2 restart isa-api
+          EOF

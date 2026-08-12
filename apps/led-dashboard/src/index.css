@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+:root {
+  --color-primary: #10b981;
+  --color-accent: #f59e0b;
+  --color-bg: #0f172a;
+  --color-bg-card: #1e293b;
+  --color-text: #f8fafc;
+  --color-text-muted: #94a3b8;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  margin: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+* { box-sizing: border-box; }
+
+@keyframes ticker-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+@keyframes ticker-scroll-fast {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.sponsor-ticker {
+  animation: ticker-scroll 20s linear infinite;
+  width: max-content;
+}
+
+.sponsor-ticker-fast {
+  animation: ticker-scroll-fast 15s linear infinite;
+  width: max-content;
+}
+
+.sponsor-ticker:hover,
+.sponsor-ticker-fast:hover {
+  animation-play-state: paused;
+}

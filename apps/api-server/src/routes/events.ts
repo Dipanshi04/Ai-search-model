@@ -37,7 +37,8 @@ eventsRouter.get('/:id', async (req: Request, res: Response) => {
       },
     });
     if (!event) {
-      return res.status(404).json({ success: false, message: 'Event not found' });
+      res.status(404).json({ success: false, message: 'Event not found' });
+      return;
     }
     res.json({ success: true, data: event });
   } catch (error) {
@@ -49,7 +50,8 @@ eventsRouter.post('/', authenticate, requireRole('SUPER_ADMIN'), async (req: Req
   try {
     const { name, description, date, maxParticipants, registrationOpen } = req.body;
     if (!name || !date) {
-      return res.status(400).json({ success: false, message: 'name and date are required' });
+      res.status(400).json({ success: false, message: 'name and date are required' });
+      return;
     }
 
     const slug = name
@@ -92,7 +94,8 @@ eventsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN'), async (req: R
     const { name, description, date, status, maxParticipants, registrationOpen, branding } = req.body;
     const event = await prisma.event.findUnique({ where: { id: req.params.id } });
     if (!event) {
-      return res.status(404).json({ success: false, message: 'Event not found' });
+      res.status(404).json({ success: false, message: 'Event not found' });
+      return;
     }
 
     const updated = await prisma.event.update({
@@ -118,7 +121,8 @@ eventsRouter.delete('/:id', authenticate, requireRole('SUPER_ADMIN'), async (req
   try {
     const event = await prisma.event.findUnique({ where: { id: req.params.id } });
     if (!event) {
-      return res.status(404).json({ success: false, message: 'Event not found' });
+      res.status(404).json({ success: false, message: 'Event not found' });
+      return;
     }
     await prisma.event.delete({ where: { id: req.params.id } });
     res.json({ success: true, message: 'Event deleted' });
@@ -131,12 +135,14 @@ eventsRouter.post('/:id/distances', authenticate, requireRole('SUPER_ADMIN', 'RA
   try {
     const { name, distanceKm } = req.body;
     if (!name || !distanceKm) {
-      return res.status(400).json({ success: false, message: 'name and distanceKm are required' });
+      res.status(400).json({ success: false, message: 'name and distanceKm are required' });
+      return;
     }
 
     const event = await prisma.event.findUnique({ where: { id: req.params.id } });
     if (!event) {
-      return res.status(404).json({ success: false, message: 'Event not found' });
+      res.status(404).json({ success: false, message: 'Event not found' });
+      return;
     }
 
     const distance = await prisma.raceDistance.create({
@@ -158,7 +164,8 @@ eventsRouter.put('/:id/distances/:distanceId', authenticate, requireRole('SUPER_
     const { name, distanceKm, status } = req.body;
     const distance = await prisma.raceDistance.findUnique({ where: { id: req.params.distanceId } });
     if (!distance) {
-      return res.status(404).json({ success: false, message: 'Distance not found' });
+      res.status(404).json({ success: false, message: 'Distance not found' });
+      return;
     }
 
     const updated = await prisma.raceDistance.update({
@@ -180,7 +187,8 @@ eventsRouter.delete('/:id/distances/:distanceId', authenticate, requireRole('SUP
   try {
     const distance = await prisma.raceDistance.findUnique({ where: { id: req.params.distanceId } });
     if (!distance) {
-      return res.status(404).json({ success: false, message: 'Distance not found' });
+      res.status(404).json({ success: false, message: 'Distance not found' });
+      return;
     }
     await prisma.raceDistance.delete({ where: { id: req.params.distanceId } });
     res.json({ success: true, message: 'Distance deleted' });

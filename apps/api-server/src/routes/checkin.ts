@@ -23,7 +23,8 @@ checkinRouter.get('/stats', async (req, res) => {
 
     const targetEventId = eventId ?? event?.id;
     if (!targetEventId) {
-      return res.json({ success: true, data: { total: 0, checkedIn: 0, percentage: 0 } });
+      res.json({ success: true, data: { total: 0, checkedIn: 0, percentage: 0 } });
+      return;
     }
 
     const [total, checkedIn] = await Promise.all([
@@ -44,7 +45,8 @@ checkinRouter.post('/scan', async (req, res) => {
   try {
     const { qrData } = req.body;
     if (!qrData) {
-      return res.status(400).json({ success: false, message: 'qrData required' });
+      res.status(400).json({ success: false, message: 'qrData required' });
+      return;
     }
 
     const participant = await prisma.participant.findUnique({
@@ -53,11 +55,13 @@ checkinRouter.post('/scan', async (req, res) => {
     });
 
     if (!participant) {
-      return res.status(404).json({ success: false, message: 'Participant not found' });
+      res.status(404).json({ success: false, message: 'Participant not found' });
+      return;
     }
 
     if (participant.checkedIn) {
-      return res.status(400).json({ success: false, message: 'Participant already checked in', participant });
+      res.status(400).json({ success: false, message: 'Participant already checked in', participant });
+      return;
     }
 
     const updated = await prisma.participant.update({
@@ -77,7 +81,8 @@ checkinRouter.post('/undo/:id', async (req, res) => {
     const { id } = req.params;
     const participant = await prisma.participant.findUnique({ where: { id } });
     if (!participant) {
-      return res.status(404).json({ success: false, message: 'Participant not found' });
+      res.status(404).json({ success: false, message: 'Participant not found' });
+      return;
     }
 
     const updated = await prisma.participant.update({

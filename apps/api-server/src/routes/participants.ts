@@ -25,10 +25,11 @@ participantsRouter.get('/stats/summary', async (req, res) => {
 
     const targetEventId = eventId ?? event?.id;
     if (!targetEventId) {
-      return res.json({
+      res.json({
         success: true,
         data: { total: 0, checkedIn: 0, running: 0, finished: 0, byCategory: [] },
       });
+      return;
     }
 
     const [total, checkedIn, running, finished, byCategory] = await Promise.all([
@@ -132,7 +133,8 @@ participantsRouter.get('/leaderboard', async (req, res) => {
   try {
     const { eventId, limit = '100' } = req.query;
     if (!eventId) {
-      return res.json({ success: true, data: [] });
+      res.json({ success: true, data: [] });
+      return;
     }
     const participants = await prisma.participant.findMany({
       where: { eventId: eventId as string },
@@ -160,9 +162,10 @@ participantsRouter.get('/companies', async (_req, res) => {
 
 participantsRouter.post('/companies', authenticate, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
-    const { name, contactEmail, contactPhone, industry, employeeCount } = req.body;
+    const { name, industry, employeeCount } = req.body;
     if (!name) {
-      return res.status(400).json({ success: false, message: 'name is required' });
+      res.status(400).json({ success: false, message: 'name is required' });
+      return;
     }
     const company = await prisma.company.create({
       data: { name, industry, employeeCount },
@@ -170,7 +173,8 @@ participantsRouter.post('/companies', authenticate, requireRole('SUPER_ADMIN'), 
     res.status(201).json({ success: true, data: company });
   } catch (error: any) {
     if (error?.code === 'P2002') {
-      return res.status(409).json({ success: false, message: 'Company name already exists' });
+      res.status(409).json({ success: false, message: 'Company name already exists' });
+      return;
     }
     res.status(500).json({ success: false, message: 'Failed to create company' });
   }
@@ -181,7 +185,8 @@ participantsRouter.put('/companies/:id', authenticate, requireRole('SUPER_ADMIN'
     const { name, industry, employeeCount } = req.body;
     const company = await prisma.company.findUnique({ where: { id: req.params.id } });
     if (!company) {
-      return res.status(404).json({ success: false, message: 'Company not found' });
+      res.status(404).json({ success: false, message: 'Company not found' });
+      return;
     }
     const updated = await prisma.company.update({
       where: { id: req.params.id },
@@ -201,7 +206,8 @@ participantsRouter.delete('/companies/:id', authenticate, requireRole('SUPER_ADM
   try {
     const company = await prisma.company.findUnique({ where: { id: req.params.id } });
     if (!company) {
-      return res.status(404).json({ success: false, message: 'Company not found' });
+      res.status(404).json({ success: false, message: 'Company not found' });
+      return;
     }
     await prisma.company.delete({ where: { id: req.params.id } });
     res.json({ success: true, message: 'Company deleted' });
@@ -217,7 +223,8 @@ participantsRouter.get('/:id', async (req, res) => {
       include: { user: true, company: true },
     });
     if (!participant) {
-      return res.status(404).json({ success: false, message: 'Participant not found' });
+      res.status(404).json({ success: false, message: 'Participant not found' });
+      return;
     }
     res.json({ success: true, data: participant });
   } catch (error) {
@@ -230,7 +237,8 @@ participantsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MA
     const { status, category, gender, companyId, bibNumber, emergencyContact, emergencyPhone, bloodGroup, tshirtSize } = req.body;
     const participant = await prisma.participant.findUnique({ where: { id: req.params.id } });
     if (!participant) {
-      return res.status(404).json({ success: false, message: 'Participant not found' });
+      res.status(404).json({ success: false, message: 'Participant not found' });
+      return;
     }
 
     const updated = await prisma.participant.update({
@@ -259,7 +267,8 @@ participantsRouter.delete('/:id', authenticate, requireRole('SUPER_ADMIN'), asyn
   try {
     const participant = await prisma.participant.findUnique({ where: { id: req.params.id } });
     if (!participant) {
-      return res.status(404).json({ success: false, message: 'Participant not found' });
+      res.status(404).json({ success: false, message: 'Participant not found' });
+      return;
     }
     await prisma.participant.delete({ where: { id: req.params.id } });
     res.json({ success: true, message: 'Participant deleted' });
@@ -273,7 +282,10 @@ export const publicParticipantsRouter = Router();
 publicParticipantsRouter.get('/search', async (req, res) => {
   try {
     const { q } = req.query;
-    if (!q) return res.json({ success: true, data: [] });
+    if (!q) {
+      res.json({ success: true, data: [] });
+      return;
+    }
 
     const participants = await prisma.participant.findMany({
       where: {

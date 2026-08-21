@@ -1,17 +1,17 @@
-import { createClient } from 'redis';
+import { createClient, RedisClientType } from 'redis';
 import { logger } from './logger.js';
 
 const globalForRedis = globalThis as unknown as {
-  redis: ReturnType<typeof createClient> | undefined;
+  redis: RedisClientType | undefined;
 };
 
-export const redis = globalForRedis.redis ?? createClient({
+export const redis: RedisClientType = (globalForRedis.redis ?? createClient({
   url: process.env.REDIS_URL || 'redis://localhost:6379',
   socket: {
     reconnectStrategy: false,
     connectTimeout: 3000,
   },
-});
+})) as RedisClientType;
 
 if (process.env.NODE_ENV !== 'production') {
   globalForRedis.redis = redis;

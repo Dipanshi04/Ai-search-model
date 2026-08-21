@@ -1,4 +1,4 @@
-﻿import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { logger } from '../config/logger.js';
 import { comparePassword, generateAccessToken, hashPassword, verifyToken } from '../utils/jwt.js';
@@ -10,7 +10,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 *
 
 export const hrRouter = Router();
 
-function hrAuth(req: Request, res: Response, next: Function) {
+function hrAuth(req: Request, res: Response, next: NextFunction) {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {

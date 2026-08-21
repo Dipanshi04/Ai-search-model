@@ -4,7 +4,7 @@ generator client {
 
 datasource db {
   provider  = "postgresql"
- url      = env("DATABASE_URL")
+  url      = env("DATABASE_URL")
   shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
 }
 
@@ -15,9 +15,13 @@ model Event {
   description     String?
   date            DateTime
   status          EventStatus      @default(UPCOMING)
+  totalDistance    Float            @default(0)
+  routeGeojson    String?
   branding        Json?
   registrationOpen Boolean        @default(true)
   maxParticipants Int?
+  accumulatedElapsedMs Int         @default(0) @map("accumulated_elapsed_ms")
+  startedAt       DateTime?        @map("started_at")
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -39,7 +43,7 @@ model RaceDistance {
   distanceKm      Float            @map("distance_km")
   status          RaceStatus       @default(UPCOMING)
   totalDistance   Float            @default(0) @map("total_distance")
-  routeGeojson    String?
+  routeGeojson    String?          @map("routegeojson")
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
@@ -76,7 +80,8 @@ model Company {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  participants   Participant[]
+  participants         Participant[]
+  bulkRegistrations    BulkRegistration[]
 
   @@map("companies")
 }
@@ -106,18 +111,21 @@ model Participant {
   emergencyPhone  String?          @map("emergency_phone")
   bloodGroup      String?          @map("blood_group")
   tshirtSize      String?          @map("tshirt_size")
+  bulkRegistrationId String?       @map("bulk_registration_id")
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
   event           Event            @relation(fields: [eventId], references: [id])
   user            User             @relation(fields: [userId], references: [id])
   company         Company?         @relation(fields: [companyId], references: [id])
+  bulkRegistration BulkRegistration? @relation(fields: [bulkRegistrationId], references: [id])
   gpsLogs         GpsLog[]
   payments        Payment[]
 
   @@index([eventId, category])
   @@index([eventId, status])
   @@index([companyId])
+  @@index([bulkRegistrationId])
   @@map("participants")
 }
 
@@ -235,7 +243,7 @@ model Payment {
   participantId   String        @map("participant_id")
   razorpayOrderId String?       @unique @map("razorpay_order_id")
   razorpayPaymentId String?     @map("razorpay_payment_id")
-  razorpaySignature String?    @map("razorpay_signature")
+  razorpaySignature String?     @map("razorpay_signature")
   amount          Int
   currency        String        @default("INR")
   status          PaymentStatus @default(PENDING)
@@ -250,6 +258,25 @@ model Payment {
   @@index([participantId])
   @@index([razorpayOrderId])
   @@map("payments")
+}
+
+model BulkRegistration {
+  id                    String        @id @default(cuid())
+  companyId             String?       @map("company_id")
+  companyName           String        @map("company_name")
+  hrName                String        @map("hr_name")
+  hrEmail               String        @unique @map("hr_email")
+  hrPasswordHash        String        @map("hr_password_hash")
+  numberOfRegistrations Int           @map("number_of_registrations")
+  paymentCompleted      Boolean       @default(false) @map("payment_completed")
+  notes                 String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  company               Company?      @relation(fields: [companyId], references: [id])
+  participants          Participant[]
+
+  @@map("bulk_registrations")
 }
 
 enum EventStatus {

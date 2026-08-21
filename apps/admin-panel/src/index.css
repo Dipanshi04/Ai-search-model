@@ -1,19 +1,32 @@
 @import "tailwindcss";
 
 :root {
-  --color-primary: #10b981;
-  --color-bg: #0f172a;
-  --color-bg-card: #1e293b;
-  --color-text: #f8fafc;
-  --color-text-muted: #94a3b8;
+  --color-primary: #7c3aed;
+  --color-secondary: #10b981;
+  --color-bg: #eef2ff;
+  --color-surface: rgba(255, 255, 255, 0.78);
+  --color-surface-strong: rgba(255, 255, 255, 0.92);
+  --color-text: #0f172a;
+  --color-text-muted: #475569;
+  --color-border: rgba(148, 163, 184, 0.16);
 }
 
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: var(--color-bg);
+  background: radial-gradient(circle at top left, rgba(124, 58, 237, 0.12), transparent 24%),
+    radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.12), transparent 20%),
+    var(--color-bg);
   color: var(--color-text);
   margin: 0;
   min-height: 100vh;
 }
 
 * { box-sizing: border-box; }
+
+.glass {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.08);
+}

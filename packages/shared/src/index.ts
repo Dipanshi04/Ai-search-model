@@ -65,3 +65,9 @@ export const routeSchema = z.object({
 });
 
 export type RouteFormData = z.infer<typeof routeSchema>;
+
+// ──────────────────────────────────────────────
+//  ISA MARATHON - UI COMPONENTS
+// ──────────────────────────────────────────────
+
+export { Logo, type LogoProps, type LogoSize, type LogoTheme } from './components/Logo';

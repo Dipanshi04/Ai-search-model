@@ -2,18 +2,46 @@
 
 :root {
   --color-primary: #10b981;
-  --color-bg: #0f172a;
-  --color-bg-card: #1e293b;
+  --color-accent: #f59e0b;
+  --color-bg: #0a0f1a;
+  --color-bg-card: #0d1320;
+  --color-bg-surface: #111827;
   --color-text: #f8fafc;
   --color-text-muted: #94a3b8;
 }
 
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  background-color: var(--color-bg);
+  background: var(--color-bg);
   color: var(--color-text);
   margin: 0;
   min-height: 100vh;
 }
 
 * { box-sizing: border-box; }
+
+@keyframes ticker-scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.sponsor-ticker {
+  animation: ticker-scroll 30s linear infinite;
+  width: max-content;
+}
+
+.sponsor-ticker:hover {
+  animation-play-state: paused;
+}
+
+.glass-card {
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.9), rgba(15, 23, 42, 0.6));
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(100, 116, 139, 0.4); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(100, 116, 139, 0.7); }

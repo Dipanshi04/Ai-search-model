@@ -25,6 +25,8 @@ body {
 /* Global Background */
 .bg-marathon {
   background-image: url('https://i.pinimg.com/736x/cf/d5/93/cfd593e107cb2ef49af2451c6bb7869e.jpg');
+  background: linear-gradient(rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.5)), 
+              url('https://i.pinimg.com/736x/cf/d5/93/cfd593e107cb2ef49af2451c6bb7869e.jpg');
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;

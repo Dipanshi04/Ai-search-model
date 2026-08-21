@@ -27,7 +27,7 @@ export default function RaceControlPage() {
 
   async function loadEvents() {
     try {
-      const res = await api.request<any[]>('/api/v1/race/events');
+      const res = await api.getEvents();
       if (res.success && res.data) {
         setEvents(res.data);
         if (res.data.length > 0 && !selectedEventId) {
@@ -36,14 +36,18 @@ export default function RaceControlPage() {
           setSelectedEventId(active?.id || upcoming?.id || res.data[0].id);
         }
       }
-    } catch {}
+    } catch (error) {
+      console.error('Failed to load events:', error);
+    }
   }
 
   async function loadStatus(eventId: string) {
     try {
-      const res = await api.request<any>(`/api/v1/race/status?eventId=${eventId}`);
+      const res = await api.getRaceStatus(eventId);
       if (res.success) setRaceStatus(res.data);
-    } catch {}
+    } catch (error) {
+      console.error('Failed to load race status:', error);
+    }
   }
 
 async function createEvent() {
@@ -75,267 +79,359 @@ async function createEvent() {
   async function handleStart() {
     if (!confirm(`Start "${raceStatus?.event?.name}"?`)) return;
     setLoading(true);
-    await api.startRace(selectedEventId);
-    await loadStatus(selectedEventId);
-    await loadEvents();
-    setLoading(false);
+    try {
+      await api.startRace(selectedEventId);
+      await loadStatus(selectedEventId);
+      await loadEvents();
+    } catch (e) {
+      console.error('Failed to start race:', e);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handlePause() {
     if (!confirm('Pause the race?')) return;
     setLoading(true);
-    await api.pauseRace(selectedEventId);
-    await loadStatus(selectedEventId);
-    await loadEvents();
-    setLoading(false);
+    try {
+      await api.pauseRace(selectedEventId);
+      await loadStatus(selectedEventId);
+      await loadEvents();
+    } catch (e) {
+      console.error('Failed to pause race:', e);
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function handleEnd() {
     if (!confirm('End the race? This cannot be undone!')) return;
     setLoading(true);
-    await api.endRace(selectedEventId);
-    await loadStatus(selectedEventId);
-    await loadEvents();
-    setLoading(false);
+    try {
+      await api.endRace(selectedEventId);
+      await loadStatus(selectedEventId);
+      await loadEvents();
+    } catch (e) {
+      console.error('Failed to end race:', e);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  const status = raceStatus?.event?.status || 'NO_ACTIVE_RACE';
+  const selectedEvent = events.find((e) => e.id === selectedEventId);
+
+  const status = raceStatus?.event?.status ?? (raceStatus ? 'NO_ACTIVE_RACE' : (selectedEvent?.status ?? 'NO_ACTIVE_RACE'));
   const isActive = status === 'ACTIVE';
   const isPaused = status === 'PAUSED';
   const isUpcoming = status === 'UPCOMING';
 
   const statusColor: Record<string, string> = {
-    UPCOMING: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
-    ACTIVE: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    PAUSED: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
-    COMPLETED: 'bg-slate-500/10 text-slate-400 border-slate-500/20',
+    UPCOMING: 'bg-blue-50 text-blue-700 border border-blue-200',
+    ACTIVE: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+    PAUSED: 'bg-amber-50 text-amber-700 border border-amber-200',
+    COMPLETED: 'bg-purple-50 text-purple-700 border border-purple-200',
+    NO_ACTIVE_RACE: 'bg-slate-50 text-slate-500 border border-slate-200',
   };
 
-  const selectedEvent = events.find((e) => e.id === selectedEventId);
+  const eventCount = events.length;
+  const participantCount = raceStatus?.stats?.participants || selectedEvent?._count?.participants || 0;
+  const checkedInCount = raceStatus?.stats?.checkedIn || 0;
+  const runningCount = raceStatus?.stats?.running || 0;
+  const finishedCount = raceStatus?.stats?.finished || 0;
 
   return (
-    
-<div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-white">Race Control</h1>
-        <div className="flex items-center gap-2">
-          <span className={`w-3 h-3 rounded-full ${isActive ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`}></span>
-          <span className={`text-sm font-medium ${
-            isActive ? 'text-emerald-400' : isPaused ? 'text-amber-400' : 'text-slate-400'
-          }`}>
-            {status}
-          </span>
-          <button
-            onClick={() => setShowCreateEventModal(true)}
-            className="ml-4 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium transition-colors"
-            title="Add New Marathon"
-          >
-            <svg className="w-4 h-4 inline-block mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M17 8l-4-4m0 0l-4 4m4-4l4 4m-4 0l4-4"/>
-            </svg>
-            Add Marathon
-          </button>
-          <button
-            onClick={() => setShowCreateEventModal(true)}
-            className="ml-2 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium transition-colors"
-          >
-            + 
-          </button>
+    <div className="space-y-8">
+      <section className="rounded-[2rem] border border-slate-200 bg-white p-8 shadow-sm">
+        <div className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-violet-700">
+              <span className={`h-2.5 w-2.5 rounded-full ${isActive ? 'bg-emerald-500 animate-pulse' : isPaused ? 'bg-amber-400' : status === 'UPCOMING' ? 'bg-blue-400' : 'bg-slate-300'}`} />
+              {status}
+            </div>
+            <div className="max-w-2xl">
+              <h1 className="text-3xl font-semibold text-slate-900">Race Control</h1>
+              <p className="mt-3 text-sm leading-7 text-slate-600">
+                Manage your events, control race status, and monitor participant progress from a polished command center.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={() => setShowCreateEventModal(true)}
+              className="inline-flex items-center justify-center rounded-full bg-violet-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700"
+            >
+              Add Marathon
+            </button>
+            <button
+              onClick={() => setShowCreateEventModal(true)}
+              className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-900 shadow-sm transition hover:border-slate-300"
+            >
+              New Event
+            </button>
+          </div>
         </div>
-        {showCreateEventModal && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur z-50">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-slate-800 p-6 rounded-xl w-80 max-w-full border border-slate-700">
-              <h2 className="text-xl font-bold text-white mb-4">Create New Marathon</h2>
-              <div className="space-y-4">
+
+        <div className="mt-8 grid gap-4 md:grid-cols-2">
+          <div className="rounded-[1.75rem] border border-slate-200 bg-slate-50 p-6">
+            <div className="rounded-[1.75rem] bg-white p-6 shadow-sm ring-1 ring-slate-200">
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <label className="text-sm text-slate-400">Marathon Name *</label>
-                  <input
-                    type="text"
-                    value={createEventName}
-                    onChange={(e) => setCreateEventName(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
-                    placeholder="e.g. ISA Tech Marathon 2026"
-                  />
+                  <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Selected event</p>
+                  <h2 className="text-2xl font-semibold text-slate-900">{raceStatus?.event?.name || selectedEvent?.name || 'No event selected'}</h2>
+                  <p className="text-sm text-slate-500 mt-1">
+                    {raceStatus?.event?.date
+                      ? new Date(raceStatus.event.date).toLocaleString()
+                      : selectedEvent?.date
+                      ? new Date(selectedEvent.date).toLocaleDateString()
+                      : 'Choose an event from the list below.'}
+                  </p>
                 </div>
-                <div>
-                  <label className="text-sm text-slate-400">Date *</label>
-                  <input
-                    type="date"
-                    value={createEventDate}
-                    onChange={(e) => setCreateEventDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm text-slate-400">Description</label>
-                  <input
-                    type="text"
-                    value={createEventDescription}
-                    onChange={(e) => setCreateEventDescription(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
-                    placeholder="Optional description"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm text-slate-400">Description</label>
-                  <input
-                    type="text"
-                    value={createEventName}
-                    onChange={(e) => setCreateEventName(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white focus:ring-2 focus:ring-emerald-500 outline-none text-sm"
-                    placeholder="Optional description"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => setShowCreateEventModal(false)}
-                    className="flex-1 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg text-sm cancel"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={() => createEvent()}
-                    className="flex-1 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium disabled:opacity-50"
-                    disabled={!createEventName || !createEventDate}
-                  >
-                    Create
-                  </button>
-                </div>
+                <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusColor[status] || 'bg-slate-100 text-slate-600'}`}>
+                  {status}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+                <p className="text-sm text-slate-500">Participants</p>
+                <p className="mt-3 text-3xl font-semibold text-slate-900">{participantCount}</p>
+              </div>
+              <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+                <p className="text-sm text-slate-500">Checked In</p>
+                <p className="mt-3 text-3xl font-semibold text-slate-900">{checkedInCount}</p>
+              </div>
+              <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+                <p className="text-sm text-slate-500">Running</p>
+                <p className="mt-3 text-3xl font-semibold text-slate-900">{runningCount}</p>
+              </div>
+              <div className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
+                <p className="text-sm text-slate-500">Finished</p>
+                <p className="mt-3 text-3xl font-semibold text-slate-900">{finishedCount}</p>
               </div>
             </div>
           </div>
-        )}
 
-      {events.length > 0 && (
-        <div className="mb-6">
-          <h2 className="text-sm font-medium text-slate-400 mb-3 uppercase tracking-wider">All Events</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {events.map((event) => (
-              <button
-                key={event.id}
-                onClick={() => setSelectedEventId(event.id)}
-                className={`p-4 rounded-xl border text-left transition-all ${
-                  selectedEventId === event.id
-                    ? 'bg-slate-700 border-emerald-500/50 ring-1 ring-emerald-500/30'
-                    : 'bg-slate-800 border-slate-700 hover:border-slate-600'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <h3 className="font-semibold text-white truncate">{event.name}</h3>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${statusColor[event.status] || 'bg-slate-700 text-slate-400'}`}>
-                    {event.status}
-                  </span>
-                </div>
-                <p className="text-xs text-slate-400">{new Date(event.date).toLocaleDateString()}</p>
-                <p className="text-xs text-slate-500 mt-1">{event._count?.participants || 0} participants</p>
-              </button>
-            ))}
+          <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-900">Live metrics</h2>
+            <p className="mt-2 text-sm text-slate-500">Track the race in real time and review the latest available statistics.</p>
+
+            <div className="mt-6 grid gap-4">
+              <div className="rounded-3xl bg-violet-50 p-5">
+                <p className="text-sm text-violet-700">Current event</p>
+                <p className="mt-3 text-xl font-semibold text-slate-900">{selectedEvent?.name || 'No selected event'}</p>
+              </div>
+              <div className="rounded-3xl bg-slate-50 p-5">
+                <p className="text-sm text-slate-500">Total events</p>
+                <p className="mt-3 text-3xl font-semibold text-slate-900">{eventCount}</p>
+              </div>
+              <div className="rounded-3xl bg-slate-50 p-5">
+                <p className="text-sm text-slate-500">Last refresh</p>
+                <p className="mt-3 text-base font-semibold text-slate-900">Every 10 seconds</p>
+              </div>
+            </div>
           </div>
         </div>
-      )}
+      </section>
 
-      {raceStatus?.event && (
-        <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 mb-6">
-          <h2 className="text-lg font-semibold text-white">{raceStatus.event.name}</h2>
-          <p className="text-slate-400 text-sm">{new Date(raceStatus.event.date).toLocaleString()}</p>
-        </div>
-      )}
+      <div className="grid gap-6 xl:grid-cols-[1.8fr_1fr]">
+        <div className="space-y-6">
+          <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-xl font-semibold text-slate-900">All Events</h2>
+                <p className="mt-1 text-sm text-slate-500">Tap any card to switch the active marathon.</p>
+              </div>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">{eventCount} events</span>
+            </div>
 
-      {raceStatus?.stats && (
-        <div className="grid grid-cols-4 gap-4 mb-8">
-          <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 text-center">
-            <p className="text-2xl font-bold text-white">{raceStatus.stats.participants}</p>
-            <p className="text-xs text-slate-400">Registered</p>
-          </div>
-          <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 text-center">
-            <p className="text-2xl font-bold text-emerald-400">{raceStatus.stats.checkedIn}</p>
-            <p className="text-xs text-slate-400">Checked In</p>
-          </div>
-          <div className="bg-amber-500/10 p-4 rounded-xl border border-amber-500/20 text-center">
-            <p className="text-2xl font-bold text-amber-400">{raceStatus.stats.running}</p>
-            <p className="text-xs text-slate-400">Running</p>
-          </div>
-          <div className="bg-purple-500/10 p-4 rounded-xl border border-purple-500/20 text-center">
-            <p className="text-2xl font-bold text-purple-400">{raceStatus.stats.finished}</p>
-            <p className="text-xs text-slate-400">Finished</p>
-          </div>
-        </div>
-      )}
-
-      {selectedEvent?.raceDistances && selectedEvent.raceDistances.length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-sm font-medium text-slate-400 mb-3 uppercase tracking-wider">Race Distances</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {selectedEvent.raceDistances.map((d: any) => {
-              const hasRoute = d._count?.routePoints > 0;
-              return (
-                <div key={d.id} className="bg-slate-800 p-4 rounded-xl border border-slate-700">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-semibold text-white">{d.name}</h3>
-                    <span className="text-lg font-bold text-emerald-400">{d.distanceKm} km</span>
+            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+              {events.map((event) => (
+                <button
+                  key={event.id}
+                  onClick={() => setSelectedEventId(event.id)}
+                  className={`group rounded-[1.75rem] border p-5 text-left transition shadow-sm ${
+                    selectedEventId === event.id
+                      ? 'border-violet-300 bg-violet-50 shadow-md'
+                      : 'border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-slate-900">{event.name}</h3>
+                      <p className="mt-2 text-sm text-slate-500">{event._count?.participants || 0} runners</p>
+                    </div>
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ${statusColor[event.status] || 'bg-slate-100 text-slate-600'}`}>
+                      {event.status}
+                    </span>
                   </div>
-                  <p className="text-xs text-slate-500 mb-3">
-                    {d._count?.routePoints || 0} route points{hasRoute ? ` · ${d.totalDistance?.toFixed(2) || '?'} km` : ' · No route'}
-                  </p>
-                  <button
-                    onClick={() => {
-                      const params = new URLSearchParams({
-                        distance: String(d.distanceKm),
-                        eventName: d.name,
-                        marathonName: selectedEvent.name,
-                      });
-                      if (hasRoute) {
-                        params.set('raceDistanceId', d.id);
-                      } else {
-                        params.set('new', '1');
-                      }
-                      navigate(`/route-builder?${params.toString()}`);
-                    }}
-                    className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                      hasRoute
-                        ? 'bg-slate-700 hover:bg-slate-600 text-white'
-                        : 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 border border-emerald-500/30'
-                    }`}
-                  >
-                    {hasRoute ? 'Edit Route' : 'Add Route'}
-                  </button>
+                  <div className="mt-4 flex items-center justify-between text-sm text-slate-500">
+                    <span>{new Date(event.date).toLocaleDateString()}</span>
+                    <span>{event._count?.routePoints || 0} routes</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          {selectedEvent && (
+            <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Selected event</p>
+                  <h2 className="mt-2 text-2xl font-semibold text-slate-900">{selectedEvent.name}</h2>
                 </div>
-              );
-            })}
+                <span className={`rounded-full px-3 py-1 text-sm font-semibold ${statusColor[selectedEvent.status] || 'bg-slate-100 text-slate-600'}`}>
+                  {selectedEvent.status}
+                </span>
+              </div>
+
+              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                <div className="rounded-3xl bg-slate-50 p-5 border border-slate-200">
+                  <p className="text-sm text-slate-500">Max runners</p>
+                  <p className="mt-3 text-2xl font-semibold text-slate-900">{selectedEvent.maxParticipants || '—'}</p>
+                </div>
+                <div className="rounded-3xl bg-slate-50 p-5 border border-slate-200">
+                  <p className="text-sm text-slate-500">Distances</p>
+                  <p className="mt-3 text-2xl font-semibold text-slate-900">{selectedEvent.raceDistances?.length || selectedEvent.distances?.length || 0}</p>
+                </div>
+              </div>
+
+              <div className="mt-6 space-y-4">
+                {selectedEvent.description && (
+                  <div className="rounded-3xl bg-slate-50 p-5 border border-slate-200">
+                    <p className="text-sm text-slate-500">Description</p>
+                    <p className="mt-2 text-sm text-slate-700">{selectedEvent.description}</p>
+                  </div>
+                )}
+                <div className="rounded-3xl bg-slate-50 p-5 border border-slate-200">
+                  <p className="text-sm text-slate-500">Route points</p>
+                  <p className="mt-2 text-sm text-slate-700">{selectedEvent._count?.routePoints || 0} mapped path points</p>
+                </div>
+              </div>
+            </section>
+          )}
+        </div>
+
+        <aside className="space-y-6">
+          <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-900">Quick stats</h2>
+            <div className="mt-6 grid gap-4">
+              <div className="rounded-3xl bg-slate-50 p-5 border border-slate-200">
+                <p className="text-sm text-slate-500">Participants</p>
+                <p className="mt-3 text-3xl font-semibold text-slate-900">{participantCount}</p>
+              </div>
+              <div className="rounded-3xl bg-slate-50 p-5 border border-slate-200">
+                <p className="text-sm text-slate-500">Checked in</p>
+                <p className="mt-3 text-3xl font-semibold text-slate-900">{checkedInCount}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-900">Race actions</h2>
+            <div className="mt-5 grid gap-3">
+              {(isUpcoming || isPaused) && (
+                <button
+                  onClick={handleStart}
+                  disabled={loading}
+                  className="w-full rounded-3xl bg-emerald-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-emerald-600 disabled:opacity-50"
+                >
+                  {isPaused ? 'Resume Race' : 'Start Race'}
+                </button>
+              )}
+
+              {isActive && (
+                <button
+                  onClick={handlePause}
+                  disabled={loading}
+                  className="w-full rounded-3xl bg-amber-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-amber-600 disabled:opacity-50"
+                >
+                  Pause Race
+                </button>
+              )}
+
+              {(isActive || isPaused) && (
+                <button
+                  onClick={handleEnd}
+                  disabled={loading}
+                  className="w-full rounded-3xl bg-red-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-red-600 disabled:opacity-50"
+                >
+                  End Race
+                </button>
+              )}
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      {showCreateEventModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-sm">
+          <div className="mx-auto my-16 max-w-xl rounded-[2rem] bg-white p-8 shadow-2xl border border-slate-200">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-2xl font-semibold text-slate-900">Create New Marathon</h2>
+                <p className="mt-2 text-sm text-slate-500">Add a new event and start planning the route immediately.</p>
+              </div>
+              <button
+                onClick={() => setShowCreateEventModal(false)}
+                className="rounded-full border border-slate-200 bg-slate-100 px-3 py-2 text-slate-600 transition hover:bg-slate-50"
+              >
+                Close
+              </button>
+            </div>
+
+            <form className="mt-8 space-y-5" onSubmit={(e) => { e.preventDefault(); createEvent(); }}>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Marathon Name *</label>
+                <input
+                  type="text"
+                  value={createEventName}
+                  onChange={(e) => setCreateEventName(e.target.value)}
+                  placeholder="e.g. ISA Tech Marathon 2026"
+                  className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-violet-300 focus:ring-2 focus:ring-violet-100"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Date *</label>
+                <input
+                  type="date"
+                  value={createEventDate}
+                  onChange={(e) => setCreateEventDate(e.target.value)}
+                  className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-violet-300 focus:ring-2 focus:ring-violet-100"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-2">Description</label>
+                <input
+                  type="text"
+                  value={createEventDescription}
+                  onChange={(e) => setCreateEventDescription(e.target.value)}
+                  placeholder="Optional description"
+                  className="w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-900 outline-none transition focus:border-violet-300 focus:ring-2 focus:ring-violet-100"
+                />
+              </div>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateEventModal(false)}
+                  className="flex-1 rounded-3xl border border-slate-200 bg-slate-100 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!createEventName || !createEventDate || loading}
+                  className="flex-1 rounded-3xl bg-violet-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:opacity-50"
+                >
+                  {loading ? 'Creating…' : 'Create Marathon'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
-
-      <div className="flex gap-4">
-        {(isUpcoming || isPaused) && (
-          <button
-            onClick={handleStart}
-            disabled={loading}
-            className="px-8 py-4 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white rounded-xl text-lg font-semibold transition-colors"
-          >
-            {isPaused ? 'Resume Race' : 'Start Race'}
-          </button>
-        )}
-
-        {isActive && (
-          <button
-            onClick={handlePause}
-            disabled={loading}
-            className="px-8 py-4 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white rounded-xl text-lg font-semibold transition-colors"
-          >
-            Pause Race
-          </button>
-        )}
-
-        {(isActive || isPaused) && (
-          <button
-            onClick={handleEnd}
-            disabled={loading}
-            className="px-8 py-4 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white rounded-xl text-lg font-semibold transition-colors"
-          >
-            End Race
-          </button>
-        )}
-      </div>
     </div>
   );
 }

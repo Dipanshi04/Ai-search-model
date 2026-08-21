@@ -14,60 +14,76 @@ export default function CheckinPage() {
   }, []);
 
   async function loadStats() {
-    const res = await api.getCheckinStats();
-    if (res.success) setStats(res.data);
+    try {
+      const res = await api.getCheckinStats();
+      if (res.success) setStats(res.data);
+    } catch (e) {
+      console.error('Failed to load checkin stats:', e);
+    }
   }
 
   async function handleScan() {
     if (!bibInput.trim()) return;
 
     setError('');
-    const res = await api.scanCheckin(bibInput.trim());
+    try {
+      const res = await api.scanCheckin(bibInput.trim());
 
-    if (res.success) {
-      setLastResult({ success: true, ...res.data });
-      setBibInput('');
-      loadStats();
-    } else {
-      setLastResult({ success: false, message: res.message });
-      setError(res.message || 'Check-in failed');
+      if (res.success) {
+        setLastResult({ success: true, ...res.data });
+        setBibInput('');
+        loadStats();
+      } else {
+        setLastResult({ success: false, message: res.message });
+        setError(res.message || 'Check-in failed');
+      }
+    } catch (e: any) {
+      setLastResult({ success: false, message: e.message || 'Check-in failed' });
+      setError(e.message || 'Check-in failed');
     }
 
     inputRef.current?.focus();
   }
 
   async function handleUndo(id: string) {
-    await api.undoCheckin(id);
-    setLastResult(null);
-    loadStats();
+    try {
+      await api.undoCheckin(id);
+      setLastResult(null);
+      loadStats();
+    } catch (e) {
+      console.error('Failed to undo checkin:', e);
+    }
   }
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-white mb-6">Check-in</h1>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-slate-950">Check-in</h1>
+        <p className="text-sm text-slate-500 mt-1">Scan participants and confirm registration at the start line.</p>
+      </div>
 
       {stats && (
-        <div className="grid grid-cols-3 gap-4 mb-8">
-          <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 text-center">
-            <p className="text-2xl font-bold text-white">{stats.total}</p>
-            <p className="text-xs text-slate-400">Total</p>
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="glass rounded-[2rem] p-5 border border-white/20 text-center shadow-sm">
+            <p className="text-2xl font-bold text-slate-950">{stats.total}</p>
+            <p className="text-xs text-slate-500 mt-1">Total</p>
           </div>
-          <div className="bg-emerald-500/10 p-4 rounded-xl border border-emerald-500/20 text-center">
-            <p className="text-2xl font-bold text-emerald-400">{stats.checkedIn}</p>
-            <p className="text-xs text-slate-400">Checked In</p>
+          <div className="glass rounded-[2rem] p-5 border border-white/20 text-center shadow-sm">
+            <p className="text-2xl font-bold text-emerald-700">{stats.checkedIn}</p>
+            <p className="text-xs text-slate-500 mt-1">Checked In</p>
           </div>
-          <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 text-center">
-            <p className="text-2xl font-bold text-amber-400">{stats.notCheckedIn}</p>
-            <p className="text-xs text-slate-400">Remaining</p>
+          <div className="glass rounded-[2rem] p-5 border border-white/20 text-center shadow-sm">
+            <p className="text-2xl font-bold text-amber-700">{(stats.total || 0) - (stats.checkedIn || 0)}</p>
+            <p className="text-xs text-slate-500 mt-1">Remaining</p>
           </div>
         </div>
       )}
 
-      <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 mb-6">
-        <label className="block text-sm font-medium text-slate-300 mb-2">
-          Scan QR Code or Enter BIB Number
+      <div className="glass rounded-[2rem] border border-white/20 p-6 shadow-sm">
+        <label className="block text-sm font-medium text-slate-600 mb-3">
+          Scan QR code or enter BIB number
         </label>
-        <div className="flex gap-3">
+        <div className="flex flex-col gap-3 md:flex-row">
           <input
             ref={inputRef}
             type="text"
@@ -75,11 +91,11 @@ export default function CheckinPage() {
             onChange={(e) => setBibInput(e.target.value.toUpperCase())}
             onKeyDown={(e) => e.key === 'Enter' && handleScan()}
             placeholder="ISA1001"
-            className="flex-1 px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-white text-lg font-mono focus:ring-2 focus:ring-emerald-500 outline-none"
+            className="flex-1 px-4 py-3 bg-white/80 border border-white/70 rounded-3xl text-slate-950 text-lg font-mono focus:ring-2 focus:ring-violet-200 outline-none"
           />
           <button
             onClick={handleScan}
-            className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg font-semibold flex items-center gap-2 transition-colors"
+            className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-3xl font-semibold transition-colors"
           >
             Check In
           </button>
@@ -87,34 +103,36 @@ export default function CheckinPage() {
       </div>
 
       {lastResult && (
-        <div className={`p-6 rounded-xl border ${
+        <div className={`p-6 rounded-[2rem] border ${
           lastResult.success
-            ? 'bg-emerald-500/10 border-emerald-500/20'
-            : 'bg-red-500/10 border-red-500/20'
+            ? 'bg-emerald-50/80 border-emerald-200'
+            : 'bg-red-50/80 border-red-200'
         }`}>
           {lastResult.success ? (
-            <div className="flex items-start gap-4">
-              <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-lg font-bold mt-1">OK</div>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+              <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 text-lg font-bold">
+                OK
+              </div>
               <div className="flex-1">
-                <p className="text-lg font-semibold text-emerald-400">{lastResult.message}</p>
-                <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
-                  <div><span className="text-slate-400">BIB:</span> <span className="text-white">{lastResult.participant?.bibNumber}</span></div>
-                  <div><span className="text-slate-400">Category:</span> <span className="text-white">{lastResult.participant?.category}</span></div>
-                  <div><span className="text-slate-400">Name:</span> <span className="text-white">{lastResult.participant?.user?.name}</span></div>
-                  <div><span className="text-slate-400">Company:</span> <span className="text-white">{lastResult.participant?.company?.name || '—'}</span></div>
+                <p className="text-lg font-semibold text-slate-950">{lastResult.message}</p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 text-sm text-slate-600">
+                  <div><span className="font-semibold text-slate-700">BIB:</span> {lastResult.participant?.bibNumber}</div>
+                  <div><span className="font-semibold text-slate-700">Category:</span> {lastResult.participant?.category}</div>
+                  <div><span className="font-semibold text-slate-700">Name:</span> {lastResult.participant?.user?.name}</div>
+                  <div><span className="font-semibold text-slate-700">Company:</span> {lastResult.participant?.company?.name || '—'}</div>
                 </div>
                 <button
                   onClick={() => handleUndo(lastResult.participant.id)}
-                  className="mt-3 text-xs text-slate-400 hover:text-red-400"
+                  className="mt-4 text-sm text-slate-600 hover:text-red-600"
                 >
                   Undo check-in
                 </button>
               </div>
             </div>
           ) : (
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center text-red-400 text-lg font-bold">!</div>
-              <p className="text-red-400">{lastResult.message}</p>
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center text-red-700 text-lg font-bold">!</div>
+              <p className="text-red-700 text-sm">{lastResult.message}</p>
             </div>
           )}
         </div>

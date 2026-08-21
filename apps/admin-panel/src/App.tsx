@@ -8,18 +8,22 @@ import ParticipantsPage from './pages/ParticipantsPage';
 import CheckinPage from './pages/CheckinPage';
 import RaceControlPage from './pages/RaceControlPage';
 import RouteBuilderPage from './pages/RouteBuilderPage';
+import LeaderboardPage from './pages/LeaderboardPage';
+import GreenMissionPage from './pages/GreenMissionPage';
+import CertificatesPage from './pages/CertificatesPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import CompaniesPage from './pages/CompaniesPage';
+import AnnouncementsPage from './pages/AnnouncementsPage';
 import SettingsPage from './pages/SettingsPage';
-import CertificatesPage from './pages/CertificatesPage';
+import BulkRegistrationPage from './pages/BulkRegistrationPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950">
-        <div className="text-slate-400">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-slate-100">
+        <div className="text-slate-500">Loading...</div>
       </div>
     );
   }
@@ -50,15 +54,16 @@ function AppRoutes() {
         <Route index element={<DashboardPage />} />
         <Route path="events" element={<EventsPage />} />
         <Route path="participants" element={<ParticipantsPage />} />
+        <Route path="companies" element={<CompaniesPage />} />
+        <Route path="bulk-registration" element={<BulkRegistrationPage />} />
         <Route path="checkin" element={<CheckinPage />} />
         <Route path="tracking" element={<RaceControlPage />} />
         <Route path="route-builder" element={<RouteBuilderPage />} />
-        <Route path="leaderboard" element={<div className="text-slate-400">Leaderboard - Coming Soon</div>} />
-        <Route path="green" element={<div className="text-slate-400">Green Mission - Coming Soon</div>} />
+        <Route path="leaderboard" element={<LeaderboardPage />} />
+        <Route path="green" element={<GreenMissionPage />} />
         <Route path="certificates" element={<CertificatesPage />} />
         <Route path="analytics" element={<AnalyticsPage />} />
-        <Route path="companies" element={<CompaniesPage />} />
-        <Route path="announcements" element={<div className="text-slate-400">Announcements - Coming Soon</div>} />
+        <Route path="announcements" element={<AnnouncementsPage />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
     </Routes>

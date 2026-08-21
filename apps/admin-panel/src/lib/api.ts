@@ -47,11 +47,23 @@ class ApiClient {
       headers,
     });
 
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      if (!response.ok) {
+        throw new Error(`Request failed: ${response.status} ${response.statusText}`);
+      }
+      return { success: true, data: undefined as T };
+    }
+
     const data = await response.json();
 
     if (response.status === 401) {
       this.clearToken();
       window.location.href = '/login';
+    }
+
+    if (!response.ok) {
+      throw new Error(data.message || `Request failed: ${response.status}`);
     }
 
     return data;
@@ -144,8 +156,9 @@ class ApiClient {
     });
   }
 
-  async getRaceStatus() {
-    return this.request<any>('/api/v1/race/status');
+  async getRaceStatus(eventId?: string) {
+    const query = eventId ? `?eventId=${encodeURIComponent(eventId)}` : '';
+    return this.request<any>(`/api/v1/race/status${query}`);
   }
 
   async getCompanies() {
@@ -227,6 +240,36 @@ class ApiClient {
 
   async deleteDistance(eventId: string, distanceId: string) {
     return this.request<void>(`/api/v1/events/${eventId}/distances/${distanceId}`, { method: 'DELETE' });
+  }
+
+  async getBulkRegistrations() {
+    return this.request<any[]>('/api/v1/bulk-registration');
+  }
+
+  async createBulkRegistration(data: {
+    companyName: string;
+    hrName: string;
+    hrEmail: string;
+    hrPassword: string;
+    numberOfRegistrations: number;
+    notes?: string;
+    companyId?: string;
+  }) {
+    return this.request<any>('/api/v1/bulk-registration', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateBulkRegistration(id: string, data: Record<string, any>) {
+    return this.request<any>(`/api/v1/bulk-registration/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteBulkRegistration(id: string) {
+    return this.request<void>(`/api/v1/bulk-registration/${id}`, { method: 'DELETE' });
   }
 }
 

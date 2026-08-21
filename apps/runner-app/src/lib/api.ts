@@ -38,12 +38,14 @@ class ApiClient {
       headers,
     });
 
-    if (response.status === 401) {
+    const data = await response.json();
+
+    if (response.status === 401 && !endpoint.includes('/auth/login')) {
       this.clearToken();
-      window.location.href = '/login';
+      window.location.href = '/';
     }
 
-    return response.json();
+    return data;
   }
 
   async login(email: string, password: string) {
@@ -76,7 +78,15 @@ class ApiClient {
   }
 
   async getTreeCounter() {
-    return this.request<any>('/api/v1/trees/counter');
+    return this.request<any[]>('/api/v1/trees/counter');
+  }
+
+  async getEvent(eventId: string) {
+    return this.request<any>(`/api/v1/events/${eventId}`);
+  }
+
+  async getRoute(raceDistanceId: string) {
+    return this.request<any>(`/api/v1/routes/${raceDistanceId}`);
   }
 }
 

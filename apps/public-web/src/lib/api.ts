@@ -100,6 +100,60 @@ class ApiClient {
   async getEventInfo() {
     return this.request<any>('/api/v1/events/current');
   }
+
+  async hrLogin(email: string, password: string) {
+    const response = await fetch(`${API_URL}/api/v1/hr/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    return response.json();
+  }
+
+  async hrGetMe() {
+    const headers: Record<string, string> = {};
+    const hrToken = localStorage.getItem('hr_token');
+    if (hrToken) headers['Authorization'] = `Bearer ${hrToken}`;
+    const response = await fetch(`${API_URL}/api/v1/hr/me`, { headers });
+    return response.json();
+  }
+
+  async hrGetParticipants() {
+    const headers: Record<string, string> = {};
+    const hrToken = localStorage.getItem('hr_token');
+    if (hrToken) headers['Authorization'] = `Bearer ${hrToken}`;
+    const response = await fetch(`${API_URL}/api/v1/hr/participants`, { headers });
+    return response.json();
+  }
+
+  async hrAddParticipant(data: {
+    name: string; email: string; phone: string; category: string; gender: string;
+    emergencyContact?: string; emergencyPhone?: string; bloodGroup?: string; tshirtSize?: string;
+  }) {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const hrToken = localStorage.getItem('hr_token');
+    if (hrToken) headers['Authorization'] = `Bearer ${hrToken}`;
+    const response = await fetch(`${API_URL}/api/v1/hr/participants`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(data),
+    });
+    return response.json();
+  }
+
+  async hrUploadCSV(file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const headers: Record<string, string> = {};
+    const hrToken = localStorage.getItem('hr_token');
+    if (hrToken) headers['Authorization'] = `Bearer ${hrToken}`;
+    const response = await fetch(`${API_URL}/api/v1/hr/participants/csv`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    return response.json();
+  }
 }
 
 export const api = new ApiClient();

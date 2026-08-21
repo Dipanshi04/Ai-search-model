@@ -10,7 +10,7 @@ import cookieParser from 'cookie-parser';
 import { Server as SocketIOServer } from 'socket.io';
 
 import { setupSocketIO } from './config/socket.js';
-import { connectRedis } from './config/redis.js';
+
 import { logger } from './config/logger.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { rateLimiter } from './middleware/rateLimiter.js';
@@ -33,6 +33,8 @@ import { qrcodeRouter } from './routes/qrcode.js';
 import { certificateRouter } from './routes/certificate.js';
 import { analyticsRouter } from './routes/analytics.js';
 import { paymentRouter } from './routes/payment.js';
+import { bulkRegistrationRouter } from './routes/bulk-registration.js';
+import { hrRouter } from './routes/hr.js';
 
 const PORT = process.env.PORT || 4000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';
@@ -66,6 +68,8 @@ app.use('/api/v1/payments', paymentRouter);
 app.use('/api/v1/qrcode', qrcodeRouter);
 app.use('/api/v1/certificates', certificateRouter);
 app.use('/api/v1/analytics', analyticsRouter);
+app.use('/api/v1/bulk-registration', bulkRegistrationRouter);
+app.use('/api/v1/hr', hrRouter);
 
 app.use('/certificates', express.static(path.join(process.cwd(), 'certificates')));
 
@@ -81,20 +85,10 @@ const io = new SocketIOServer(httpServer, {
 setupSocketIO(io);
 
 async function start() {
-  try {
-    await connectRedis();
-  } catch (err) {
-    logger.warn('Redis unavailable, continuing without it:', err);
-  }
-
   httpServer.listen(PORT, () => {
     logger.info(`ISA Marathon API on port ${PORT}`);
     logger.info(`Socket.IO ready`);
     logger.info(`CORS: ${CORS_ORIGIN}`);
-  });
-
-  import('./jobs/certificateWorker.js').catch((err) => {
-    logger.warn('Certificate worker failed to start (non-critical):', err);
   });
 }
 

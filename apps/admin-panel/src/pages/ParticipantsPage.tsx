@@ -33,115 +33,120 @@ export default function ParticipantsPage() {
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this participant?')) {
-      await api.deleteParticipant(id);
-      loadParticipants();
+      try {
+        await api.deleteParticipant(id);
+        loadParticipants();
+      } catch (e) {
+        console.error('Failed to delete participant:', e);
+      }
     }
   };
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-6">
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Participants</h1>
-          <p className="text-slate-400 text-sm">{total} registered</p>
+          <h1 className="text-2xl font-bold text-slate-950">Participants</h1>
+          <p className="text-slate-500 text-sm">{total} registered</p>
         </div>
         <button
           onClick={() => api.exportParticipantsCSV()}
-          className="px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg text-sm font-medium transition-colors"
+          className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-3xl text-sm font-medium transition-colors shadow-sm"
         >
           Export CSV
         </button>
       </div>
 
-      <div className="flex gap-4 mb-6">
-        <div className="flex-1">
+      <div className="glass rounded-[2rem] border border-white/20 p-4 shadow-sm">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-4">
           <input
             type="text"
             placeholder="Search by name, email, BIB, or company..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && loadParticipants()}
-            className="w-full px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+            className="w-full md:max-w-xl px-4 py-3 bg-white/80 border border-white/60 rounded-3xl text-slate-900 text-sm focus:ring-2 focus:ring-violet-200 outline-none"
           />
+          <select
+            value={category}
+            onChange={(e) => { setCategory(e.target.value); setPage(1); }}
+            className="px-4 py-3 bg-white/80 border border-white/60 rounded-3xl text-slate-900 text-sm outline-none"
+          >
+            <option value="">All Categories</option>
+            <option value="RUN_3K">3K</option>
+            <option value="RUN_5K">5K</option>
+          </select>
         </div>
-        <select
-          value={category}
-          onChange={(e) => { setCategory(e.target.value); setPage(1); }}
-          className="px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm outline-none"
-        >
-          <option value="">All Categories</option>
-          <option value="RUN_3K">3K</option>
-          <option value="RUN_5K">5K</option>
-        </select>
-      </div>
 
-      <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-slate-700">
-              <th className="text-left px-6 py-3 text-xs font-medium text-slate-400 uppercase">BIB</th>
-              <th className="text-left px-6 py-3 text-xs font-medium text-slate-400 uppercase">Name</th>
-              <th className="text-left px-6 py-3 text-xs font-medium text-slate-400 uppercase">Email</th>
-              <th className="text-left px-6 py-3 text-xs font-medium text-slate-400 uppercase">Category</th>
-              <th className="text-left px-6 py-3 text-xs font-medium text-slate-400 uppercase">Company</th>
-              <th className="text-left px-6 py-3 text-xs font-medium text-slate-400 uppercase">Status</th>
-              <th className="text-left px-6 py-3 text-xs font-medium text-slate-400 uppercase">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {participants.map((p) => (
-              <tr key={p.id} className="border-b border-slate-700/50 hover:bg-slate-700/30">
-                <td className="px-6 py-4 text-sm font-mono text-emerald-400">{p.bibNumber}</td>
-                <td className="px-6 py-4 text-sm text-white">{p.user?.name}</td>
-                <td className="px-6 py-4 text-sm text-slate-400">{p.user?.email}</td>
-                <td className="px-6 py-4">
-                  <span className="px-2 py-1 bg-blue-500/10 text-blue-400 rounded text-xs">
-                    {p.category?.replace('RUN_', '').replace('_', ' ')}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-sm text-slate-400">{p.company?.name || '—'}</td>
-                <td className="px-6 py-4">
-                  <span className={`px-2 py-1 rounded text-xs ${
-                    p.status === 'REGISTERED' ? 'bg-slate-500/10 text-slate-400' :
-                    p.status === 'CHECKED_IN' ? 'bg-emerald-500/10 text-emerald-400' :
-                    p.status === 'RUNNING' ? 'bg-amber-500/10 text-amber-400' :
-                    p.status === 'FINISHED' ? 'bg-purple-500/10 text-purple-400' :
-                    'bg-slate-500/10 text-slate-400'
-                  }`}>
-                    {p.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-2">
-                    <button className="text-slate-400 hover:text-white text-xs">View</button>
-                    <button onClick={() => handleDelete(p.id)} className="text-slate-400 hover:text-red-400 text-xs">Delete</button>
-                  </div>
-                </td>
+        <div className="overflow-x-auto rounded-[2rem] border border-white/20 bg-white/70">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-white/85">
+                <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">BIB</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Name</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Email</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Category</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Company</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Status</th>
+                <th className="text-left px-6 py-3 text-xs font-semibold text-slate-500 uppercase">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {participants.map((p) => (
+                <tr key={p.id} className="border-t border-slate-200/80 hover:bg-slate-100/60 transition-colors">
+                  <td className="px-6 py-4 text-sm font-mono text-violet-700">{p.bibNumber}</td>
+                  <td className="px-6 py-4 text-sm text-slate-900">{p.user?.name}</td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{p.user?.email}</td>
+                  <td className="px-6 py-4">
+                    <span className="px-2 py-1 bg-violet-50 text-violet-700 rounded-full text-xs">
+                      {p.category?.replace('RUN_', '').replace('_', ' ')}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-slate-600">{p.company?.name || '—'}</td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                      p.status === 'REGISTERED' ? 'bg-slate-100 text-slate-600' :
+                      p.status === 'CHECKED_IN' ? 'bg-emerald-100 text-emerald-700' :
+                      p.status === 'RUNNING' ? 'bg-amber-100 text-amber-700' :
+                      p.status === 'FINISHED' ? 'bg-purple-100 text-purple-700' :
+                      'bg-slate-100 text-slate-600'
+                    }`}>
+                      {p.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <button className="text-violet-700 hover:text-violet-900 text-xs">View</button>
+                      <button onClick={() => handleDelete(p.id)} className="text-red-500 hover:text-red-600 text-xs">Delete</button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {participants.length === 0 && (
+                <tr><td colSpan={7} className="px-6 py-8 text-center text-slate-500">No participants yet.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
 
-      <div className="flex items-center justify-between mt-6">
-        <p className="text-sm text-slate-400">
-          Page {page} of {totalPages}
-        </p>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setPage(Math.max(1, page - 1))}
-            disabled={page === 1}
-            className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white disabled:opacity-50"
-          >
-            Previous
-          </button>
-          <button
-            onClick={() => setPage(Math.min(totalPages, page + 1))}
-            disabled={page === totalPages}
-            className="px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg text-sm text-white disabled:opacity-50"
-          >
-            Next
-          </button>
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between mt-6">
+          <p className="text-sm text-slate-500">Page {page} of {totalPages}</p>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setPage(Math.max(1, page - 1))}
+              disabled={page === 1}
+              className="px-4 py-2 bg-white/80 border border-white/70 rounded-3xl text-sm text-slate-700 disabled:opacity-50"
+            >
+              Previous
+            </button>
+            <button
+              onClick={() => setPage(Math.min(totalPages, page + 1))}
+              disabled={page === totalPages}
+              className="px-4 py-2 bg-white/80 border border-white/70 rounded-3xl text-sm text-slate-700 disabled:opacity-50"
+            >
+              Next
+            </button>
+          </div>
         </div>
       </div>
     </div>

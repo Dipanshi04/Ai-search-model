@@ -2,6 +2,16 @@ import { useState, useEffect } from 'react';
 import RunnerDashboard from './pages/RunnerDashboard';
 import LoginPage from './pages/LoginPage';
 import { api } from './lib/api';
+import logoDark from './components/logo-dark.png';
+import logoLight from './components/logo-light.png';
+
+const Logo = ({ size = 'h-14', theme = 'dark' }: { size?: string; theme?: 'light' | 'dark' }) => (
+  <img 
+    src={theme === 'dark' ? '/logo-light.png' : '/logo-dark.png'} 
+    alt="ISA Marathon" 
+    className={`${size} w-auto max-w-[200px] object-contain drop-shadow-md mx-auto block`} 
+  />
+);
 
 interface ParticipantInfo {
   participantId: string;
@@ -42,8 +52,11 @@ export default function App() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-950">
-        <div className="text-slate-400">Loading...</div>
+      <div className="min-h-screen min-h-[100dvh] flex items-center justify-center bg-[#0a0f1a]">
+        <div className="flex flex-col items-center gap-3">
+          <Logo size="h-8" />
+          <div className="w-5 h-5 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
+        </div>
       </div>
     );
   }

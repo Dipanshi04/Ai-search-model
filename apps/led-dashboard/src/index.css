@@ -31,8 +31,28 @@ body {
   100% { transform: translateX(-50%); }
 }
 
+@keyframes slide-down {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+@keyframes pulse-subtle {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(16, 185, 129, 0);
+  }
+}
+
 .sponsor-ticker {
-  animation: ticker-scroll 20s linear infinite;
+  animation: ticker-scroll 25s linear infinite;
   width: max-content;
 }
 
@@ -44,4 +64,73 @@ body {
 .sponsor-ticker:hover,
 .sponsor-ticker-fast:hover {
   animation-play-state: paused;
+}
+
+.animate-slide-down {
+  animation: slide-down 0.4s ease-out forwards;
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 3s ease-in-out infinite;
+}
+
+/* Custom scrollbar for leaderboard */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.5);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.8);
+}
+
+/* Focus visible for accessibility */
+*:focus-visible {
+  outline: 2px solid #10b981;
+  outline-offset: 2px;
+}
+
+/* Mapbox custom styles */
+.mapboxgl-ctrl-group {
+  background: rgba(30, 41, 59, 0.9) !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(71, 85, 105, 0.5) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+.mapboxgl-ctrl-group button {
+  background: transparent !important;
+  color: #f8fafc !important;
+}
+
+.mapboxgl-ctrl-group button:hover {
+  background: rgba(16, 185, 129, 0.1) !important;
+}
+
+/* Smooth transitions for all interactive elements */
+button, a, [role="button"] {
+  transition: all 0.2s ease;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .sponsor-ticker,
+  .sponsor-ticker-fast,
+  .animate-pulse,
+  .animate-pulse-subtle,
+  .animate-slide-down {
+    animation: none !important;
+  }
+  
+  * {
+    transition-duration: 0.01ms !important;
+  }
 }

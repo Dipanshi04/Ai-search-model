@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../config/database.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireRole } from '../middleware/auth.js';
+import { getSocketIO } from '../config/socket.js';
 
 export const raceRouter = Router();
 
@@ -53,6 +54,8 @@ raceRouter.get('/status', async (req: Request, res: Response) => {
       return;
     }
 
+    const now = new Date();
+
     const [participants, checkedIn, running, finished] = await Promise.all([
       prisma.participant.count({ where: { eventId: event.id } }),
       prisma.participant.count({ where: { eventId: event.id, checkedIn: true } }),
@@ -62,14 +65,21 @@ raceRouter.get('/status', async (req: Request, res: Response) => {
       }),
     ]);
 
+    // Calculate current elapsed time from accumulatedElapsedMs
+    let elapsedMs = event.accumulatedElapsedMs || 0;
+    if (event.status === 'ACTIVE' && event.startedAt) {
+      elapsedMs += now.getTime() - new Date(event.startedAt).getTime();
+    }
+
     res.json({
       success: true,
       data: {
-        event,
+        event: { ...event, elapsedMs },
         stats: { participants, checkedIn, running, finished },
       },
     });
   } catch (error) {
+    console.error('Race status error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch race status' });
   }
 });
@@ -94,11 +104,21 @@ raceRouter.post('/start', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER
     }
 
     const wasPaused = event.status === 'PAUSED';
+    const now = new Date();
+
+    // Calculate effective start time: now - accumulatedElapsedMs
+    const effectiveStartAt = wasPaused && event.accumulatedElapsedMs > 0
+      ? new Date(now.getTime() - event.accumulatedElapsedMs)
+      : now;
 
     const [updated] = await prisma.$transaction([
       prisma.event.update({
         where: { id: eventId },
-        data: { status: 'ACTIVE' },
+        data: { 
+          status: 'ACTIVE',
+          ...(!wasPaused && { startedAt: now, accumulatedElapsedMs: 0 }),
+          ...(wasPaused && { startedAt: effectiveStartAt }),
+        },
       }),
       prisma.raceDistance.updateMany({
         where: { eventId },
@@ -111,12 +131,19 @@ raceRouter.post('/start', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER
         },
         data: {
           status: 'RUNNING',
-          startedAt: new Date(),
+          startedAt: now,
         },
       }),
     ]);
 
-    res.json({ success: true, data: { event: updated, message: wasPaused ? 'Race resumed' : 'Race started' } });
+    try {
+      const io = getSocketIO();
+      io.to(`event:${eventId}`).emit('race:status', { status: 'ACTIVE', eventId, message: wasPaused ? 'Race resumed' : 'Race started', elapsedMs: event.accumulatedElapsedMs });
+      io.to(`tracking:${eventId}`).emit('race:status', { status: 'ACTIVE', eventId, message: wasPaused ? 'Race resumed' : 'Race started', elapsedMs: event.accumulatedElapsedMs });
+      io.to(`leaderboard:${eventId}`).emit('race:status', { status: 'ACTIVE', eventId, message: wasPaused ? 'Race resumed' : 'Race started', elapsedMs: event.accumulatedElapsedMs });
+    } catch {}
+
+    res.json({ success: true, data: { event: updated, message: wasPaused ? 'Race resumed' : 'Race started', elapsedMs: event.accumulatedElapsedMs } });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to start race' });
   }
@@ -141,10 +168,18 @@ raceRouter.post('/pause', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER
       return;
     }
 
+    const eventStartedAt = event.startedAt;
+    const now = new Date();
+    const currentRunMs = eventStartedAt ? now.getTime() - new Date(eventStartedAt).getTime() : 0;
+    const newAccumulatedElapsedMs = event.accumulatedElapsedMs + currentRunMs;
+
     const [updated] = await prisma.$transaction([
       prisma.event.update({
         where: { id: eventId },
-        data: { status: 'PAUSED' },
+        data: { 
+          status: 'PAUSED',
+          accumulatedElapsedMs: newAccumulatedElapsedMs,
+        },
       }),
       prisma.raceDistance.updateMany({
         where: { eventId },
@@ -156,7 +191,14 @@ raceRouter.post('/pause', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER
       }),
     ]);
 
-    res.json({ success: true, data: { event: updated, message: 'Race paused' } });
+    try {
+      const io = getSocketIO();
+      io.to(`event:${eventId}`).emit('race:status', { status: 'PAUSED', eventId, message: 'Race paused', elapsedMs: newAccumulatedElapsedMs });
+      io.to(`tracking:${eventId}`).emit('race:status', { status: 'PAUSED', eventId, message: 'Race paused', elapsedMs: newAccumulatedElapsedMs });
+      io.to(`leaderboard:${eventId}`).emit('race:status', { status: 'PAUSED', eventId, message: 'Race paused', elapsedMs: newAccumulatedElapsedMs });
+    } catch {}
+
+    res.json({ success: true, data: { event: updated, message: 'Race paused', elapsedMs: newAccumulatedElapsedMs } });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to pause race' });
   }
@@ -181,10 +223,20 @@ raceRouter.post('/end', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER')
       return;
     }
 
+    // Calculate final elapsed time
+    const now = new Date();
+    const currentRunMs = event.status === 'ACTIVE' && event.startedAt
+      ? now.getTime() - new Date(event.startedAt).getTime()
+      : 0;
+    const finalAccumulatedElapsedMs = event.accumulatedElapsedMs + currentRunMs;
+
     const [updated] = await prisma.$transaction([
       prisma.event.update({
         where: { id: eventId },
-        data: { status: 'COMPLETED' },
+        data: { 
+          status: 'COMPLETED',
+          accumulatedElapsedMs: finalAccumulatedElapsedMs,
+        },
       }),
       prisma.raceDistance.updateMany({
         where: { eventId },
@@ -194,12 +246,19 @@ raceRouter.post('/end', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER')
         where: { eventId, status: { in: ['RUNNING', 'PAUSED'] } },
         data: {
           status: 'FINISHED',
-          finishedAt: new Date(),
+          finishedAt: now,
         },
       }),
     ]);
 
-    res.json({ success: true, data: { event: updated, message: 'Race ended' } });
+    try {
+      const io = getSocketIO();
+      io.to(`event:${eventId}`).emit('race:status', { status: 'COMPLETED', eventId, message: 'Race ended', elapsedMs: finalAccumulatedElapsedMs });
+      io.to(`tracking:${eventId}`).emit('race:status', { status: 'COMPLETED', eventId, message: 'Race ended', elapsedMs: finalAccumulatedElapsedMs });
+      io.to(`leaderboard:${eventId}`).emit('race:status', { status: 'COMPLETED', eventId, message: 'Race ended', elapsedMs: finalAccumulatedElapsedMs });
+    } catch {}
+
+    res.json({ success: true, data: { event: updated, message: 'Race ended', elapsedMs: finalAccumulatedElapsedMs } });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to end race' });
   }

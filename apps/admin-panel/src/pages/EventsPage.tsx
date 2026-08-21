@@ -1,10 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
 import { api } from '../lib/api';
-
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
 
 interface EventDistance {
   id: string;
@@ -35,8 +31,6 @@ export default function EventsPage() {
   const navigate = useNavigate();
   const [events, setEvents] = useState<Event[]>([]);
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showRouteModal, setShowRouteModal] = useState(false);
-  const [selectedEvent, _setSelectedEvent] = useState<Event | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({
     name: '',
@@ -47,9 +41,6 @@ export default function EventsPage() {
   });
   const [distanceForm, setDistanceForm] = useState({ name: '', distanceKm: '' });
   const [saving, setSaving] = useState(false);
-
-  const mapContainer = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<mapboxgl.Map | null>(null);
 
   useEffect(() => { fetchEvents(); }, []);
 
@@ -69,33 +60,47 @@ export default function EventsPage() {
     };
 
     setSaving(true);
-    if (editingId) {
-      await api.updateEvent(editingId, payload);
-    } else {
-      await api.createEvent(payload);
+    try {
+      if (editingId) {
+        await api.updateEvent(editingId, payload);
+      } else {
+        await api.createEvent(payload);
+      }
+      setShowCreateModal(false);
+      resetForm();
+      fetchEvents();
+    } catch (e) {
+      console.error('Failed to save event:', e);
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
-    setShowCreateModal(false);
-    resetForm();
-    fetchEvents();
   }
 
   async function handleAddDistance() {
     if (!editingId || !distanceForm.name || !distanceForm.distanceKm) return;
     setSaving(true);
-    await api.createDistance(editingId, {
-      name: distanceForm.name,
-      distanceKm: parseFloat(distanceForm.distanceKm),
-    });
-    setDistanceForm({ name: '', distanceKm: '' });
-    setSaving(false);
-    fetchEvents();
+    try {
+      await api.createDistance(editingId, {
+        name: distanceForm.name,
+        distanceKm: parseFloat(distanceForm.distanceKm),
+      });
+      setDistanceForm({ name: '', distanceKm: '' });
+      fetchEvents();
+    } catch (e) {
+      console.error('Failed to add distance:', e);
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function handleDeleteDistance(eventId: string, distanceId: string) {
     if (!confirm('Delete this distance? This cannot be undone.')) return;
-    await api.deleteDistance(eventId, distanceId);
-    fetchEvents();
+    try {
+      await api.deleteDistance(eventId, distanceId);
+      fetchEvents();
+    } catch (e) {
+      console.error('Failed to delete distance:', e);
+    }
   }
 
   function resetForm() {
@@ -117,76 +122,13 @@ export default function EventsPage() {
 
   async function handleDelete(id: string) {
     if (!confirm('Delete this event? This cannot be undone.')) return;
-    await api.deleteEvent(id);
-    fetchEvents();
+    try {
+      await api.deleteEvent(id);
+      fetchEvents();
+    } catch (e) {
+      console.error('Failed to delete event:', e);
+    }
   }
-
-  useEffect(() => {
-    if (!showRouteModal || !selectedEvent || !mapContainer.current || !MAPBOX_TOKEN) return;
-
-    mapboxgl.accessToken = MAPBOX_TOKEN;
-    const map = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/streets-v12',
-      center: [75.8577, 22.7196],
-      zoom: 12,
-      attributionControl: false,
-    });
-
-    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
-    mapRef.current = map;
-
-    map.on('load', () => {
-      const points = selectedEvent.routePoints || [];
-      if (points.length < 2) return;
-
-      const coords = points.map((p) => [p.lng, p.lat] as [number, number]);
-
-      map.addSource('route', {
-        type: 'geojson',
-        data: {
-          type: 'Feature',
-          properties: {},
-          geometry: { type: 'LineString', coordinates: coords },
-        },
-      });
-      map.addLayer({
-        id: 'route-line',
-        type: 'line',
-        source: 'route',
-        layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: { 'line-color': '#9C27B0', 'line-width': 4 },
-      });
-
-      const startEl = document.createElement('div');
-      startEl.innerHTML = `<div style="background:#10b981;color:white;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:bold;">START</div>`;
-      new mapboxgl.Marker({ element: startEl })
-        .setLngLat([points[0]!.lng, points[0]!.lat])
-        .addTo(map);
-
-      if (coords.length > 2) {
-        const endEl = document.createElement('div');
-        endEl.innerHTML = `<div style="background:#ef4444;color:white;padding:3px 8px;border-radius:4px;font-size:11px;font-weight:bold;">FINISH</div>`;
-        new mapboxgl.Marker({ element: endEl })
-          .setLngLat([coords[coords.length - 1]![0], coords[coords.length - 1]![1]])
-          .addTo(map);
-      }
-
-      for (let i = 1; i < points.length - 1; i++) {
-        const el = document.createElement('div');
-        el.innerHTML = `<div style="background:#3b82f6;color:white;width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:bold;">${i}</div>`;
-        new mapboxgl.Marker({ element: el })
-          .setLngLat([points[i]!.lng, points[i]!.lat])
-          .addTo(map);
-      }
-
-      const bounds = new mapboxgl.LngLatBounds();
-      coords.forEach((c: [number, number]) => bounds.extend(c));
-      map.fitBounds(bounds, { padding: 60 });
-    });
-
-    return () => { map.remove(); mapRef.current = null; };
-  }, [showRouteModal, selectedEvent]);
 
   const statusColors: Record<string, string> = {
     UPCOMING: 'bg-blue-500/20 text-blue-400',
@@ -201,132 +143,130 @@ export default function EventsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-white">Events</h1>
-          <p className="text-xs text-white/50 mt-0.5">Create and manage marathon events</p>
+          <h1 className="text-2xl font-bold text-slate-950">Events</h1>
+          <p className="text-sm text-slate-500 mt-1">Create and manage marathon events with route and distance details.</p>
         </div>
         <button
           onClick={() => { resetForm(); setShowCreateModal(true); }}
-          className="px-4 py-2 bg-white hover:bg-white/90 text-black rounded-xl text-sm font-medium"
+          className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-3xl text-sm font-medium shadow-sm"
         >
           Create Event
         </button>
       </div>
 
-      <div className="glass rounded-2xl overflow-hidden">
+      <div className="glass rounded-[2rem] overflow-hidden border border-white/20 shadow-sm">
         <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-white/10">
-              <th className="text-left px-4 py-3 text-white/50 font-medium">Event</th>
-              <th className="text-left px-4 py-3 text-white/50 font-medium">Date</th>
-              <th className="text-left px-4 py-3 text-white/50 font-medium">Status</th>
-              <th className="text-left px-4 py-3 text-white/50 font-medium">Runners</th>
-              <th className="text-left px-4 py-3 text-white/50 font-medium">Distances</th>
-              <th className="text-right px-4 py-3 text-white/50 font-medium">Actions</th>
+          <thead className="bg-white/80 backdrop-blur-md">
+            <tr className="border-b border-white/20">
+              <th className="text-left px-5 py-4 text-slate-500 font-semibold">Event</th>
+              <th className="text-left px-5 py-4 text-slate-500 font-semibold">Date</th>
+              <th className="text-left px-5 py-4 text-slate-500 font-semibold">Status</th>
+              <th className="text-left px-5 py-4 text-slate-500 font-semibold">Runners</th>
+              <th className="text-left px-5 py-4 text-slate-500 font-semibold">Distances</th>
+              <th className="text-right px-5 py-4 text-slate-500 font-semibold">Actions</th>
             </tr>
           </thead>
           <tbody>
             {events.map((ev) => (
-              <tr key={ev.id} className="border-t border-white/5 hover:bg-white/5 transition-colors">
-                <td className="px-4 py-3">
-                  <p className="text-white font-medium">{ev.name}</p>
-                  <p className="text-xs text-white/30 truncate max-w-[200px]">{ev.description}</p>
+              <tr key={ev.id} className="border-t border-white/10 hover:bg-slate-50/70 transition-colors">
+                <td className="px-5 py-4">
+                  <p className="text-slate-950 font-semibold">{ev.name}</p>
+                  <p className="text-xs text-slate-500 truncate max-w-[220px]">{ev.description}</p>
                 </td>
-                <td className="px-4 py-3 text-white/70">
+                <td className="px-5 py-4 text-slate-600">
                   {new Date(ev.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </td>
-                <td className="px-4 py-3">
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[ev.status] || 'bg-white/10 text-white/50'}`}>
+                <td className="px-5 py-4">
+                  <span className={`px-2 py-1 rounded-full text-xs font-semibold ${statusColors[ev.status] || 'bg-slate-100 text-slate-600'}`}>
                     {ev.status}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-blue-400">{ev._count?.participants || 0}</td>
-                <td className="px-4 py-3">
+                <td className="px-5 py-4 text-violet-700 font-semibold">{ev._count?.participants || 0}</td>
+                <td className="px-5 py-4 space-y-2">
                   {eventDistances(ev).length > 0 ? (
-                    <div className="space-y-1">
-                      {eventDistances(ev).map((d) => (
-                        <button
-                          key={d.id}
-                          onClick={() => navigate(`/route-builder?eventId=${ev.id}`)}
-                          className="block text-xs text-purple-400 hover:text-purple-300"
-                        >
-                          {d.name} ({d.distanceKm}km)
-                          {d._count?.routePoints > 0 && <span className="text-white/30"> — {d.totalDistance.toFixed(1)}km</span>}
-                        </button>
-                      ))}
-                    </div>
+                    eventDistances(ev).map((d) => (
+                      <button
+                        key={d.id}
+                        onClick={() => navigate(`/route-builder?eventId=${ev.id}`)}
+                        className="block text-xs text-violet-700 hover:text-violet-900"
+                      >
+                        {d.name} ({d.distanceKm}km)
+                        {d._count?.routePoints > 0 && <span className="text-slate-400"> — {d.totalDistance.toFixed(1)}km</span>}
+                      </button>
+                    ))
                   ) : (
-                    <span className="text-white/20 text-xs">No distances</span>
+                    <span className="text-slate-400 text-xs">No distances</span>
                   )}
                 </td>
-                <td className="px-4 py-3 text-right space-x-2">
+                <td className="px-5 py-4 text-right space-x-3">
                   <button
                     onClick={() => navigate(`/route-builder?eventId=${ev.id}`)}
-                    className="text-purple-400 hover:text-purple-300 text-xs"
+                    className="text-violet-700 hover:text-violet-900 text-xs"
                   >
                     Build Route
                   </button>
-                  <button onClick={() => openEdit(ev)} className="text-amber-400 hover:text-amber-300 text-xs">
+                  <button onClick={() => openEdit(ev)} className="text-amber-600 hover:text-amber-700 text-xs">
                     Edit
                   </button>
-                  <button onClick={() => handleDelete(ev.id)} className="text-red-400 hover:text-red-300 text-xs">
+                  <button onClick={() => handleDelete(ev.id)} className="text-red-600 hover:text-red-700 text-xs">
                     Delete
                   </button>
                 </td>
               </tr>
             ))}
             {events.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-white/30">No events yet. Create your first marathon!</td></tr>
+              <tr><td colSpan={6} className="px-5 py-8 text-center text-slate-500">No events yet. Create your first marathon!</td></tr>
             )}
           </tbody>
         </table>
       </div>
 
       {showCreateModal && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="glass rounded-2xl p-6 w-[480px]">
-            <h3 className="text-white font-semibold mb-4">{editingId ? 'Edit Event' : 'Create New Event'}</h3>
+        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="glass rounded-[2rem] p-6 w-[480px] border border-white/20 shadow-lg">
+            <h3 className="text-slate-950 font-semibold mb-4">{editingId ? 'Edit Event' : 'Create New Event'}</h3>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className="block text-white/50 text-sm mb-1">Event Name *</label>
+                <label className="block text-slate-600 text-sm mb-1">Event Name *</label>
                 <input
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   required
                   placeholder="e.g. ISA Marathon 2026"
-                  className="w-full px-3 py-2 glass rounded-xl text-white text-sm focus:ring-2 focus:ring-[#9C27B0] outline-none"
+                  className="w-full px-3 py-3 bg-white/80 border border-white/70 rounded-3xl text-slate-950 text-sm focus:ring-2 focus:ring-violet-200 outline-none"
                 />
               </div>
               <div>
-                <label className="block text-white/50 text-sm mb-1">Description</label>
+                <label className="block text-slate-600 text-sm mb-1">Description</label>
                 <textarea
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                   rows={2}
                   placeholder="Short description"
-                  className="w-full px-3 py-2 glass rounded-xl text-white text-sm resize-none focus:ring-2 focus:ring-[#9C27B0] outline-none"
+                  className="w-full px-3 py-3 bg-white/80 border border-white/70 rounded-3xl text-slate-950 text-sm resize-none focus:ring-2 focus:ring-violet-200 outline-none"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <div>
-                  <label className="block text-white/50 text-sm mb-1">Event Date *</label>
+                  <label className="block text-slate-600 text-sm mb-1">Event Date *</label>
                   <input
                     type="date"
                     value={form.date}
                     onChange={(e) => setForm({ ...form, date: e.target.value })}
                     required
-                    className="w-full px-3 py-2 glass rounded-xl text-white text-sm focus:ring-2 focus:ring-[#9C27B0] outline-none"
+                    className="w-full px-3 py-3 bg-white/80 border border-white/70 rounded-3xl text-slate-950 text-sm focus:ring-2 focus:ring-violet-200 outline-none"
                   />
                 </div>
                 <div>
-                  <label className="block text-white/50 text-sm mb-1">Max Participants</label>
+                  <label className="block text-slate-600 text-sm mb-1">Max Participants</label>
                   <input
                     type="number"
                     value={form.maxParticipants}
                     onChange={(e) => setForm({ ...form, maxParticipants: e.target.value })}
                     placeholder="Unlimited"
-                    className="w-full px-3 py-2 glass rounded-xl text-white text-sm focus:ring-2 focus:ring-[#9C27B0] outline-none"
+                    className="w-full px-3 py-3 bg-white/80 border border-white/70 rounded-3xl text-slate-950 text-sm focus:ring-2 focus:ring-violet-200 outline-none"
                   />
                 </div>
               </div>
@@ -335,45 +275,45 @@ export default function EventsPage() {
                   type="checkbox"
                   checked={form.registrationOpen}
                   onChange={(e) => setForm({ ...form, registrationOpen: e.target.checked })}
-                  className="rounded"
+                  className="rounded text-violet-700"
                 />
-                <label className="text-white/50 text-sm">Open for registration</label>
+                <label className="text-slate-600 text-sm">Open for registration</label>
               </div>
               {editingId && (
-                <div className="pt-2 border-t border-white/10">
-                  <label className="block text-white/50 text-sm mb-2">Add Distance</label>
-                  <div className="flex gap-2">
+                <div className="pt-4 border-t border-white/10">
+                  <label className="block text-slate-600 text-sm mb-2">Add Distance</label>
+                  <div className="flex flex-col gap-3 sm:flex-row">
                     <input
                       value={distanceForm.name}
                       onChange={(e) => setDistanceForm({ ...distanceForm, name: e.target.value })}
                       placeholder="e.g. 10K Run"
-                      className="flex-1 px-3 py-2 glass rounded-xl text-white text-sm focus:ring-2 focus:ring-[#9C27B0] outline-none"
+                      className="flex-1 px-3 py-3 bg-white/80 border border-white/70 rounded-3xl text-slate-950 text-sm focus:ring-2 focus:ring-violet-200 outline-none"
                     />
                     <input
                       type="number"
                       value={distanceForm.distanceKm}
                       onChange={(e) => setDistanceForm({ ...distanceForm, distanceKm: e.target.value })}
                       placeholder="km"
-                      className="w-20 px-3 py-2 glass rounded-xl text-white text-sm focus:ring-2 focus:ring-[#9C27B0] outline-none"
+                      className="w-full sm:w-28 px-3 py-3 bg-white/80 border border-white/70 rounded-3xl text-slate-950 text-sm focus:ring-2 focus:ring-violet-200 outline-none"
                     />
                     <button
                       type="button"
                       onClick={handleAddDistance}
                       disabled={saving || !distanceForm.name || !distanceForm.distanceKm}
-                      className="px-4 py-2 bg-[#9C27B0] hover:bg-[#7B1FA2] disabled:opacity-40 text-white rounded-xl text-sm font-medium shrink-0"
+                      className="px-4 py-3 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white rounded-3xl text-sm font-medium"
                     >
                       Add
                     </button>
                   </div>
                   {editingEvent && eventDistances(editingEvent).length > 0 && (
-                    <div className="mt-3 space-y-1.5">
+                    <div className="mt-4 space-y-2">
                       {eventDistances(editingEvent).map((d) => (
-                        <div key={d.id} className="flex items-center gap-2 text-xs bg-white/5 p-2 rounded-lg">
-                          <span className="text-white/70">{d.name} ({d.distanceKm}km)</span>
+                        <div key={d.id} className="flex items-center gap-2 text-sm bg-slate-50/70 p-3 rounded-3xl border border-white/70">
+                          <span className="text-slate-700">{d.name} ({d.distanceKm}km)</span>
                           <button
                             type="button"
                             onClick={() => handleDeleteDistance(editingId, d.id)}
-                            className="ml-auto text-red-400 hover:text-red-300 text-xs shrink-0"
+                            className="ml-auto text-red-600 hover:text-red-700 text-xs"
                           >
                             Remove
                           </button>
@@ -383,82 +323,16 @@ export default function EventsPage() {
                   )}
                 </div>
               )}
-              <div className="flex gap-3 pt-2">
-                <button type="submit" className="flex-1 px-4 py-2 bg-white hover:bg-white/90 text-black rounded-xl text-sm font-medium">
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-end pt-2">
+                <button type="submit" className="flex-1 sm:flex-none px-4 py-3 bg-violet-600 hover:bg-violet-700 text-white rounded-3xl text-sm font-medium">
                   {editingId ? 'Update Event' : 'Create Event'}
                 </button>
                 <button type="button" onClick={() => { setShowCreateModal(false); resetForm(); }}
-                  className="px-4 py-2 glass hover:bg-white/10 text-white rounded-xl text-sm">
+                  className="px-4 py-3 bg-white/80 text-slate-700 rounded-3xl border border-white/70 text-sm">
                   Cancel
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {showRouteModal && selectedEvent && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
-          <div className="glass rounded-2xl w-[900px] max-h-[80vh] overflow-hidden">
-            <div className="flex items-center justify-between p-4 border-b border-white/10">
-              <div>
-                <h3 className="text-white font-semibold">{selectedEvent.name} — Route</h3>
-                <p className="text-xs text-white/30 mt-0.5">
-                  {selectedEvent.routePoints?.length || 0} points &middot; {selectedEvent.totalDistance?.toFixed(2) || 0} km loop
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => { setShowRouteModal(false); navigate(`/route-builder?eventId=${selectedEvent.id}`); }}
-                  className="px-4 py-2 bg-white hover:bg-white/90 text-black rounded-xl text-sm font-medium"
-                >
-                  Edit Route
-                </button>
-                <button
-                  onClick={() => setShowRouteModal(false)}
-                  className="px-4 py-2 glass hover:bg-white/10 text-white rounded-xl text-sm"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-5 gap-0">
-              <div className="col-span-3 h-[500px]">
-                {MAPBOX_TOKEN ? (
-                  <div ref={mapContainer} className="w-full h-full" />
-                ) : (
-                  <div className="w-full h-full bg-slate-900 flex items-center justify-center">
-                    <p className="text-white/30">No Mapbox token</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="col-span-2 border-l border-white/10 p-4 max-h-[500px] overflow-auto">
-                <h4 className="text-sm font-bold text-white/70 mb-3">Route Points</h4>
-                <div className="space-y-1">
-                  {(selectedEvent.routePoints || []).map((p: { lat: number; lng: number; cumDistance?: number }, i: number) => (
-                    <div key={i} className="flex items-center gap-2 text-xs bg-white/5 p-2 rounded-lg">
-                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
-                        i === 0 ? 'bg-emerald-500 text-white'
-                        : i === (selectedEvent.routePoints?.length || 0) - 1 ? 'bg-red-500 text-white'
-                        : 'bg-blue-500 text-white'
-                      }`}>
-                        {i}
-                      </span>
-                      <span className="text-white/50 font-mono">
-                        {p.lat.toFixed(5)}, {p.lng.toFixed(5)}
-                      </span>
-                      <span className="text-white/30 ml-auto">{p.cumDistance?.toFixed(2)} km</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-4 pt-3 border-t border-white/10 text-center">
-                  <p className="text-xl font-bold text-white">{selectedEvent.totalDistance?.toFixed(2) || 0} km</p>
-                  <p className="text-xs text-white/30">Total distance</p>
-                </div>
-              </div>
-            </div>
           </div>
         </div>
       )}

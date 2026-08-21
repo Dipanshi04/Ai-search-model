@@ -263,9 +263,9 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="bg-marathon min-h-screen flex items-center justify-center px-4 py-4">
+    <div className="bg-marathon min-h-screen flex items-center justify-center px-4 py-8">
       <div className="relative z-10 w-full max-w-3xl">
-        <form onSubmit={handleSubmitForm} className="glass-strong p-5 sm:p-6 rounded-3xl">
+        <form onSubmit={handleSubmitForm} className="glass-strong rounded-3xl p-5 sm:p-6 sm:p-8">
           <div className="text-center mb-4">
             <h1 className="text-2xl sm:text-3xl font-black text-slate-800 mb-1">
               Register for ISA Marathon
@@ -281,7 +281,7 @@ export default function RegisterPage() {
 
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Full Name *</label>
+              <label className="block text-xs font-medium oklch(0 0 0) mb-1">Full Name *</label>
               <input
                 type="text"
                 required
@@ -292,7 +292,7 @@ export default function RegisterPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Email *</label>
+              <label className="block text-xs font-medium oklch(0 0 0) mb-1">Email *</label>
               <input
                 type="email"
                 required
@@ -303,7 +303,7 @@ export default function RegisterPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Phone *</label>
+              <label className="block text-xs font-medium oklch(0 0 0) mb-1">Phone *</label>
               <input
                 type="tel"
                 required
@@ -314,7 +314,7 @@ export default function RegisterPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Gender *</label>
+              <label className="block text-xs font-medium oklch(0 0 0) mb-1">Gender *</label>
               <select
                 value={form.gender}
                 onChange={(e) => setForm({ ...form, gender: e.target.value })}
@@ -326,17 +326,17 @@ export default function RegisterPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Company</label>
+              <label className="block text-xs font-medium oklch(0 0 0) mb-1">Company</label>
               <input
                 type="text"
                 value={form.companyName}
                 onChange={(e) => setForm({ ...form, companyName: e.target.value })}
                 className="w-full px-3 py-2 glass-dark rounded-lg text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-slate-800 outline-none text-sm"
-                placeholder="Optional"
+                placeholder="company"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Emergency Contact</label>
+              <label className="block text-xs font-medium oklch(0 0 0) mb-1">Emergency Contact</label>
               <input
                 type="text"
                 value={form.emergencyContact}
@@ -346,7 +346,7 @@ export default function RegisterPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Emergency Phone</label>
+              <label className="block text-xs font-medium oklch(0 0 0) mb-1">Emergency Phone</label>
               <input
                 type="tel"
                 value={form.emergencyPhone}
@@ -356,7 +356,7 @@ export default function RegisterPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Blood Group</label>
+              <label className="block text-xs font-medium oklch(0 0 0) mb-1">Blood Group</label>
               <select
                 value={form.bloodGroup}
                 onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })}
@@ -377,7 +377,7 @@ export default function RegisterPage() {
 
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">Distance *</label>
+              <label className="block text-xs font-medium oklch(0 0 0) mb-1">Distance *</label>
               <div className="flex gap-2">
                 <label
                   className={`flex-1 flex items-center justify-center p-2 rounded-lg border-2 cursor-pointer transition-all text-center ${
@@ -416,7 +416,7 @@ export default function RegisterPage() {
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">T-Shirt Size</label>
+              <label className="block text-xs font-medium oklch(0 0 0) mb-1">T-Shirt Size</label>
               <select
                 value={form.tshirtSize}
                 onChange={(e) => setForm({ ...form, tshirtSize: e.target.value })}
@@ -463,7 +463,7 @@ export default function RegisterPage() {
           <div className="glass-strong rounded-3xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl relative">
             <div className="p-6 border-b border-slate-200/50">
               <h2 className="text-2xl font-black text-slate-800">Terms & Conditions</h2>
-              <p className="text-sm text-slate-600 mt-1">Please read carefully before proceeding</p>
+              <p className="text-sm oklch(0 0 0) mt-1">Please read carefully before proceeding</p>
             </div>
 
             <div
@@ -475,25 +475,25 @@ export default function RegisterPage() {
                 <h3 className="font-bold text-slate-900 mb-2">Payment Details</h3>
                 <div className="glass-dark rounded-xl p-4 space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-slate-700">3K Fun Run - Registration Fee</span>
+                    <span className="oklch(0 0 0)">3K Fun Run - Registration Fee</span>
                     <span className="font-bold text-slate-900">Rs. 500</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-slate-700">5K Challenge - Registration Fee</span>
+                    <span className="oklch(0 0 0)">5K Challenge - Registration Fee</span>
                     <span className="font-bold text-slate-900">Rs. 800</span>
                   </div>
                   <div className="border-t border-slate-300 pt-2 mt-2">
                     <div className="flex justify-between">
-                      <span className="text-slate-700">Payment Method</span>
-                      <span className="text-slate-700">Razorpay (UPI / Cards / Net Banking)</span>
+                      <span className="oklch(0 0 0)">Payment Method</span>
+                      <span className="oklch(0 0 0)">Razorpay (UPI / Cards / Net Banking)</span>
                     </div>
                   </div>
                 </div>
               </div>
 
               <div>
-                <h3 className="font-bold text-slate-900 mb-2">Payment Rules</h3>
-                <ul className="space-y-2 list-disc list-inside text-slate-700">
+                <h3 className="font-bold oklch(0 0 0) mb-2">Payment Rules</h3>
+                <ul className="space-y-2 list-disc list-inside oklch(0 0 0)">
                   <li>Registration fee is non-refundable once payment is confirmed.</li>
                   <li>Payment must be completed within 15 minutes of starting the registration process.</li>
                   <li>Failed transactions will be auto-reversed within 5-7 business days.</li>
@@ -503,8 +503,8 @@ export default function RegisterPage() {
               </div>
 
               <div>
-                <h3 className="font-bold text-slate-900 mb-2">Cancellation & Refund Policy</h3>
-                <ul className="space-y-2 list-disc list-inside text-slate-700">
+                <h3 className="font-bold oklch(0 0 0) mb-2">Cancellation & Refund Policy</h3>
+                <ul className="space-y-2 list-disc list-inside oklch(0 0 0)">
                   <li>Cancellations made 15+ days before the event: 50% refund.</li>
                   <li>Cancellations made less than 15 days before the event: No refund.</li>
                   <li>No-shows on race day: No refund.</li>
@@ -513,8 +513,8 @@ export default function RegisterPage() {
               </div>
 
               <div>
-                <h3 className="font-bold text-slate-900 mb-2">Race Day Rules</h3>
-                <ul className="space-y-2 list-disc list-inside text-slate-700">
+                <h3 className="font-bold oklch(0 0 0) mb-2">Race Day Rules</h3>
+                <ul className="space-y-2 list-disc list-inside oklch(0 0 0)">
                   <li>Valid photo ID is required for check-in on race day.</li>
                   <li>BIB number must be visible at all times during the race.</li>
                   <li>Organizers reserve the right to disqualify participants for unsportsmanlike conduct.</li>
@@ -523,8 +523,8 @@ export default function RegisterPage() {
               </div>
 
               <div>
-                <h3 className="font-bold text-slate-900 mb-2">Liability Waiver</h3>
-                <p className="text-slate-700">
+                <h3 className="font-bold oklch(0 0 0) mb-2">Liability Waiver</h3>
+                <p className="oklch(0 0 0)">
                   By registering, I confirm that I am physically fit to participate in the marathon event. 
                   I understand that running involves inherent risks including but not limited to falls, 
                   contact with other participants, effects of weather, traffic, and road conditions. 
@@ -534,8 +534,8 @@ export default function RegisterPage() {
               </div>
 
               <div>
-                <h3 className="font-bold text-slate-900 mb-2">Privacy Policy</h3>
-                <p className="text-slate-700">
+                <h3 className="font-bold oklch(0 0 0) mb-2">Privacy Policy</h3>
+                <p className="oklch(0 0 0)">
                   Your personal information will be used solely for event management purposes. 
                   Your data may be shared with race timing services and medical teams for safety. 
                   Photos and videos taken during the event may be used for promotional purposes.

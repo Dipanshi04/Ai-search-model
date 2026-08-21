@@ -31,6 +31,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else {
           api.clearToken();
         }
+      }).catch(() => {
+        api.clearToken();
+      }).finally(() => {
         setIsLoading(false);
       });
     } else {
@@ -39,13 +42,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    const res = await api.adminLogin(email, password);
-    if (res.success && res.data) {
-      api.setToken(res.data.tokens.accessToken);
-      setUser(res.data.user);
-      return true;
+    try {
+      const res = await api.adminLogin(email, password);
+      if (res.success && res.data) {
+        api.setToken(res.data.tokens.accessToken);
+        setUser(res.data.user);
+        return true;
+      }
+      return false;
+    } catch (e) {
+      console.error('Login failed:', e);
+      return false;
     }
-    return false;
   };
 
   const logout = () => {

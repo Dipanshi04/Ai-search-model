@@ -3,24 +3,28 @@ import { io, Socket } from 'socket.io-client';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { formatDuration } from '@isa/utils';
+import logoDark from './components/logo-dark.png';
+import logoLight from './components/logo-light.png';
+
+const Logo = ({ size = 'h-18', theme = 'dark' }: { size?: string; theme?: 'light' | 'dark' }) => (
+  <img src={theme === 'dark' ? logoLight : logoDark} alt="ISA Marathon" className={`${size} w-auto max-w-full object-contain drop-shadow-md`} />
+);
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
-const EVENT_ID = import.meta.env.VITE_EVENT_ID || 'default-event-id';
+const EVENT_ID = import.meta.env.VITE_EVENT_ID || '';
 
 const RUNNER_COLORS = [
   '#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6',
   '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#a855f7',
 ];
 
-const TIER_COLORS: Record<string, string> = {
-  PLATINUM: '#e5e7eb',
-  GOLD: '#f59e0b',
-  SILVER: '#94a3b8',
-  BRONZE: '#d97706',
+const CATEGORY_LABELS: Record<string, string> = {
+  overall: 'OVERALL',
+  RUN_3K: '3K',
+  RUN_5K: '5K',
+  company: 'COMPANY',
 };
-
-
 
 interface LeaderboardEntry {
   rank: number;
@@ -39,6 +43,27 @@ interface Sponsor {
   website?: string;
 }
 
+function SponsorTicker({ sponsors }: { sponsors: Sponsor[] }) {
+  if (sponsors.length === 0) return null;
+  const items = [...sponsors, ...sponsors, ...sponsors];
+  return (
+    <div className="overflow-hidden whitespace-nowrap py-3">
+      <div className="sponsor-ticker inline-flex items-center gap-10">
+        {items.map((s, i) => (
+          <div key={`${s.id}-${i}`} className="flex items-center gap-3 shrink-0">
+            {s.logoUrl ? (
+              <img src={s.logoUrl} alt={s.name} className="h-8 w-auto object-contain" />
+            ) : (
+              <span className="text-sm text-slate-400 font-medium">{s.name}</span>
+            )}
+            <span className="text-slate-700 mx-2">|</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function LEDScreen() {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [totalRunners, setTotalRunners] = useState(0);
@@ -49,12 +74,16 @@ export default function LEDScreen() {
   const [currentCategory, setCurrentCategory] = useState('overall');
   const [announcement, setAnnouncement] = useState<{ title: string; message: string } | null>(null);
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
+  const [mapLoaded, setMapLoaded] = useState(false);
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
   const markerColorsRef = useRef<Map<string, string>>(new Map());
+  const startFinishMarkersRef = useRef<mapboxgl.Marker[]>([]);
   const socketRef = useRef<Socket | null>(null);
   const raceStartRef = useRef<Date | null>(null);
+  const accumulatedElapsedRef = useRef(0);
+  const routePointsRef = useRef<{ lat: number; lng: number }[]>([]);
 
   const getColorForRunner = (participantId: string): string => {
     if (markerColorsRef.current.has(participantId)) {
@@ -68,43 +97,176 @@ export default function LEDScreen() {
 
   const drawRoute = (map: mapboxgl.Map, points: { lat: number; lng: number }[]) => {
     if (!map || !map.isStyleLoaded() || points.length < 2) return;
+
+    // Clean up existing layers
     try {
+      if (map.getLayer('route-glow')) map.removeLayer('route-glow');
       if (map.getLayer('route-line')) map.removeLayer('route-line');
+      if (map.getLayer('route-outline')) map.removeLayer('route-outline');
+      if (map.getLayer('start-marker')) map.removeLayer('start-marker');
+      if (map.getLayer('finish-marker')) map.removeLayer('finish-marker');
       if (map.getSource('route')) map.removeSource('route');
+      if (map.getSource('route-points')) map.removeSource('route-points');
     } catch {}
+
+    // Clean up existing START/FINISH HTML markers
+    startFinishMarkersRef.current.forEach((m) => m.remove());
+    startFinishMarkersRef.current = [];
+
     const coords = points.map((p) => [p.lng, p.lat] as [number, number]);
+
+    // Route source
     map.addSource('route', {
       type: 'geojson',
       data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords } },
     });
+
+    // Outer glow layer
     map.addLayer({
-      id: 'route-line', type: 'line', source: 'route',
+      id: 'route-glow',
+      type: 'line',
+      source: 'route',
       layout: { 'line-join': 'round', 'line-cap': 'round' },
-      paint: { 'line-color': '#10b981', 'line-width': 5, 'line-opacity': 0.6 },
+      paint: {
+        'line-color': '#10b981',
+        'line-width': 16,
+        'line-opacity': 0.15,
+        'line-blur': 8,
+      },
     });
+
+    // Main route line
+    map.addLayer({
+      id: 'route-line',
+      type: 'line',
+      source: 'route',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': '#10b981',
+        'line-width': 5,
+        'line-opacity': 0.9,
+      },
+    });
+
+    // Inner bright line
+    map.addLayer({
+      id: 'route-outline',
+      type: 'line',
+      source: 'route',
+      layout: { 'line-join': 'round', 'line-cap': 'round' },
+      paint: {
+        'line-color': '#34d399',
+        'line-width': 2,
+        'line-opacity': 0.6,
+      },
+    });
+
+    // Start/Finish markers as symbol layers
+    map.addSource('route-points', {
+      type: 'geojson',
+      data: {
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: { label: 'START', color: '#10b981' },
+            geometry: { type: 'Point', coordinates: coords[0] },
+          },
+          {
+            type: 'Feature',
+            properties: { label: 'FINISH', color: '#ef4444' },
+            geometry: { type: 'Point', coordinates: coords[coords.length - 1] },
+          },
+        ],
+      },
+    });
+
+    // Create custom HTML markers for start/finish
+    const startEl = document.createElement('div');
+    startEl.innerHTML = `<div style="background:#10b981;color:white;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:800;letter-spacing:1px;white-space:nowrap;box-shadow:0 0 20px rgba(16,185,129,0.6);">START</div>`;
+    const startMarker = new mapboxgl.Marker({ element: startEl, offset: [0, -20] })
+      .setLngLat(coords[0] as [number, number])
+      .addTo(map);
+
+    const finishEl = document.createElement('div');
+    finishEl.innerHTML = `<div style="background:#ef4444;color:white;padding:4px 12px;border-radius:6px;font-size:11px;font-weight:800;letter-spacing:1px;white-space:nowrap;box-shadow:0 0 20px rgba(239,68,68,0.6);">FINISH</div>`;
+    const finishMarker = new mapboxgl.Marker({ element: finishEl, offset: [0, -20] })
+      .setLngLat(coords[coords.length - 1] as [number, number])
+      .addTo(map);
+
+    startFinishMarkersRef.current = [startMarker, finishMarker];
+
+    // Fit bounds
     const bounds = new mapboxgl.LngLatBounds();
     coords.forEach((c) => bounds.extend(c));
     map.fitBounds(bounds, { padding: 80, duration: 2000 });
-  };
 
-  const routePointsRef = useRef<{ lat: number; lng: number }[]>([]);
+    setMapLoaded(true);
+  };
 
   useEffect(() => {
     async function loadInitial() {
       try {
-        const eventRes = await fetch(`${API_URL}/api/v1/events/${EVENT_ID}`);
-        const eventData = await eventRes.json();
-        if (eventData.success && eventData.data?.distances) {
-          const allPoints: { lat: number; lng: number }[] = [];
-          for (const d of eventData.data.distances) {
-            if (d.routePoints && d.routePoints.length > 0) {
-              allPoints.push(...d.routePoints.map((p: any) => ({ lat: p.lat, lng: p.lng })));
-            }
-          }
-          if (allPoints.length > 0) {
-            routePointsRef.current = allPoints;
+        let eventId = EVENT_ID;
+        const statusRes = await fetch(`${API_URL}/api/v1/race/status`);
+        const statusData = await statusRes.json();
+        if (statusData.success && statusData.data?.event) {
+          const ev = statusData.data.event;
+          eventId = ev.id;
+          // Initialize timer from elapsedMs (includes accumulated pause time)
+          const elapsedMs = ev.elapsedMs || 0;
+          if (elapsedMs > 0) {
+            const now = new Date();
+            raceStartRef.current = new Date(now.getTime() - elapsedMs);
+            accumulatedElapsedRef.current = elapsedMs;
+          } else if (ev.startedAt) {
+            raceStartRef.current = new Date(ev.startedAt);
           }
         }
+
+        if (!eventId) return;
+
+        const eventRes = await fetch(`${API_URL}/api/v1/events/${eventId}`);
+        const eventData = await eventRes.json();
+          if (eventData.success && eventData.data?.raceDistances) {
+            const allPoints: { lat: number; lng: number }[] = [];
+            for (const d of eventData.data.raceDistances) {
+              if (d._count?.routePoints > 0) {
+                try {
+                  const routeRes = await fetch(`${API_URL}/api/v1/routes/${d.id}`);
+                  const routeData = await routeRes.json();
+                  if (routeData.success && routeData.data?.routePoints) {
+                    allPoints.push(
+                      ...routeData.data.routePoints
+                        .sort((a: any, b: any) => a.sequence - b.sequence)
+                        .map((p: any) => ({ lat: p.lat, lng: p.lng }))
+                    );
+                  }
+                } catch (e) {
+                  console.error('Failed to fetch route for distance:', d.id, e);
+                }
+              }
+            }
+            if (allPoints.length > 0) {
+              routePointsRef.current = allPoints;
+              // Draw route on existing map if already loaded
+              const map = mapRef.current;
+              if (map && map.isStyleLoaded()) {
+                drawRoute(map, allPoints);
+              }
+            }
+          }
+
+          const sponsorRes = await fetch(`${API_URL}/api/v1/sponsors?eventId=${eventId}`);
+          const sponsorData = await sponsorRes.json();
+          if (sponsorData.success) setSponsors(sponsorData.data);
+
+          const greenRes = await fetch(`${API_URL}/api/v1/green/trees?eventId=${eventId}`);
+          const greenData = await greenRes.json();
+          if (greenData.success) {
+            setTreeCount(greenData.data.totalTrees);
+            setCo2Offset(greenData.data.totalCO2);
+          }
 
         const lbRes = await fetch(`${API_URL}/api/v1/participants/leaderboard?limit=10`);
         const lbData = await lbRes.json();
@@ -116,17 +278,6 @@ export default function LEDScreen() {
           setTotalRunners(allLbData.data.length);
           setTotalFinished(allLbData.data.filter((p: any) => p.status === 'FINISHED').length);
         }
-
-        const sponsorRes = await fetch(`${API_URL}/api/v1/sponsors?eventId=${EVENT_ID}`);
-        const sponsorData = await sponsorRes.json();
-        if (sponsorData.success) setSponsors(sponsorData.data);
-
-        const greenRes = await fetch(`${API_URL}/api/v1/green/trees?eventId=${EVENT_ID}`);
-        const greenData = await greenRes.json();
-        if (greenData.success) {
-          setTreeCount(greenData.data.totalTrees);
-          setCo2Offset(greenData.data.totalCO2);
-        }
       } catch (error) {
         console.error('LED: Initial load error:', error);
       }
@@ -136,17 +287,16 @@ export default function LEDScreen() {
 
   useEffect(() => {
     if (!mapContainer.current || mapRef.current || !MAPBOX_TOKEN) return;
-
     mapboxgl.accessToken = MAPBOX_TOKEN;
 
     const firstRoutePoint = routePointsRef.current[0];
-    const center = firstRoutePoint
-      ? [firstRoutePoint.lng, firstRoutePoint.lat] as [number, number]
-      : [75.8577, 22.7196] as [number, number];
+    const center: [number, number] = firstRoutePoint
+      ? [firstRoutePoint.lng, firstRoutePoint.lat]
+      : [75.8577, 22.7196];
 
     const map = new mapboxgl.Map({
       container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/streets-v12',
+      style: 'mapbox://styles/mapbox/dark-v11',
       center,
       zoom: 14,
       interactive: true,
@@ -160,9 +310,15 @@ export default function LEDScreen() {
       if (routePointsRef.current.length >= 2) {
         drawRoute(map, routePointsRef.current);
       }
+      setMapLoaded(true);
     });
 
-    return () => { mapRef.current = null; map.remove(); };
+    return () => {
+      startFinishMarkersRef.current.forEach((m) => m.remove());
+      startFinishMarkersRef.current = [];
+      mapRef.current = null;
+      map.remove();
+    };
   }, []);
 
   useEffect(() => {
@@ -182,20 +338,67 @@ export default function LEDScreen() {
     socket.on('runner:update', (data: any) => {
       const map = mapRef.current;
       if (!map || !data.lat || !data.lng) return;
-
       const color = getColorForRunner(data.participantId);
       const existing = markersRef.current.get(data.participantId);
       if (existing) {
         existing.setLngLat([data.lng, data.lat]);
       } else {
+        // Glowing runner dot
         const el = document.createElement('div');
-        el.innerHTML = `<div style="width:14px;height:14px;background:${color};border-radius:50%;border:2px solid white;box-shadow:0 0 8px ${color}90;"></div>`;
-        const marker = new mapboxgl.Marker({ element: el })
+        el.style.cssText = `
+          width: 14px; height: 14px;
+          background: ${color};
+          border-radius: 50%;
+          border: 2.5px solid white;
+          box-shadow: 0 0 12px ${color}90, 0 0 24px ${color}40;
+          position: relative;
+        `;
+        // Pulse ring
+        const pulse = document.createElement('div');
+        pulse.style.cssText = `
+          position: absolute; top: -6px; left: -6px;
+          width: 26px; height: 26px;
+          border-radius: 50%;
+          border: 2px solid ${color}60;
+          animation: pulse-ring 2s ease-out infinite;
+        `;
+        el.appendChild(pulse);
+
+        // Add pulse keyframes if not exists
+        if (!document.getElementById('pulse-keyframes')) {
+          const style = document.createElement('style');
+          style.id = 'pulse-keyframes';
+          style.textContent = `
+            @keyframes pulse-ring {
+              0% { transform: scale(0.8); opacity: 1; }
+              100% { transform: scale(2); opacity: 0; }
+            }
+          `;
+          document.head.appendChild(style);
+        }
+
+        const marker = new mapboxgl.Marker({ element: el, offset: [-7, -7] })
           .setLngLat([data.lng, data.lat])
           .addTo(map);
+
+        // Add name label
+        const label = document.createElement('div');
+        label.style.cssText = `
+          background: rgba(0,0,0,0.85);
+          color: white;
+          padding: 4px 8px;
+          border-radius: 6px;
+          font-size: 11px;
+          font-weight: 700;
+          white-space: nowrap;
+          pointer-events: none;
+          margin-top: 6px;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        `;
+        label.textContent = data.name || data.bibNumber || '';
+
         markersRef.current.set(data.participantId, marker);
       }
-
       if (data.status === 'FINISHED') {
         setTotalFinished((prev) => prev + 1);
       }
@@ -217,6 +420,28 @@ export default function LEDScreen() {
       setTimeout(() => setAnnouncement(null), 15000);
     });
 
+    socket.on('race:status', (data: any) => {
+      if (data.status === 'ACTIVE') {
+        if (data.elapsedMs && data.elapsedMs > 0) {
+          const now = new Date();
+          raceStartRef.current = new Date(now.getTime() - data.elapsedMs);
+          accumulatedElapsedRef.current = 0;
+        } else if (!raceStartRef.current) {
+          raceStartRef.current = new Date();
+        }
+      } else if (data.status === 'PAUSED') {
+        if (data.elapsedMs && data.elapsedMs > 0) {
+          accumulatedElapsedRef.current = data.elapsedMs;
+        } else if (raceStartRef.current) {
+          accumulatedElapsedRef.current = Date.now() - raceStartRef.current.getTime();
+        }
+        raceStartRef.current = null;
+      } else if (data.status === 'COMPLETED') {
+        raceStartRef.current = null;
+        accumulatedElapsedRef.current = 0;
+      }
+    });
+
     socketRef.current = socket;
     return () => { socket.disconnect(); };
   }, [currentCategory]);
@@ -224,7 +449,10 @@ export default function LEDScreen() {
   useEffect(() => {
     const interval = setInterval(() => {
       if (raceStartRef.current) {
-        setElapsedTime(Math.floor((Date.now() - raceStartRef.current.getTime()) / 1000));
+        const liveMs = Date.now() - raceStartRef.current.getTime();
+        setElapsedTime(Math.floor((liveMs + accumulatedElapsedRef.current) / 1000));
+      } else if (accumulatedElapsedRef.current > 0) {
+        setElapsedTime(Math.floor(accumulatedElapsedRef.current / 1000));
       }
     }, 1000);
     return () => clearInterval(interval);
@@ -241,207 +469,134 @@ export default function LEDScreen() {
     return () => clearInterval(interval);
   }, []);
 
-  const getSponsorInitials = (name: string) => {
-    return name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
-  };
-
-  const categoryLabel: Record<string, string> = {
-    overall: 'Overall',
-    RUN_3K: '3K',
-    RUN_5K: '5K',
-    company: 'Company',
-  };
-
   return (
-    <div className="w-screen h-screen bg-slate-950 text-white flex flex-col overflow-hidden select-none">
-      {/* Top Header Bar */}
-      <header className="h-[70px] xl:h-[80px] bg-gradient-to-r from-slate-900 via-slate-900 to-slate-800 flex items-center justify-between px-6 xl:px-10 border-b border-slate-700/50 shrink-0">
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 xl:w-12 xl:h-12 bg-emerald-500 rounded-lg flex items-center justify-center font-black text-slate-900 text-lg xl:text-xl">ISA</div>
-          <div>
-            <h1 className="text-xl xl:text-3xl font-black text-white tracking-wider leading-tight">ISA TECH MARATHON</h1>
-            <p className="text-[10px] xl:text-xs text-emerald-400 tracking-[0.2em]">RUN FOR A GREENER TOMORROW</p>
-          </div>
+    <div className="w-screen h-screen bg-[#0a0f1a] text-white flex flex-col overflow-hidden select-none font-sans">
+      {/* Header */}
+      <header className="h-[90px] bg-[#0d1320] border-b border-slate-800/60 flex items-center justify-between px-10 shrink-0 z-30">
+        <div className="flex items-center gap-6">
+          <Logo size="h-14" />
         </div>
-
-        <div className="flex items-center gap-8 xl:gap-14">
+        <div className="flex items-center gap-12">
           <div className="text-center">
-            <p className="text-2xl xl:text-4xl font-black font-mono text-emerald-400 tracking-wider leading-none">{formatDuration(elapsedTime)}</p>
-            <p className="text-[9px] xl:text-[11px] text-slate-400 uppercase tracking-[0.15em] mt-1">Elapsed</p>
+            <p className="text-4xl font-mono font-black text-emerald-400 leading-none">{formatDuration(elapsedTime)}</p>
+            <p className="text-sm text-slate-400 uppercase tracking-widest mt-2">Elapsed</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl xl:text-4xl font-black text-white leading-none">{totalRunners.toLocaleString()}</p>
-            <p className="text-[9px] xl:text-[11px] text-slate-400 uppercase tracking-[0.15em] mt-1">Runners</p>
+            <p className="text-4xl font-black text-white leading-none">{totalRunners}</p>
+            <p className="text-sm text-slate-400 uppercase tracking-widest mt-2">Runners</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl xl:text-4xl font-black text-purple-400 leading-none">{totalFinished.toLocaleString()}</p>
-            <p className="text-[9px] xl:text-[11px] text-slate-400 uppercase tracking-[0.15em] mt-1">Finished</p>
+            <p className="text-4xl font-black text-violet-400 leading-none">{totalFinished}</p>
+            <p className="text-sm text-slate-400 uppercase tracking-widest mt-2">Finished</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl xl:text-4xl font-black text-green-400 leading-none">{treeCount.toLocaleString()}</p>
-            <p className="text-[9px] xl:text-[11px] text-green-500 uppercase tracking-[0.15em] mt-1">Trees</p>
+            <p className="text-4xl font-black text-green-400 leading-none">{treeCount}</p>
+            <p className="text-sm text-green-400/80 uppercase tracking-widest mt-2">Trees</p>
           </div>
           <div className="text-center">
-            <p className="text-2xl xl:text-4xl font-black text-emerald-300 leading-none">{Math.round(co2Offset).toLocaleString()}</p>
-            <p className="text-[9px] xl:text-[11px] text-slate-400 uppercase tracking-[0.15em] mt-1">kg CO2</p>
+            <p className="text-4xl font-black text-emerald-300 leading-none">{Math.round(co2Offset)}</p>
+            <p className="text-sm text-slate-400 uppercase tracking-widest mt-2">kg CO2</p>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
       <div className="flex-1 flex min-h-0">
-        {/* Left Sidebar - Green Impact */}
-        <aside className="hidden lg:flex w-56 xl:w-64 bg-slate-900/60 border-r border-slate-800/50 p-5 xl:p-7 flex-col shrink-0">
-          <h2 className="text-sm xl:text-base font-black text-green-400 mb-5 xl:mb-7 text-center uppercase tracking-[0.2em]">Green Impact</h2>
-          <div className="space-y-5 xl:space-y-7 text-center flex-1 flex flex-col justify-center">
-            <div>
-              <p className="text-4xl xl:text-5xl font-black text-green-400 leading-none">{treeCount.toLocaleString()}</p>
-              <p className="text-[10px] xl:text-xs text-slate-400 mt-2 uppercase tracking-wider">Trees Planted</p>
-            </div>
-            <div className="w-16 h-px bg-slate-700 mx-auto" />
-            <div>
-              <p className="text-2xl xl:text-3xl font-black text-emerald-400 leading-none">{Math.round(co2Offset).toLocaleString()}</p>
-              <p className="text-[10px] xl:text-xs text-slate-400 mt-2 uppercase tracking-wider">kg CO2 Offset</p>
-            </div>
-            <div className="w-16 h-px bg-slate-700 mx-auto" />
-            <div>
-              <p className="text-xl xl:text-2xl font-black text-amber-400 leading-none">{Math.floor(co2Offset / 4600)}</p>
-              <p className="text-[10px] xl:text-xs text-slate-400 mt-2 uppercase tracking-wider">Cars Off Road/Yr</p>
-            </div>
-          </div>
-
-          {/* Sponsors Ticker at Bottom */}
-          {sponsors.length > 0 && (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 pt-3">
-              <p className="text-[9px] xl:text-[10px] text-slate-500 uppercase tracking-[0.2em] text-center mb-2 hidden lg:block">Our Sponsors</p>
-              {[...sponsors, ...sponsors, ...sponsors, ...sponsors].map((sponsor, i) => (
-                <div
-                  key={`${sponsor.id}-${i}`}
-                  className="border rounded-md p-2 bg-slate-800/50 transition-all hover:bg-slate-700/50 group cursor-pointer group-hover:bg-slate-700/80">
-{sponsor.logoUrl ? (
-                    <img src={sponsor.logoUrl} alt={sponsor.name} className="w-full h-24 object-contain transition-transform duration-300 group-hover:scale-105" />
-                  ) : (
-                    <div
-                      className="h-24 rounded-md flex items-center justify-center bg-slate-700/50"
-                    >
-                      <div
-                        className="w-6 h-6 rounded-md flex items-center justify-center text-sm font-black"
-                        style={{ backgroundColor: `${TIER_COLORS[sponsor.tier] || '#475569'}20`, color: TIER_COLORS[sponsor.tier] || '#94a3b8' }}
-                      >
-                        {getSponsorInitials(sponsor.name)}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </aside>
-        </div>
-
-        {/* Center - Map */}
+        {/* Map */}
         <main className="flex-1 relative min-w-0">
           {MAPBOX_TOKEN ? (
             <div ref={mapContainer} className="w-full h-full" />
           ) : (
-            <div className="w-full h-full flex items-center justify-center bg-slate-900/30">
-              <div className="text-center text-slate-600">
+            <div className="w-full h-full flex items-center justify-center bg-slate-900/50">
+              <div className="text-center text-slate-700">
                 <p className="text-6xl mb-4">MAP</p>
-                <p className="text-xl">Set VITE_MAPBOX_TOKEN to enable map</p>
+                <p className="text-lg">Set VITE_MAPBOX_TOKEN to enable map</p>
               </div>
             </div>
           )}
 
-          {/* Announcement Overlay */}
+          {/* Map overlay - Route info */}
+          {mapLoaded && routePointsRef.current.length > 0 && (
+            <div className="absolute bottom-8 left-8 bg-[#0d1320]/90 backdrop-blur-md border border-slate-700/50 rounded-xl px-6 py-4 z-10 pointer-events-none">
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-4 h-4 rounded-full bg-emerald-500" style={{ boxShadow: '0 0 8px rgba(16,185,129,0.6)' }} />
+                  <span className="text-sm text-slate-300">Route Active</span>
+                </div>
+                <div className="w-px h-6 bg-slate-700" />
+                <span className="text-sm text-slate-400">{routePointsRef.current.length} points mapped</span>
+                <div className="w-px h-6 bg-slate-700" />
+                <span className="text-sm text-emerald-400 font-bold">{markersRef.current.size} runners tracked</span>
+              </div>
+            </div>
+          )}
+
+          {/* Announcement overlay */}
           {announcement && (
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-amber-500/90 text-slate-900 px-8 py-3 rounded-xl shadow-2xl z-10 animate-pulse">
+            <div className="absolute top-6 left-1/2 -translate-x-1/2 bg-gradient-to-r from-amber-500 to-orange-500 text-slate-900 px-10 py-4 rounded-xl shadow-2xl z-20 animate-fade-in-up">
               <p className="font-black text-lg">{announcement.title}</p>
-              <p className="text-sm font-medium">{announcement.message}</p>
+              <p className="text-base font-medium">{announcement.message}</p>
             </div>
           )}
         </main>
 
-        {/* Right Sidebar - Leaderboard */}
-        <aside className="w-64 xl:w-80 bg-slate-900/60 border-l border-slate-800/50 p-4 xl:p-5 flex flex-col shrink-0">
-          <div className="flex items-center justify-between mb-3 xl:mb-4">
-            <h2 className="text-sm xl:text-base font-black text-amber-400 uppercase tracking-[0.15em]">
-              {categoryLabel[currentCategory] || 'Leaderboard'}
-            </h2>
-            <span className="text-[9px] xl:text-[10px] text-slate-500 uppercase tracking-wider">Top 10</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {leaderboard.map((entry) => (
-              <div
-                key={entry.rank}
-                className={`border rounded-lg p-3 bg-slate-800/50 transition-all hover:bg-slate-700/50 cursor-pointer ${entry.rank <= 3 ? 'border-emerald-500/30' : ''} ${entry.rank === 1 ? 'animate-pulse' : ''}`}>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className={`text-sm font-bold w-6 text-center ${
+        {/* Sidebar */}
+        <aside className="w-[400px] xl:w-[440px] bg-[#0d1320] border-l border-slate-800/60 flex flex-col shrink-0 overflow-y-auto">
+          {/* Leaderboard */}
+          <div className="p-5 border-b border-slate-800/40">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-extrabold text-amber-400 uppercase tracking-widest">Leaderboard</h2>
+              <span className="text-xs bg-slate-800 text-slate-400 px-3 py-1 rounded-full font-semibold uppercase tracking-wider">
+                {CATEGORY_LABELS[currentCategory]}
+              </span>
+            </div>
+            <div className="space-y-2">
+              {leaderboard.map((entry) => (
+                <div
+                  key={entry.rank}
+                  className={`flex items-center gap-4 px-4 py-3 rounded-lg transition-all ${
+                    entry.rank === 1 ? 'bg-amber-500/10 border border-amber-500/30' :
+                    entry.rank <= 3 ? 'bg-slate-800/60 border border-slate-700/50' :
+                    'bg-slate-900/40 hover:bg-slate-800/40'
+                  }`}
+                >
+                  <span className={`text-sm font-bold w-7 text-center shrink-0 ${
                     entry.rank === 1 ? 'text-amber-400' :
                     entry.rank === 2 ? 'text-slate-300' :
-                    entry.rank === 3 ? 'text-orange-500' :
-                    'text-slate-400'
-                  }`}>
-                    {entry.rank}
-                  </span>
-                  <div>
-                    <p className="text-xs font-bold truncate leading-tight">{entry.name}</p>
-                    <p className="text-[8px] text-slate-400 truncate">
-                      {entry.bibNumber}{entry.companyName ? ` · ${entry.companyName}` : ''}
+                    entry.rank === 3 ? 'text-orange-400' : 'text-slate-400'
+                  }`}>{entry.rank}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-base font-bold truncate leading-tight text-white">{entry.name}</p>
+                    <p className="text-sm text-slate-400 truncate">
+                      #{entry.bibNumber}{entry.companyName ? ` · ${entry.companyName}` : ''}
                     </p>
                   </div>
-                </div>
-                <p className="text-xs text-emerald-400 whitespace-nowrap">{entry.distance.toFixed(2)} km</p>
-              </div>
-            ))}
-            {leaderboard.length === 0 && (
-              <div className="col-span-full h-24 flex items-center justify-center">
-                <p className="text-slate-600 text-sm text-center">Waiting for race...</p>
-              </div>
-            )}
-          </div>
-
-          {/* Mobile Sponsors Ticker */}
-          {sponsors.length > 0 && (
-<div className="grid grid-cols-2 gap-2 pt-2">
-              <p className="text-[9px] text-slate-500 uppercase tracking-[0.15em] text-center mb-2 hidden lg:block">Sponsors</p>
-              {[...sponsors, ...sponsors].map((sponsor, i) => (
-                <div
-                  key={`m-${sponsor.id}-${i}`}
-                  className="border rounded-md p-2 bg-slate-800/50 transition-all hover:bg-slate-700/50 group cursor-pointer group-hover:bg-slate-700/80">
-                  {sponsor.logoUrl ? (
-                    <img src={sponsor.logoUrl} alt={sponsor.name} className="w-full h-24 object-contain transition-transform duration-300 group-hover:scale-105" />
-                  ) : (
-                    <div
-                      className="h-24 rounded-md flex items-center justify-center bg-slate-700/50"
-                    >
-                      <div
-                        className="w-6 h-6 rounded-md flex items-center justify-center text-sm font-black"
-                        style={{ backgroundColor: `${TIER_COLORS[sponsor.tier] || '#475569'}20`, color: TIER_COLORS[sponsor.tier] || '#94a3b8' }}
-                      >
-                        {getSponsorInitials(sponsor.name)}
-                      </div>
-                    </div>
-                  }
+                  <span className="text-sm font-mono font-bold text-emerald-400 shrink-0">{entry.distance.toFixed(2)} km</span>
                 </div>
               ))}
-            </div>
-                      )}
-                    </div>
-                  ))}
+              {leaderboard.length === 0 && (
+                <div className="h-24 flex items-center justify-center">
+                  <p className="text-slate-500 text-base">Waiting for race...</p>
                 </div>
-              </div>
+              )}
             </div>
-          )}
-        </aside>
-      </div>
+          </div>
+          </aside>
+        </div>
 
-      {/* Bottom Announcement Banner */}
+      {/* Announcement Banner */}
       {announcement && (
-        <div className="h-10 xl:h-12 bg-gradient-to-r from-amber-500/20 via-amber-500/30 to-amber-500/20 border-t border-amber-500/40 flex items-center justify-center px-8 shrink-0">
-          <span className="text-amber-400 font-black mr-3 text-sm xl:text-base">{announcement.title}:</span>
-          <span className="text-amber-200 text-xs xl:text-sm">{announcement.message}</span>
+        <div className="h-14 bg-gradient-to-r from-amber-500/20 via-amber-500/30 to-amber-500/20 border-t border-amber-500/30 flex items-center justify-center px-10 shrink-0">
+          <span className="text-amber-400 font-bold mr-3 text-base">{announcement.title}:</span>
+          <span className="text-amber-200/80 text-sm">{announcement.message}</span>
         </div>
       )}
+
+      {/* Sponsors Ticker */}
+      <div className="h-16 bg-[#0d1320] border-t border-slate-800/40 flex items-center px-10 shrink-0">
+        <span className="text-xs font-extrabold text-slate-500 uppercase tracking-widest mr-6 shrink-0">Sponsors</span>
+        <SponsorTicker sponsors={sponsors} />
+      </div>
     </div>
   );
 }

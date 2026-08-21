@@ -1,43 +1,293 @@
 import { Router } from 'express';
 import { prisma } from '../config/database.js';
+import { authenticate } from '../middleware/auth.js';
+import { requireRole } from '../middleware/auth.js';
 
 export const participantsRouter = Router();
 
-participantsRouter.get('/', async (_req, res) => {
-  const participants = await prisma.participant.findMany({
-    include: { user: true },
-    take: 500,
-  });
-  res.json({ success: true, data: participants });
+participantsRouter.get('/stats/summary', async (req, res) => {
+  try {
+    const eventId = typeof req.query.eventId === 'string' ? req.query.eventId : undefined;
+
+    let event = undefined;
+    if (!eventId) {
+      event = await prisma.event.findFirst({
+        where: { status: { in: ['ACTIVE', 'PAUSED'] } },
+        orderBy: { updatedAt: 'desc' },
+      });
+      if (!event) {
+        event = await prisma.event.findFirst({
+          where: { status: 'UPCOMING' },
+          orderBy: { date: 'asc' },
+        });
+      }
+    }
+
+    const targetEventId = eventId ?? event?.id;
+    if (!targetEventId) {
+      return res.json({
+        success: true,
+        data: { total: 0, checkedIn: 0, running: 0, finished: 0, byCategory: [] },
+      });
+    }
+
+    const [total, checkedIn, running, finished, byCategory] = await Promise.all([
+      prisma.participant.count({ where: { eventId: targetEventId } }),
+      prisma.participant.count({ where: { eventId: targetEventId, checkedIn: true } }),
+      prisma.participant.count({ where: { eventId: targetEventId, status: 'RUNNING' } }),
+      prisma.participant.count({
+        where: { eventId: targetEventId, status: { in: ['FINISHED', 'DNF'] } },
+      }),
+      prisma.participant.groupBy({
+        by: ['category'],
+        where: { eventId: targetEventId },
+        _count: { category: true },
+      }),
+    ]);
+
+    res.json({
+      success: true,
+      data: { total, checkedIn, running, finished, byCategory },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch participant stats' });
+  }
+});
+
+participantsRouter.get('/export/csv', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'), async (_req, res) => {
+  try {
+    const participants = await prisma.participant.findMany({
+      include: { user: true, company: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const headers = ['ID', 'Bib Number', 'Name', 'Email', 'Phone', 'Company', 'Category', 'Gender', 'Status', 'Checked In', 'Total Distance', 'Finish Time'];
+    const rows = participants.map((p) => [
+      p.id,
+      p.bibNumber,
+      p.user.name,
+      p.user.email,
+      p.user.phone,
+      p.company?.name ?? '',
+      p.category,
+      p.gender,
+      p.status,
+      p.checkedIn ? 'Yes' : 'No',
+      p.totalDistance,
+      p.finishTime ?? '',
+    ]);
+
+    const csv = [headers.join(','), ...rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=participants.csv');
+    res.send(csv);
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to export CSV' });
+  }
+});
+
+participantsRouter.get('/', async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
+    const search = typeof req.query.search === 'string' ? req.query.search : undefined;
+    const category = typeof req.query.category === 'string' ? req.query.category : undefined;
+    const eventId = typeof req.query.eventId === 'string' ? req.query.eventId : undefined;
+
+    const where: any = {};
+    if (eventId) where.eventId = eventId;
+    if (category) where.category = category;
+    if (search) {
+      where.OR = [
+        { bibNumber: { contains: search, mode: 'insensitive' } },
+        { user: { name: { contains: search, mode: 'insensitive' } } },
+        { user: { email: { contains: search, mode: 'insensitive' } } },
+        { company: { name: { contains: search, mode: 'insensitive' } } },
+      ];
+    }
+
+    const [participants, total] = await Promise.all([
+      prisma.participant.findMany({
+        where,
+        include: { user: true, company: true },
+        skip: (page - 1) * limit,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+      }),
+      prisma.participant.count({ where }),
+    ]);
+
+    res.json({
+      success: true,
+      data: participants,
+      pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch participants' });
+  }
 });
 
 participantsRouter.get('/leaderboard', async (req, res) => {
-  const { eventId, limit = '100' } = req.query;
-  const participants = await prisma.participant.findMany({
-    where: { eventId: eventId as string || 'default-event-id' },
-    include: { user: true },
-    orderBy: { totalDistance: 'desc' },
-    take: parseInt(limit as string),
-  });
-  res.json({ success: true, data: participants });
+  try {
+    const { eventId, limit = '100' } = req.query;
+    if (!eventId) {
+      return res.json({ success: true, data: [] });
+    }
+    const participants = await prisma.participant.findMany({
+      where: { eventId: eventId as string },
+      include: { user: true },
+      orderBy: { totalDistance: 'desc' },
+      take: parseInt(limit as string),
+    });
+    res.json({ success: true, data: participants });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch leaderboard' });
+  }
+});
+
+participantsRouter.get('/companies', async (_req, res) => {
+  try {
+    const companies = await prisma.company.findMany({
+      include: { _count: { select: { participants: true } } },
+      orderBy: { name: 'asc' },
+    });
+    res.json({ success: true, data: companies });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch companies' });
+  }
+});
+
+participantsRouter.post('/companies', authenticate, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const { name, contactEmail, contactPhone, industry, employeeCount } = req.body;
+    if (!name) {
+      return res.status(400).json({ success: false, message: 'name is required' });
+    }
+    const company = await prisma.company.create({
+      data: { name, industry, employeeCount },
+    });
+    res.status(201).json({ success: true, data: company });
+  } catch (error: any) {
+    if (error?.code === 'P2002') {
+      return res.status(409).json({ success: false, message: 'Company name already exists' });
+    }
+    res.status(500).json({ success: false, message: 'Failed to create company' });
+  }
+});
+
+participantsRouter.put('/companies/:id', authenticate, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const { name, industry, employeeCount } = req.body;
+    const company = await prisma.company.findUnique({ where: { id: req.params.id } });
+    if (!company) {
+      return res.status(404).json({ success: false, message: 'Company not found' });
+    }
+    const updated = await prisma.company.update({
+      where: { id: req.params.id },
+      data: {
+        ...(name !== undefined && { name }),
+        ...(industry !== undefined && { industry }),
+        ...(employeeCount !== undefined && { employeeCount }),
+      },
+    });
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to update company' });
+  }
+});
+
+participantsRouter.delete('/companies/:id', authenticate, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const company = await prisma.company.findUnique({ where: { id: req.params.id } });
+    if (!company) {
+      return res.status(404).json({ success: false, message: 'Company not found' });
+    }
+    await prisma.company.delete({ where: { id: req.params.id } });
+    res.json({ success: true, message: 'Company deleted' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to delete company' });
+  }
+});
+
+participantsRouter.get('/:id', async (req, res) => {
+  try {
+    const participant = await prisma.participant.findUnique({
+      where: { id: req.params.id },
+      include: { user: true, company: true },
+    });
+    if (!participant) {
+      return res.status(404).json({ success: false, message: 'Participant not found' });
+    }
+    res.json({ success: true, data: participant });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch participant' });
+  }
+});
+
+participantsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'), async (req, res) => {
+  try {
+    const { status, category, gender, companyId, bibNumber, emergencyContact, emergencyPhone, bloodGroup, tshirtSize } = req.body;
+    const participant = await prisma.participant.findUnique({ where: { id: req.params.id } });
+    if (!participant) {
+      return res.status(404).json({ success: false, message: 'Participant not found' });
+    }
+
+    const updated = await prisma.participant.update({
+      where: { id: req.params.id },
+      data: {
+        ...(status !== undefined && { status }),
+        ...(category !== undefined && { category }),
+        ...(gender !== undefined && { gender }),
+        ...(companyId !== undefined && { companyId }),
+        ...(bibNumber !== undefined && { bibNumber }),
+        ...(emergencyContact !== undefined && { emergencyContact }),
+        ...(emergencyPhone !== undefined && { emergencyPhone }),
+        ...(bloodGroup !== undefined && { bloodGroup }),
+        ...(tshirtSize !== undefined && { tshirtSize }),
+      },
+      include: { user: true, company: true },
+    });
+
+    res.json({ success: true, data: updated });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to update participant' });
+  }
+});
+
+participantsRouter.delete('/:id', authenticate, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const participant = await prisma.participant.findUnique({ where: { id: req.params.id } });
+    if (!participant) {
+      return res.status(404).json({ success: false, message: 'Participant not found' });
+    }
+    await prisma.participant.delete({ where: { id: req.params.id } });
+    res.json({ success: true, message: 'Participant deleted' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to delete participant' });
+  }
 });
 
 export const publicParticipantsRouter = Router();
 
 publicParticipantsRouter.get('/search', async (req, res) => {
-  const { q } = req.query;
-  if (!q) return res.json({ success: true, data: [] });
-  
-  const participants = await prisma.participant.findMany({
-    where: {
-      OR: [
-        { bibNumber: { contains: q as string, mode: 'insensitive' } },
-        { user: { name: { contains: q as string, mode: 'insensitive' } } },
-        { company: { name: { contains: q as string, mode: 'insensitive' } } },
-      ],
-    },
-    include: { user: true, company: true },
-    take: 20,
-  });
-  res.json({ success: true, data: participants });
+  try {
+    const { q } = req.query;
+    if (!q) return res.json({ success: true, data: [] });
+
+    const participants = await prisma.participant.findMany({
+      where: {
+        OR: [
+          { bibNumber: { contains: q as string, mode: 'insensitive' } },
+          { user: { name: { contains: q as string, mode: 'insensitive' } } },
+          { company: { name: { contains: q as string, mode: 'insensitive' } } },
+        ],
+      },
+      include: { user: true, company: true },
+      take: 20,
+    });
+    res.json({ success: true, data: participants });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Search failed' });
+  }
 });

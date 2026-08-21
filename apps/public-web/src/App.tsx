@@ -3,6 +3,7 @@ import RegisterPage from './pages/RegisterPage';
 import HRPortalPage from './pages/HRPortalPage';
 import logoDark from './components/logo-dark.png';
 
+
 const Logo = ({ size = 'h-16' }: { size?: string }) => (
   <img src={logoDark} alt="ISA Marathon" className={`${size} w-auto max-w-full object-contain drop-shadow-lg`} />
 );
@@ -34,17 +35,16 @@ function HomePage() {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
-              <a 
-                href="/register" 
+              <span 
                 className="white-btn w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 rounded-xl text-base sm:text-lg shadow-xl"
               >
-                Register Now
-              </a>
+                Coming Soon
+              </span>
             </div>
             
             
             <div className="mt-6 sm:mt-8 glass-dark inline-block px-4 sm:px-5 py-1.5 sm:py-2 rounded-full">
-              <span className="text-xs sm:text-sm text-slate-800 font-medium">August 24, 2026 - Indore, India</span>
+              <span className="text-xs sm:text-sm text-slate-800 font-medium">September 27, 2026 - Indore, India</span>
             </div>
           </div>
         </div>

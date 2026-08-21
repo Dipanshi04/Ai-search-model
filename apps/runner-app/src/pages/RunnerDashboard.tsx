@@ -34,7 +34,7 @@ export default function RunnerDashboard({ participantId, token, category, eventI
   });
   const [elapsedTime, setElapsedTime] = useState(0);
   const [mapReady, setMapReady] = useState(false);
-  const [trackingStarted, setTrackingStarted] = useState(false);
+  const [, setTrackingStarted] = useState(false);
 
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);

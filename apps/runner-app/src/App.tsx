@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react';
 import RunnerDashboard from './pages/RunnerDashboard';
 import LoginPage from './pages/LoginPage';
 import { api } from './lib/api';
-import logoDark from './components/logo-dark.png';
-import logoLight from './components/logo-light.png';
 
 const Logo = ({ size = 'h-14', theme = 'dark' }: { size?: string; theme?: 'light' | 'dark' }) => (
   <img 

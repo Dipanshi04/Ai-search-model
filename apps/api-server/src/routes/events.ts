@@ -3,7 +3,7 @@ import { prisma } from '../config/database.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireRole } from '../middleware/auth.js';
 
-export const eventsRouter = Router();
+export const eventsRouter: Router = Router();
 
 eventsRouter.get('/', async (_req: Request, res: Response) => {
   try {
@@ -27,7 +27,7 @@ eventsRouter.get('/', async (_req: Request, res: Response) => {
 eventsRouter.get('/:id', async (req: Request, res: Response) => {
   try {
     const event = await prisma.event.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: {
         _count: { select: { participants: true } },
         raceDistances: {
@@ -92,14 +92,14 @@ eventsRouter.post('/', authenticate, requireRole('SUPER_ADMIN'), async (req: Req
 eventsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN'), async (req: Request, res: Response) => {
   try {
     const { name, description, date, status, maxParticipants, registrationOpen, branding } = req.body;
-    const event = await prisma.event.findUnique({ where: { id: req.params.id } });
+    const event = await prisma.event.findUnique({ where: { id: req.params.id as string } });
     if (!event) {
       res.status(404).json({ success: false, message: 'Event not found' });
       return;
     }
 
     const updated = await prisma.event.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data: {
         ...(name !== undefined && { name }),
         ...(description !== undefined && { description }),
@@ -119,12 +119,12 @@ eventsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN'), async (req: R
 
 eventsRouter.delete('/:id', authenticate, requireRole('SUPER_ADMIN'), async (req: Request, res: Response) => {
   try {
-    const event = await prisma.event.findUnique({ where: { id: req.params.id } });
+    const event = await prisma.event.findUnique({ where: { id: req.params.id as string } });
     if (!event) {
       res.status(404).json({ success: false, message: 'Event not found' });
       return;
     }
-    await prisma.event.delete({ where: { id: req.params.id } });
+    await prisma.event.delete({ where: { id: req.params.id as string } });
     res.json({ success: true, message: 'Event deleted' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to delete event' });
@@ -139,7 +139,7 @@ eventsRouter.post('/:id/distances', authenticate, requireRole('SUPER_ADMIN', 'RA
       return;
     }
 
-    const event = await prisma.event.findUnique({ where: { id: req.params.id } });
+    const event = await prisma.event.findUnique({ where: { id: req.params.id as string } });
     if (!event) {
       res.status(404).json({ success: false, message: 'Event not found' });
       return;
@@ -147,7 +147,7 @@ eventsRouter.post('/:id/distances', authenticate, requireRole('SUPER_ADMIN', 'RA
 
     const distance = await prisma.raceDistance.create({
       data: {
-        eventId: req.params.id,
+        eventId: req.params.id as string,
         name,
         distanceKm,
       },
@@ -162,14 +162,14 @@ eventsRouter.post('/:id/distances', authenticate, requireRole('SUPER_ADMIN', 'RA
 eventsRouter.put('/:id/distances/:distanceId', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'), async (req: Request, res: Response) => {
   try {
     const { name, distanceKm, status } = req.body;
-    const distance = await prisma.raceDistance.findUnique({ where: { id: req.params.distanceId } });
+    const distance = await prisma.raceDistance.findUnique({ where: { id: req.params.distanceId as string } });
     if (!distance) {
       res.status(404).json({ success: false, message: 'Distance not found' });
       return;
     }
 
     const updated = await prisma.raceDistance.update({
-      where: { id: req.params.distanceId },
+      where: { id: req.params.distanceId as string },
       data: {
         ...(name !== undefined && { name }),
         ...(distanceKm !== undefined && { distanceKm }),
@@ -185,12 +185,12 @@ eventsRouter.put('/:id/distances/:distanceId', authenticate, requireRole('SUPER_
 
 eventsRouter.delete('/:id/distances/:distanceId', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'), async (req: Request, res: Response) => {
   try {
-    const distance = await prisma.raceDistance.findUnique({ where: { id: req.params.distanceId } });
+    const distance = await prisma.raceDistance.findUnique({ where: { id: req.params.distanceId as string } });
     if (!distance) {
       res.status(404).json({ success: false, message: 'Distance not found' });
       return;
     }
-    await prisma.raceDistance.delete({ where: { id: req.params.distanceId } });
+    await prisma.raceDistance.delete({ where: { id: req.params.distanceId as string } });
     res.json({ success: true, message: 'Distance deleted' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to delete distance' });

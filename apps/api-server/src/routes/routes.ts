@@ -3,7 +3,7 @@ import { prisma } from '../config/database.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireRole } from '../middleware/auth.js';
 
-export const routesRouter = Router();
+export const routesRouter: Router = Router();
 
 routesRouter.get('/event/:eventId', async (req: Request, res: Response) => {
   try {

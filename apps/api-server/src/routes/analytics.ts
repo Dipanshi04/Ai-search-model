@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../config/database.js';
 
-export const analyticsRouter = Router();
+export const analyticsRouter: Router = Router();
 
 analyticsRouter.get('/', async (_req, res) => {
   try {

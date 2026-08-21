@@ -18,7 +18,7 @@ export function authenticate(req: Request, res: Response, next: NextFunction): v
       return;
     }
 
-    const token = authHeader.split(' ')[1];
+    const token = authHeader.split(' ')[1]!;
     const decoded = verifyToken(token);
     req.user = decoded;
     next();

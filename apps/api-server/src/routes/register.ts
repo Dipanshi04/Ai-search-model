@@ -4,7 +4,7 @@ import { logger } from '../config/logger.js';
 import bcrypt from 'bcryptjs';
 import { generateQRCode } from '../utils/qrcode.js';
 
-export const registerRouter = Router();
+export const registerRouter: Router = Router();
 
 registerRouter.post('/', async (req: Request, res: Response) => {
   try {

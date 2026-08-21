@@ -8,7 +8,7 @@ import { authenticate } from '../middleware/auth.js';
 import { prisma } from '../config/database.js';
 import { logger } from '../config/logger.js';
 
-export const authRouter = Router();
+export const authRouter: Router = Router();
 
 authRouter.post(
   '/login',

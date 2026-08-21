@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { prisma } from '../config/database.js';
 
-export const checkinRouter = Router();
+export const checkinRouter: Router = Router();
 
 checkinRouter.get('/stats', async (req, res) => {
   try {

@@ -8,7 +8,7 @@ import { parse } from 'csv-parse/sync';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
-export const hrRouter = Router();
+export const hrRouter: Router = Router();
 
 function hrAuth(req: Request, res: Response, next: NextFunction) {
   try {

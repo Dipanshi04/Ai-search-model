@@ -76,11 +76,13 @@ export async function getRunnerDistance(participantId: string): Promise<number> 
 
   let totalDistance = 0;
   for (let i = 1; i < logs.length; i++) {
+    const prev = logs[i - 1]!;
+    const curr = logs[i]!;
     totalDistance += calculateDistance(
-      logs[i - 1].lat,
-      logs[i - 1].lng,
-      logs[i].lat,
-      logs[i].lng
+      prev.lat,
+      prev.lng,
+      curr.lat,
+      curr.lng
     );
   }
 

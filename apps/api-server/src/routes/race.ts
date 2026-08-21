@@ -4,7 +4,7 @@ import { authenticate } from '../middleware/auth.js';
 import { requireRole } from '../middleware/auth.js';
 import { getSocketIO } from '../config/socket.js';
 
-export const raceRouter = Router();
+export const raceRouter: Router = Router();
 
 raceRouter.get('/events', async (_req: Request, res: Response) => {
   try {

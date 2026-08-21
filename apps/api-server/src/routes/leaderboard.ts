@@ -1,8 +1,7 @@
 import { Router } from 'express';
 
-export const leaderboardRouter = Router();
+export const leaderboardRouter: Router = Router();
 
-leaderboardRouter.get('/', async (req, res) => {
-  const { eventId, category } = req.query;
+leaderboardRouter.get('/', async (_req, res) => {
   res.json({ success: true, data: [] });
 });

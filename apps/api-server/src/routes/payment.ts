@@ -7,7 +7,7 @@ const razorpay = new Razorpay({
   key_secret: process.env.RAZORPAY_KEY_SECRET as string,
 });
 
-export const paymentRouter = Router();
+export const paymentRouter: Router = Router();
 
 paymentRouter.get('/config', async (_req: Request, res: Response) => {
   res.json({ success: true, data: { keyId: process.env.RAZORPAY_KEY_ID } });

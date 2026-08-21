@@ -4,7 +4,7 @@ import { logger } from '../config/logger.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { hashPassword } from '../utils/jwt.js';
 
-export const bulkRegistrationRouter = Router();
+export const bulkRegistrationRouter: Router = Router();
 
 bulkRegistrationRouter.use(authenticate);
 bulkRegistrationRouter.use(requireRole('SUPER_ADMIN'));

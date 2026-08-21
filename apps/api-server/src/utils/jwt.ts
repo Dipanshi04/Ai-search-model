@@ -1,6 +1,10 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
-import { JWT_CONFIG } from '@isa/config';
+
+const JWT_CONFIG = {
+  ACCESS_TOKEN_EXPIRY: '24h',
+  REFRESH_TOKEN_EXPIRY: '7d',
+};
 
 export interface JwtPayload {
   userId: string;
@@ -11,13 +15,13 @@ export interface JwtPayload {
 export function generateAccessToken(payload: JwtPayload): string {
   return jwt.sign(payload, process.env.JWT_SECRET!, {
     expiresIn: JWT_CONFIG.ACCESS_TOKEN_EXPIRY,
-  });
+  } as jwt.SignOptions);
 }
 
 export function generateRefreshToken(payload: JwtPayload): string {
   return jwt.sign(payload, process.env.JWT_SECRET!, {
     expiresIn: JWT_CONFIG.REFRESH_TOKEN_EXPIRY,
-  });
+  } as jwt.SignOptions);
 }
 
 export function verifyToken(token: string): JwtPayload {

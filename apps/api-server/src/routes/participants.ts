@@ -3,7 +3,7 @@ import { prisma } from '../config/database.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireRole } from '../middleware/auth.js';
 
-export const participantsRouter = Router();
+export const participantsRouter: Router = Router();
 
 participantsRouter.get('/stats/summary', async (req, res) => {
   try {
@@ -183,13 +183,13 @@ participantsRouter.post('/companies', authenticate, requireRole('SUPER_ADMIN'), 
 participantsRouter.put('/companies/:id', authenticate, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
     const { name, industry, employeeCount } = req.body;
-    const company = await prisma.company.findUnique({ where: { id: req.params.id } });
+    const company = await prisma.company.findUnique({ where: { id: req.params.id as string } });
     if (!company) {
       res.status(404).json({ success: false, message: 'Company not found' });
       return;
     }
     const updated = await prisma.company.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data: {
         ...(name !== undefined && { name }),
         ...(industry !== undefined && { industry }),
@@ -204,12 +204,12 @@ participantsRouter.put('/companies/:id', authenticate, requireRole('SUPER_ADMIN'
 
 participantsRouter.delete('/companies/:id', authenticate, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
-    const company = await prisma.company.findUnique({ where: { id: req.params.id } });
+    const company = await prisma.company.findUnique({ where: { id: req.params.id as string } });
     if (!company) {
       res.status(404).json({ success: false, message: 'Company not found' });
       return;
     }
-    await prisma.company.delete({ where: { id: req.params.id } });
+    await prisma.company.delete({ where: { id: req.params.id as string } });
     res.json({ success: true, message: 'Company deleted' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to delete company' });
@@ -219,7 +219,7 @@ participantsRouter.delete('/companies/:id', authenticate, requireRole('SUPER_ADM
 participantsRouter.get('/:id', async (req, res) => {
   try {
     const participant = await prisma.participant.findUnique({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       include: { user: true, company: true },
     });
     if (!participant) {
@@ -235,14 +235,14 @@ participantsRouter.get('/:id', async (req, res) => {
 participantsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'), async (req, res) => {
   try {
     const { status, category, gender, companyId, bibNumber, emergencyContact, emergencyPhone, bloodGroup, tshirtSize } = req.body;
-    const participant = await prisma.participant.findUnique({ where: { id: req.params.id } });
+    const participant = await prisma.participant.findUnique({ where: { id: req.params.id as string } });
     if (!participant) {
       res.status(404).json({ success: false, message: 'Participant not found' });
       return;
     }
 
     const updated = await prisma.participant.update({
-      where: { id: req.params.id },
+      where: { id: req.params.id as string },
       data: {
         ...(status !== undefined && { status }),
         ...(category !== undefined && { category }),
@@ -265,19 +265,19 @@ participantsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MA
 
 participantsRouter.delete('/:id', authenticate, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
-    const participant = await prisma.participant.findUnique({ where: { id: req.params.id } });
+    const participant = await prisma.participant.findUnique({ where: { id: req.params.id as string } });
     if (!participant) {
       res.status(404).json({ success: false, message: 'Participant not found' });
       return;
     }
-    await prisma.participant.delete({ where: { id: req.params.id } });
+    await prisma.participant.delete({ where: { id: req.params.id as string } });
     res.json({ success: true, message: 'Participant deleted' });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to delete participant' });
   }
 });
 
-export const publicParticipantsRouter = Router();
+export const publicParticipantsRouter: Router = Router();
 
 publicParticipantsRouter.get('/search', async (req, res) => {
   try {

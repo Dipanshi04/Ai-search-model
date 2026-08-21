@@ -39,7 +39,7 @@ import { hrRouter } from './routes/hr.js';
 const PORT = process.env.PORT || 4000;
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';
 
-const app = express();
+const app: ReturnType<typeof express> = express();
 
 app.use(helmet());
 app.use(cors({ origin: CORS_ORIGIN.split(','), credentials: true }));

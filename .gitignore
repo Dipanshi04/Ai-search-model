@@ -9,11 +9,10 @@ build/
 .next/
 .turbo/
 
-# Environment files
-.env
-.env.local
-.env.*.local
-.env.production
+# Environment files (NEVER commit secrets)
+**/.env
+**/.env.*
+!**/.env.example
 
 # IDE
 .vscode/settings.json

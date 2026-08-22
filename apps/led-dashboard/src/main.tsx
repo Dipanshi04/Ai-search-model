@@ -10,7 +10,7 @@ const queryClient = new QueryClient();
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter basename="/led-dashboard">
+      <BrowserRouter>
         <App />
       </BrowserRouter>
     </QueryClientProvider>

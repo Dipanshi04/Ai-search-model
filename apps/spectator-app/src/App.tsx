@@ -8,7 +8,7 @@ const Logo = ({ size = 'h-14', theme = 'dark' }: { size?: string; theme?: 'light
   <img src={theme === 'dark' ? logoLight : logoDark} alt="ISA Marathon" className={`${size} w-auto max-w-full object-contain drop-shadow-md`} />
 );
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 interface RunnerPosition {
   participantId: string;

@@ -11,7 +11,7 @@ const Logo = ({ size = 'h-18', theme = 'dark' }: { size?: string; theme?: 'light
 );
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+const API_URL = import.meta.env.VITE_API_URL || '';
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || '';
 
 const RUNNER_COLORS = [

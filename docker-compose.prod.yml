@@ -12,7 +12,7 @@ services:
       DATABASE_URL: postgresql://isa:isa_password@postgres:5432/isa_marathon
       REDIS_URL: redis://redis:6379
       JWT_SECRET: ${JWT_SECRET}
-      CORS_ORIGIN: https://marathon.isatech.dev,https://admin.isatech.dev
+      CORS_ORIGIN: https://marathon.theisa.in,https://admin.theisa.in
     depends_on:
       - postgres
       - redis

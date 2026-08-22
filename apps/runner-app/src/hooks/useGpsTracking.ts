@@ -39,7 +39,7 @@ export function useGpsTracking(participantId: string, token: string) {
       return;
     }
 
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+    const API_URL = import.meta.env.VITE_API_URL || '';
     const socket = io(API_URL, {
       auth: { token },
       transports: ['websocket'],

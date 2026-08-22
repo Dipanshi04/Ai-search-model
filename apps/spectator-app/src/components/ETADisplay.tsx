@@ -24,7 +24,7 @@ export function ETADisplay({ runnerId, routeDistanceKm }: ETADisplayProps) {
   const socketRef = useRef<Socket | null>(null);
 
   useEffect(() => {
-    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+    const API_URL = import.meta.env.VITE_API_URL || '';
     const socket = io(API_URL, { transports: ['websocket'] });
 
     socket.on('connect', () => {

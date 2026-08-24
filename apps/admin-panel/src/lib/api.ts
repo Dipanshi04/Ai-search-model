@@ -161,8 +161,9 @@ class ApiClient {
     return this.request<any>(`/api/v1/race/status${query}`);
   }
 
-  async getCompanies() {
-    return this.request<any[]>('/api/v1/participants/companies');
+  async getCompanies(params?: Record<string, string>) {
+    const query = params ? '?' + new URLSearchParams(params).toString() : '';
+    return this.request<any[]>(`/api/v1/participants/companies${query}`);
   }
 
   async createCompany(data: { name: string; contactEmail?: string; contactPhone?: string }) {

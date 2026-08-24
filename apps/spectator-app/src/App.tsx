@@ -65,18 +65,22 @@ export default function SpectatorTracking() {
   const socketRef = useRef<Socket | null>(null);
   const raceStartRef = useRef<Date | null>(null);
   const accumulatedElapsedRef = useRef(0);
+  const resolvedEventIdRef = useRef('');
+  const [socketReady, setSocketReady] = useState(false);
 
   useEffect(() => {
     async function loadInitial() {
       try {
-        const [statusRes, sponsorRes, lbRes] = await Promise.allSettled([
+        const [statusRes, sponsorRes, lbRes, treeRes] = await Promise.allSettled([
           fetch(`${API_URL}/api/v1/race/status`).then((r) => r.json()),
           fetch(`${API_URL}/api/v1/sponsors`).then((r) => r.json()),
           fetch(`${API_URL}/api/v1/participants/leaderboard?limit=500`).then((r) => r.json()),
+          fetch(`${API_URL}/api/v1/trees/counter`).then((r) => r.json()),
         ]);
 
         if (statusRes.status === 'fulfilled' && statusRes.value.success) {
           const ev = statusRes.value.data?.event;
+          if (ev?.id) resolvedEventIdRef.current = ev.id;
           const elapsedMs = ev?.elapsedMs || 0;
           if (elapsedMs > 0) {
             const now = new Date();
@@ -108,6 +112,13 @@ export default function SpectatorTracking() {
             status: p.status,
           })));
         }
+
+        if (treeRes.status === 'fulfilled' && treeRes.value.success) {
+          setTreeCount(treeRes.value.data.totalTrees || 0);
+          setCo2Offset(treeRes.value.data.totalCO2 || 0);
+        }
+
+        if (resolvedEventIdRef.current) setSocketReady(true);
       } catch (e) {
         console.error('Initial load error:', e);
       }
@@ -116,12 +127,16 @@ export default function SpectatorTracking() {
   }, []);
 
   useEffect(() => {
+    if (!socketReady) return;
+    const eventId = resolvedEventIdRef.current;
+    if (!eventId) return;
+
     const socket = io(API_URL, { transports: ['polling', 'websocket'] });
 
     socket.on('connect', () => {
-      socket.emit('join:tracking', 'default-event-id');
-      socket.emit('join:leaderboard', 'default-event-id');
-      socket.emit('join:event', 'default-event-id');
+      socket.emit('join:tracking', eventId);
+      socket.emit('join:leaderboard', eventId);
+      socket.emit('join:event', eventId);
     });
 
     socket.on('race:start', (data: any) => {
@@ -201,7 +216,7 @@ export default function SpectatorTracking() {
 
     socketRef.current = socket;
     return () => { socket.disconnect(); };
-  }, []);
+  }, [socketReady]);
 
   useEffect(() => {
     const interval = setInterval(() => {

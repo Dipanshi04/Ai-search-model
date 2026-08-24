@@ -8,7 +8,7 @@ export const registerRouter: Router = Router();
 
 registerRouter.post('/', async (req: Request, res: Response) => {
   try {
-    const { name, email, phone, category, gender, companyName, emergencyContact, emergencyPhone, bloodGroup, tshirtSize } = req.body;
+    const { name, email, phone, category, gender, companyName, eventId: reqEventId, emergencyContact, emergencyPhone, bloodGroup, tshirtSize } = req.body;
 
     if (!name || !email || !phone || !category || !gender) {
       res.status(400).json({ success: false, message: 'Missing required fields' });
@@ -24,21 +24,30 @@ registerRouter.post('/', async (req: Request, res: Response) => {
       });
     }
 
-    // Get active event
-    const event = await prisma.event.findFirst({ where: { status: 'UPCOMING' } });
+    // Get event
+    let event;
+    if (reqEventId) {
+      event = await prisma.event.findUnique({ where: { id: reqEventId } });
+    } else {
+      event = await prisma.event.findFirst({ where: { status: { in: ['UPCOMING', 'ACTIVE'] } }, orderBy: { date: 'asc' } });
+    }
     if (!event) {
       res.status(400).json({ success: false, message: 'No active event for registration' });
       return;
     }
 
-    // Generate BIB number
-    const lastParticipant = await prisma.participant.findFirst({
-      where: { eventId: event.id },
-      orderBy: { bibNumber: 'desc' },
-    });
-
-    const lastNum = lastParticipant ? parseInt(lastParticipant.bibNumber.replace('ISA', '')) : 0;
-    const bibNumber = `ISA${(lastNum + 1).toString().padStart(4, '0')}`;
+    // Generate BIB number with retry for race conditions
+    let bibNumber = '';
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const lastParticipant = await prisma.participant.findFirst({
+        where: { eventId: event.id },
+        orderBy: { bibNumber: 'desc' },
+      });
+      const lastNum = lastParticipant ? parseInt(lastParticipant.bibNumber.replace('ISA', '')) : 0;
+      bibNumber = `ISA${(lastNum + 1 + attempt).toString().padStart(4, '0')}`;
+      const existing = await prisma.participant.findUnique({ where: { bibNumber } });
+      if (!existing) break;
+    }
 
     // Find or create company
     let companyId = undefined;

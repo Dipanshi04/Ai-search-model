@@ -45,9 +45,44 @@ export default function RouteBuilderPage() {
   const [eventName, setEventName] = useState(searchParams.get('eventName') || '');
   const [marathonName] = useState(searchParams.get('marathonName') || '');
 
+  const [startLatStr, setStartLatStr] = useState('');
+  const [startLngStr, setStartLngStr] = useState('');
+  const [finishLatStr, setFinishLatStr] = useState('');
+  const [finishLngStr, setFinishLngStr] = useState('');
+
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapInstance = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<mapboxgl.Marker[]>([]);
+
+  useEffect(() => {
+    if (startPoint) {
+      setStartLatStr(String(startPoint.lat));
+      setStartLngStr(String(startPoint.lng));
+    }
+  }, [startPoint]);
+
+  useEffect(() => {
+    if (finishPoint) {
+      setFinishLatStr(String(finishPoint.lat));
+      setFinishLngStr(String(finishPoint.lng));
+    }
+  }, [finishPoint]);
+
+  const handleStartCoordBlur = (axis: 'lat' | 'lng') => {
+    const str = axis === 'lat' ? startLatStr : startLngStr;
+    const val = parseFloat(str);
+    if (!isNaN(val) && startPoint) {
+      setStartPoint(prev => prev ? { ...prev, [axis]: val } : null);
+    }
+  };
+
+  const handleFinishCoordBlur = (axis: 'lat' | 'lng') => {
+    const str = axis === 'lat' ? finishLatStr : finishLngStr;
+    const val = parseFloat(str);
+    if (!isNaN(val) && finishPoint) {
+      setFinishPoint(prev => prev ? { ...prev, [axis]: val } : null);
+    }
+  };
 
   const paramDistance = searchParams.get('distance');
   const paramRaceDistanceId = searchParams.get('raceDistanceId');
@@ -206,9 +241,9 @@ export default function RouteBuilderPage() {
     setRouteCoords([]);
     setTotalDistance(0);
     try {
-      const via = waypoints.length > 0 ? `&via=${[startPoint, ...waypoints, finishPoint].slice(1, -1).map((p) => `${p.lng},${p.lat}`).join(';')}` : '';
-      const coords = `${startPoint.lng},${startPoint.lat};${finishPoint.lng},${finishPoint.lat}`;
-      const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coords}?geometries=geojson&overview=full&steps=true&access_token=${MAPBOX_TOKEN}${via}`;
+      const allPts = [startPoint, ...waypoints, finishPoint];
+      const coords = allPts.map((p) => `${p.lng},${p.lat}`).join(';');
+      const url = `https://api.mapbox.com/directions/v5/mapbox/driving/${coords}?geometries=geojson&overview=full&steps=true&access_token=${MAPBOX_TOKEN}`;
       const res = await fetch(url);
       const data = await res.json();
       if (data.routes && data.routes.length > 0) {
@@ -216,7 +251,7 @@ export default function RouteBuilderPage() {
         setRouteCoords(route.geometry.coordinates as [number, number][]);
         setTotalDistance(Math.round(route.distance) / 1000);
       } else {
-        setRouteCoords([startPoint, ...waypoints, finishPoint].map((p) => [p.lng, p.lat] as [number, number]));
+        setRouteCoords(allPts.map((p) => [p.lng, p.lat] as [number, number]));
       }
     } catch (err) {
       console.error('Route fetch failed:', err);
@@ -283,6 +318,10 @@ export default function RouteBuilderPage() {
     setTotalDistance(0);
     setSaved(false);
     setClickMode(false);
+    setStartLatStr('');
+    setStartLngStr('');
+    setFinishLatStr('');
+    setFinishLngStr('');
   };
 
   const allPoints: RoutePoint[] = [];
@@ -441,9 +480,10 @@ export default function RouteBuilderPage() {
                     <div>
                       <label className="text-[10px] text-slate-500">Lat</label>
                       <input
-                        type="number" step="any"
-                        onChange={(e) => setStartPoint(prev => prev ? { ...prev, lat: parseFloat(e.target.value) || prev.lat } : null)}
-                        value={startPoint?.lat ?? ''}
+                        type="text" inputMode="decimal"
+                        onChange={(e) => setStartLatStr(e.target.value)}
+                        onBlur={() => handleStartCoordBlur('lat')}
+                        value={startLatStr}
                         className="w-full px-3 py-2 bg-white/80 border border-white/70 rounded-xl text-slate-950 focus:ring-2 focus:ring-violet-200 outline-none text-sm"
                         placeholder="22.7196"
                       />
@@ -451,9 +491,10 @@ export default function RouteBuilderPage() {
                     <div>
                       <label className="text-[10px] text-slate-500">Lng</label>
                       <input
-                        type="number" step="any"
-                        onChange={(e) => setStartPoint(prev => prev ? { ...prev, lng: parseFloat(e.target.value) || prev.lng } : null)}
-                        value={startPoint?.lng ?? ''}
+                        type="text" inputMode="decimal"
+                        onChange={(e) => setStartLngStr(e.target.value)}
+                        onBlur={() => handleStartCoordBlur('lng')}
+                        value={startLngStr}
                         className="w-full px-3 py-2 bg-white/80 border border-white/70 rounded-xl text-slate-950 focus:ring-2 focus:ring-violet-200 outline-none text-sm"
                         placeholder="75.8577"
                       />
@@ -461,8 +502,8 @@ export default function RouteBuilderPage() {
                   </div>
                   <button
                     onClick={() => {
-                      const lat = parseFloat(String(startPoint?.lat || ''));
-                      const lng = parseFloat(String(startPoint?.lng || ''));
+                      const lat = parseFloat(startLatStr);
+                      const lng = parseFloat(startLngStr);
                       if (isNaN(lat) || isNaN(lng)) return;
                       setStartPoint((prev) => prev ? { ...prev, lat, lng } : null);
                     }}
@@ -522,9 +563,10 @@ export default function RouteBuilderPage() {
                     <div>
                       <label className="text-[10px] text-slate-500">Lat</label>
                       <input
-                        type="number" step="any"
-                        onChange={(e) => setFinishPoint(prev => prev ? { ...prev, lat: parseFloat(e.target.value) || prev.lat } : null)}
-                        value={finishPoint?.lat ?? ''}
+                        type="text" inputMode="decimal"
+                        onChange={(e) => setFinishLatStr(e.target.value)}
+                        onBlur={() => handleFinishCoordBlur('lat')}
+                        value={finishLatStr}
                         className="w-full px-3 py-2 bg-white/80 border border-white/70 rounded-xl text-slate-950 focus:ring-2 focus:ring-violet-200 outline-none text-sm"
                         placeholder="22.7196"
                       />
@@ -532,9 +574,10 @@ export default function RouteBuilderPage() {
                     <div>
                       <label className="text-[10px] text-slate-500">Lng</label>
                       <input
-                        type="number" step="any"
-                        onChange={(e) => setFinishPoint(prev => prev ? { ...prev, lng: parseFloat(e.target.value) || prev.lng } : null)}
-                        value={finishPoint?.lng ?? ''}
+                        type="text" inputMode="decimal"
+                        onChange={(e) => setFinishLngStr(e.target.value)}
+                        onBlur={() => handleFinishCoordBlur('lng')}
+                        value={finishLngStr}
                         className="w-full px-3 py-2 bg-white/80 border border-white/70 rounded-xl text-slate-950 focus:ring-2 focus:ring-violet-200 outline-none text-sm"
                         placeholder="75.8577"
                       />

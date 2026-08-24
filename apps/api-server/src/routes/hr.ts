@@ -115,6 +115,24 @@ hrRouter.get('/me', hrAuth, async (req: Request, res: Response) => {
   }
 });
 
+hrRouter.get('/event/current', hrAuth, async (req: Request, res: Response) => {
+  try {
+    const event = await prisma.event.findFirst({
+      where: { status: { in: ['UPCOMING'] } },
+      orderBy: { date: 'asc' },
+      select: { id: true, name: true, status: true, date: true, registrationOpen: true },
+    });
+    if (!event) {
+      res.status(404).json({ success: false, message: 'No active event found' });
+      return;
+    }
+    res.json({ success: true, data: event });
+  } catch (error) {
+    logger.error('HR get current event error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch event' });
+  }
+});
+
 hrRouter.get('/participants', hrAuth, async (req: Request, res: Response) => {
   try {
     const hrId = (req as any).hr.userId;
@@ -137,8 +155,8 @@ hrRouter.get('/participants', hrAuth, async (req: Request, res: Response) => {
 hrRouter.post('/participants', hrAuth, async (req: Request, res: Response) => {
   try {
     const hrId = (req as any).hr.userId;
-    const { name, email, phone, category, gender, emergencyContact, emergencyPhone, bloodGroup, tshirtSize } = req.body as {
-      name: string; email: string; phone: string; category: string; gender: string;
+    const { name, email, phone, category, gender, eventId: reqEventId, emergencyContact, emergencyPhone, bloodGroup, tshirtSize } = req.body as {
+      name: string; email: string; phone: string; category: string; gender: string; eventId?: string;
       emergencyContact?: string; emergencyPhone?: string; bloodGroup?: string; tshirtSize?: string;
     };
 
@@ -159,7 +177,12 @@ hrRouter.post('/participants', hrAuth, async (req: Request, res: Response) => {
       return;
     }
 
-    const event = await prisma.event.findFirst({ where: { status: 'UPCOMING' } });
+    let event;
+    if (reqEventId) {
+      event = await prisma.event.findUnique({ where: { id: reqEventId } });
+    } else {
+      event = await prisma.event.findFirst({ where: { status: { in: ['UPCOMING', 'ACTIVE'] } }, orderBy: { date: 'asc' } });
+    }
     if (!event) {
       res.status(400).json({ success: false, message: 'No active event for registration' });
       return;
@@ -176,12 +199,17 @@ hrRouter.post('/participants', hrAuth, async (req: Request, res: Response) => {
       user = await prisma.user.create({ data: { email, phone, name, passwordHash } });
     }
 
-    const lastParticipant = await prisma.participant.findFirst({
-      where: { eventId: event.id },
-      orderBy: { bibNumber: 'desc' },
-    });
-    const lastNum = lastParticipant ? parseInt(lastParticipant.bibNumber.replace('ISA', '')) : 0;
-    const bibNumber = `ISA${(lastNum + 1).toString().padStart(4, '0')}`;
+    let bibNumber = '';
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const lastParticipant = await prisma.participant.findFirst({
+        where: { eventId: event.id },
+        orderBy: { bibNumber: 'desc' },
+      });
+      const lastNum = lastParticipant ? parseInt(lastParticipant.bibNumber.replace('ISA', '')) : 0;
+      bibNumber = `ISA${(lastNum + 1 + attempt).toString().padStart(4, '0')}`;
+      const existing = await prisma.participant.findUnique({ where: { bibNumber } });
+      if (!existing) break;
+    }
 
     const participant = await prisma.participant.create({
       data: {
@@ -280,7 +308,13 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
       return;
     }
 
-    const event = await prisma.event.findFirst({ where: { status: 'UPCOMING' } });
+    let event;
+    const reqEventId = req.query.eventId as string | undefined;
+    if (reqEventId) {
+      event = await prisma.event.findUnique({ where: { id: reqEventId } });
+    } else {
+      event = await prisma.event.findFirst({ where: { status: { in: ['UPCOMING', 'ACTIVE'] } }, orderBy: { date: 'asc' } });
+    }
     if (!event) {
       res.status(400).json({ success: false, message: 'No active event for registration' });
       return;
@@ -299,21 +333,40 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
       const name = record.name?.trim();
       const email = record.email?.trim().toLowerCase();
       const phone = record.phone?.trim();
-      const category = record.category?.trim().toUpperCase();
       const gender = record.gender?.trim().toUpperCase();
       const emergencyContact = record.emergencycontact?.trim() || record.emergency_contact?.trim() || null;
       const emergencyPhone = record.emergencyphone?.trim() || record.emergency_phone?.trim() || null;
       const bloodGroup = record.bloodgroup?.trim() || record.blood_group?.trim() || null;
       const tshirtSize = record.tshirtsize?.trim() || record.tshirt_size?.trim() || null;
 
-      if (!name || !email || !phone || !category || !gender) {
+      if (!name || !email || !phone || !gender) {
         results.push({ success: false, name: name || 'N/A', email: email || 'N/A', error: 'Missing required fields' });
         continue;
       }
 
-      if (!['RUN_3K', 'RUN_5K'].includes(category)) {
-        results.push({ success: false, name, email, error: `Invalid category: ${category}. Must be RUN_3K or RUN_5K` });
+      const categoryMap: Record<string, string> = {
+        STUDENT: 'RUN_3K',
+        PROFESSIONAL: 'RUN_5K',
+        GENERAL: 'RUN_5K',
+        '3K': 'RUN_3K',
+        '5K': 'RUN_5K',
+        '3KM': 'RUN_3K',
+        '5KM': 'RUN_5K',
+        FUN: 'RUN_3K',
+        CHALLENGE: 'RUN_5K',
+      };
+      let category = record.category?.trim().toUpperCase();
+      if (!category) {
+        results.push({ success: false, name, email, error: 'Missing required field: category' });
         continue;
+      }
+      if (!['RUN_3K', 'RUN_5K'].includes(category)) {
+        const mapped = categoryMap[category];
+        if (!mapped) {
+          results.push({ success: false, name, email, error: `Invalid category: ${category}. Must be RUN_3K or RUN_5K` });
+          continue;
+        }
+        category = mapped;
       }
 
       if (!['MALE', 'FEMALE', 'NON_BINARY'].includes(gender)) {
@@ -334,7 +387,14 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
         }
 
         lastNum++;
-        const bibNumber = `ISA${lastNum.toString().padStart(4, '0')}`;
+        let bibNumber = `ISA${lastNum.toString().padStart(4, '0')}`;
+        // Ensure bib is unique (retry if collision)
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const exists = await prisma.participant.findUnique({ where: { bibNumber } });
+          if (!exists) break;
+          lastNum++;
+          bibNumber = `ISA${lastNum.toString().padStart(4, '0')}`;
+        }
 
         const participant = await prisma.participant.create({
           data: {
@@ -384,4 +444,13 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
     logger.error('HR CSV upload error:', error);
     res.status(500).json({ success: false, message: 'Failed to process CSV' });
   }
+});
+
+hrRouter.get('/participants/csv/sample', hrAuth, (req: Request, res: Response) => {
+  const csv = `name,email,phone,category,gender,emergencyContact,emergencyPhone,bloodGroup,tshirtSize
+John Doe,john@example.com,9876543210,RUN_3K,MALE,Raj Doe,9876543211,O+,M
+Jane Smith,jane@example.com,9876543212,RUN_5K,FEMALE,Priya Smith,9876543213,A+,S`;
+  res.setHeader('Content-Type', 'text/csv');
+  res.setHeader('Content-Disposition', 'attachment; filename=sample-participants.csv');
+  res.send(csv);
 });

@@ -126,9 +126,18 @@ class ApiClient {
     return response.json();
   }
 
+  async hrGetCurrentEvent() {
+    const headers: Record<string, string> = {};
+    const hrToken = localStorage.getItem('hr_token');
+    if (hrToken) headers['Authorization'] = `Bearer ${hrToken}`;
+    const response = await fetch(`${API_URL}/api/v1/hr/event/current`, { headers });
+    return response.json();
+  }
+
   async hrAddParticipant(data: {
     name: string; email: string; phone: string; category: string; gender: string;
     emergencyContact?: string; emergencyPhone?: string; bloodGroup?: string; tshirtSize?: string;
+    eventId?: string;
   }) {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     const hrToken = localStorage.getItem('hr_token');
@@ -153,6 +162,20 @@ class ApiClient {
       body: formData,
     });
     return response.json();
+  }
+
+  async hrDownloadSampleCSV() {
+    const hrToken = localStorage.getItem('hr_token');
+    const headers: Record<string, string> = {};
+    if (hrToken) headers['Authorization'] = `Bearer ${hrToken}`;
+    const response = await fetch(`${API_URL}/api/v1/hr/participants/csv/sample`, { headers });
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'sample-participants.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
   }
 }
 

@@ -1,7 +1,8 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { logger } from './logger.js';
-import { processGpsUpdate, flushGpsLogs } from '../services/tracking.js';
+import { processGpsUpdate, flushGpsLogs, getRunnerDistance } from '../services/tracking.js';
 import { prisma } from './database.js';
+import { markRunnerFinished, recalcTreeCounter } from '../services/greenMission.js';
 
 let ioInstance: SocketIOServer | null = null;
 
@@ -62,6 +63,35 @@ export function setupSocketIO(io: SocketIOServer): void {
     }) => {
       try {
         await processGpsUpdate(data);
+
+        // Update total distance from GPS logs
+        const distance = await getRunnerDistance(data.participantId);
+        await prisma.participant.update({
+          where: { id: data.participantId },
+          data: { totalDistance: distance },
+        });
+
+        // Broadcast runner position to tracking room
+        const io = getSocketIO();
+        const participant = await prisma.participant.findUnique({
+          where: { id: data.participantId },
+          select: { eventId: true, bibNumber: true, category: true, user: { select: { name: true } } },
+        });
+        if (participant?.eventId) {
+          io.to(`tracking:${participant.eventId}`).emit('runner:update', {
+            participantId: data.participantId,
+            eventId: participant.eventId,
+            bibNumber: participant.bibNumber,
+            category: participant.category,
+            name: participant.user?.name || participant.bibNumber,
+            lat: data.lat,
+            lng: data.lng,
+            accuracy: data.accuracy,
+            speed: data.speed,
+            distance,
+            timestamp: data.timestamp,
+          });
+        }
       } catch (error) {
         logger.error('[Socket] GPS processing error:', error);
       }
@@ -87,6 +117,14 @@ export function setupSocketIO(io: SocketIOServer): void {
         });
       } catch (error) {
         logger.error('[Socket] Runner pause error:', error);
+      }
+    });
+
+    socket.on('runner:finish', async (data: { participantId: string }) => {
+      try {
+        await markRunnerFinished(data.participantId);
+      } catch (error) {
+        logger.error('[Socket] Runner finish error:', error);
       }
     });
 

@@ -25,6 +25,13 @@ const emptyForm = {
 };
 
 export default function BulkRegistrationPage() {
+  const getHrPortalUrl = () => {
+    const h = window.location.hostname;
+    if (h === 'localhost') return `http://localhost:3000/hr-portal`;
+    if (h === 'admin.theisa.in') return `https://marathon.theisa.in/hr-portal`;
+    return `${window.location.origin}/hr-portal`;
+  };
+
   const [registrations, setRegistrations] = useState<BulkRegistration[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -138,10 +145,10 @@ export default function BulkRegistrationPage() {
         </svg>
         <div className="flex-1 min-w-0">
           <p className="text-xs text-slate-500 mb-0.5">Share this link with HR to register participants</p>
-          <p className="text-sm font-mono text-violet-700 truncate">{window.location.origin}/hr-portal</p>
+          <p className="text-sm font-mono text-violet-700 truncate">{getHrPortalUrl()}</p>
         </div>
         <button
-          onClick={() => navigator.clipboard.writeText(`${window.location.origin}/hr-portal`)}
+          onClick={() => navigator.clipboard.writeText(getHrPortalUrl())}
           className="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-xs font-medium shrink-0 transition"
         >
           Copy Link

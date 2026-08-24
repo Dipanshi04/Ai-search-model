@@ -1,8 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../config/database.js';
-import { authenticate } from '../middleware/auth.js';
-import { requireRole } from '../middleware/auth.js';
+import { logger } from '../config/logger.js';
+import { authenticate, requireRole } from '../middleware/auth.js';
 import { getSocketIO } from '../config/socket.js';
+import { recalcTreeCounter } from '../services/greenMission.js';
 
 export const raceRouter: Router = Router();
 
@@ -257,6 +258,9 @@ raceRouter.post('/end', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER')
       io.to(`tracking:${eventId}`).emit('race:status', { status: 'COMPLETED', eventId, message: 'Race ended', elapsedMs: finalAccumulatedElapsedMs });
       io.to(`leaderboard:${eventId}`).emit('race:status', { status: 'COMPLETED', eventId, message: 'Race ended', elapsedMs: finalAccumulatedElapsedMs });
     } catch {}
+
+    // Recalculate tree counter for all finished runners
+    await recalcTreeCounter(eventId);
 
     res.json({ success: true, data: { event: updated, message: 'Race ended', elapsedMs: finalAccumulatedElapsedMs } });
   } catch (error) {

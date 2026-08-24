@@ -17,6 +17,17 @@ import AnnouncementsPage from './pages/AnnouncementsPage';
 import SettingsPage from './pages/SettingsPage';
 import BulkRegistrationPage from './pages/BulkRegistrationPage';
 
+function HrPortalRedirect() {
+  const h = window.location.hostname;
+  const base = h === 'localhost'
+    ? 'http://localhost:3000'
+    : h === 'admin.theisa.in'
+      ? 'https://marathon.theisa.in'
+      : window.location.origin;
+  window.location.replace(`${base}/hr-portal`);
+  return null;
+}
+
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
 
@@ -40,6 +51,7 @@ function AppRoutes() {
 
   return (
     <Routes>
+      <Route path="/hr-portal" element={<HrPortalRedirect />} />
       <Route
         path="/login"
         element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />}

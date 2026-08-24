@@ -6,15 +6,24 @@ export default function ParticipantsPage() {
   const [_loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('');
+  const [eventId, setEventId] = useState('');
+  const [events, setEvents] = useState<any[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+
+  useEffect(() => {
+    api.getEvents().then((res) => {
+      if (res.success && res.data) setEvents(res.data);
+    });
+  }, []);
 
   async function loadParticipants() {
     setLoading(true);
     const params: Record<string, string> = { page: page.toString(), limit: '20' };
     if (search) params.search = search;
     if (category) params.category = category;
+    if (eventId) params.eventId = eventId;
 
     const res = await api.getParticipants(params);
     if (res.success && res.data) {
@@ -29,7 +38,7 @@ export default function ParticipantsPage() {
 
   useEffect(() => {
     loadParticipants();
-  }, [page, category]);
+  }, [page, category, eventId]);
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this participant?')) {
@@ -75,6 +84,16 @@ export default function ParticipantsPage() {
             <option value="">All Categories</option>
             <option value="RUN_3K">3K</option>
             <option value="RUN_5K">5K</option>
+          </select>
+          <select
+            value={eventId}
+            onChange={(e) => { setEventId(e.target.value); setPage(1); }}
+            className="px-4 py-3 bg-white/80 border border-white/60 rounded-3xl text-slate-900 text-sm outline-none"
+          >
+            <option value="">All Events</option>
+            {events.map((ev) => (
+              <option key={ev.id} value={ev.id}>{ev.name}</option>
+            ))}
           </select>
         </div>
 

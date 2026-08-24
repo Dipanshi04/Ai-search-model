@@ -30,6 +30,14 @@ const emptyForm = {
 
 type Tab = 'dashboard' | 'add' | 'csv';
 
+interface CurrentEvent {
+  id: string;
+  name: string;
+  status: string;
+  date: string;
+  registrationOpen: boolean;
+}
+
 export default function HRPortalPage() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('hr_token'));
   const [profile, setProfile] = useState<HrProfile | null>(null);
@@ -43,12 +51,14 @@ export default function HRPortalPage() {
   const [csvResult, setCsvResult] = useState<any>(null);
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [currentEvent, setCurrentEvent] = useState<CurrentEvent | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (token) {
       loadProfile();
       loadParticipants();
+      loadEvent();
     }
   }, [token]);
 
@@ -58,6 +68,13 @@ export default function HRPortalPage() {
       if (res.success) setProfile(res.data);
       else { setToken(null); localStorage.removeItem('hr_token'); }
     } catch { setToken(null); localStorage.removeItem('hr_token'); }
+  }
+
+  async function loadEvent() {
+    try {
+      const res = await api.hrGetCurrentEvent();
+      if (res.success) setCurrentEvent(res.data);
+    } catch {}
   }
 
   async function loadParticipants() {
@@ -93,7 +110,7 @@ export default function HRPortalPage() {
     e.preventDefault();
     setLoading(true); setError(''); setSuccess('');
     try {
-      const res = await api.hrAddParticipant(form);
+      const res = await api.hrAddParticipant({ ...form, eventId: currentEvent?.id });
       if (res.success) {
         setSuccess('Registered! BIB: ' + res.data.bibNumber);
         setForm(emptyForm);
@@ -160,6 +177,9 @@ export default function HRPortalPage() {
           <div>
             <h1 className="text-white font-bold text-lg">{profile?.companyName || 'HR Portal'}</h1>
             <p className="text-white/60 text-xs">{profile?.hrName} ({profile?.hrEmail})</p>
+            {currentEvent && (
+              <p className="text-emerald-400 text-xs font-medium mt-0.5">Registering for: {currentEvent.name}</p>
+            )}
           </div>
           <button onClick={handleLogout} className="text-white/60 hover:text-white text-sm font-medium">Logout</button>
         </div>
@@ -312,10 +332,17 @@ export default function HRPortalPage() {
         {tab === 'csv' && (
           <div className="glass-strong rounded-2xl p-6">
             <h2 className="text-lg font-bold oklch(0 0 0) mb-2">Bulk Upload via CSV</h2>
-            <p className="text-sm oklch(0 0 0) mb-4">
+            <p className="text-sm oklch(0 0 0) mb-2">
               CSV must have columns: name, email, phone, category, gender.
               Optional: emergencyContact, emergencyPhone, bloodGroup, tshirtSize.
             </p>
+            <p className="text-xs text-slate-500 mb-4">
+              Accepted categories: <strong>RUN_3K</strong>, <strong>RUN_5K</strong>, STUDENT, PROFESSIONAL, GENERAL, 3K, 5K, FUN, CHALLENGE
+            </p>
+            <button type="button" onClick={() => api.hrDownloadSampleCSV()}
+              className="mb-4 px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-sm font-medium transition">
+              Download Sample CSV
+            </button>
             <form onSubmit={handleCSVUpload} className="space-y-4">
               <div>
                 <input ref={fileInputRef} type="file" accept=".csv" onChange={e => setCsvFile(e.target.files?.[0] || null)}

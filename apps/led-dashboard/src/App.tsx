@@ -75,6 +75,7 @@ export default function LEDScreen() {
   const [announcement, setAnnouncement] = useState<{ title: string; message: string } | null>(null);
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [socketReady, setSocketReady] = useState(false);
   const mapContainer = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
@@ -84,6 +85,9 @@ export default function LEDScreen() {
   const raceStartRef = useRef<Date | null>(null);
   const accumulatedElapsedRef = useRef(0);
   const routePointsRef = useRef<{ lat: number; lng: number }[]>([]);
+  const pendingRunnersRef = useRef<any[]>([]);
+  const routesByCategoryRef = useRef<Map<string, { lat: number; lng: number }[]>>(new Map());
+  const resolvedEventIdRef = useRef<string>(EVENT_ID);
 
   const getColorForRunner = (participantId: string): string => {
     if (markerColorsRef.current.has(participantId)) {
@@ -225,35 +229,45 @@ export default function LEDScreen() {
         }
 
         if (!eventId) return;
+        resolvedEventIdRef.current = eventId;
+        setSocketReady(true);
 
         const eventRes = await fetch(`${API_URL}/api/v1/events/${eventId}`);
         const eventData = await eventRes.json();
           if (eventData.success && eventData.data?.raceDistances) {
-            const allPoints: { lat: number; lng: number }[] = [];
             for (const d of eventData.data.raceDistances) {
               if (d._count?.routePoints > 0) {
                 try {
                   const routeRes = await fetch(`${API_URL}/api/v1/routes/${d.id}`);
                   const routeData = await routeRes.json();
                   if (routeData.success && routeData.data?.routePoints) {
-                    allPoints.push(
-                      ...routeData.data.routePoints
-                        .sort((a: any, b: any) => a.sequence - b.sequence)
-                        .map((p: any) => ({ lat: p.lat, lng: p.lng }))
-                    );
+                    const points = routeData.data.routePoints
+                      .sort((a: any, b: any) => a.sequence - b.sequence)
+                      .map((p: any) => ({ lat: p.lat, lng: p.lng }));
+                    // Store by category name (e.g., "3K", "5K") and also by enum (RUN_3K, RUN_5K)
+                    const nameUpper = (d.name || '').toUpperCase();
+                    if (nameUpper.includes('3')) {
+                      routesByCategoryRef.current.set('RUN_3K', points);
+                      routesByCategoryRef.current.set('3K', points);
+                    }
+                    if (nameUpper.includes('5')) {
+                      routesByCategoryRef.current.set('RUN_5K', points);
+                      routesByCategoryRef.current.set('5K', points);
+                    }
+                    // First route with points becomes the default
+                    if (routePointsRef.current.length === 0) {
+                      routePointsRef.current = points;
+                    }
                   }
                 } catch (e) {
                   console.error('Failed to fetch route for distance:', d.id, e);
                 }
               }
             }
-            if (allPoints.length > 0) {
-              routePointsRef.current = allPoints;
-              // Draw route on existing map if already loaded
-              const map = mapRef.current;
-              if (map && map.isStyleLoaded()) {
-                drawRoute(map, allPoints);
-              }
+            // Draw default route on existing map if already loaded
+            const map = mapRef.current;
+            if (map && map.isStyleLoaded() && routePointsRef.current.length >= 2) {
+              drawRoute(map, routePointsRef.current);
             }
           }
 
@@ -310,6 +324,35 @@ export default function LEDScreen() {
       if (routePointsRef.current.length >= 2) {
         drawRoute(map, routePointsRef.current);
       }
+      // Replay queued runner updates
+      for (const data of pendingRunnersRef.current) {
+        const color = getColorForRunner(data.participantId);
+        if (!markersRef.current.has(data.participantId)) {
+          const el = document.createElement('div');
+          el.style.cssText = `
+            width: 14px; height: 14px;
+            background: ${color};
+            border-radius: 50%;
+            border: 2.5px solid white;
+            box-shadow: 0 0 12px ${color}90, 0 0 24px ${color}40;
+            position: relative;
+          `;
+          const pulse = document.createElement('div');
+          pulse.style.cssText = `
+            position: absolute; top: -6px; left: -6px;
+            width: 26px; height: 26px;
+            border-radius: 50%;
+            border: 2px solid ${color}60;
+            animation: pulse-ring 2s ease-out infinite;
+          `;
+          el.appendChild(pulse);
+          const marker = new mapboxgl.Marker({ element: el, offset: [-7, -7] })
+            .setLngLat([data.lng, data.lat])
+            .addTo(map);
+          markersRef.current.set(data.participantId, marker);
+        }
+      }
+      pendingRunnersRef.current = [];
       setMapLoaded(true);
     });
 
@@ -322,12 +365,16 @@ export default function LEDScreen() {
   }, []);
 
   useEffect(() => {
+    if (!socketReady) return;
+    const eventId = resolvedEventIdRef.current;
+    if (!eventId) return;
+
     const socket = io(API_URL, { transports: ['websocket'] });
 
     socket.on('connect', () => {
-      socket.emit('join:tracking', EVENT_ID);
-      socket.emit('join:leaderboard', EVENT_ID);
-      socket.emit('join:event', EVENT_ID);
+      socket.emit('join:tracking', eventId);
+      socket.emit('join:leaderboard', eventId);
+      socket.emit('join:event', eventId);
     });
 
     socket.on('race:start', (data: any) => {
@@ -337,13 +384,16 @@ export default function LEDScreen() {
 
     socket.on('runner:update', (data: any) => {
       const map = mapRef.current;
-      if (!map || !data.lat || !data.lng) return;
+      if (!map || !data.lat || !data.lng) {
+        // Queue if map not ready
+        if (data.lat && data.lng) pendingRunnersRef.current.push(data);
+        return;
+      }
       const color = getColorForRunner(data.participantId);
       const existing = markersRef.current.get(data.participantId);
       if (existing) {
         existing.setLngLat([data.lng, data.lat]);
       } else {
-        // Glowing runner dot
         const el = document.createElement('div');
         el.style.cssText = `
           width: 14px; height: 14px;
@@ -353,7 +403,6 @@ export default function LEDScreen() {
           box-shadow: 0 0 12px ${color}90, 0 0 24px ${color}40;
           position: relative;
         `;
-        // Pulse ring
         const pulse = document.createElement('div');
         pulse.style.cssText = `
           position: absolute; top: -6px; left: -6px;
@@ -364,7 +413,6 @@ export default function LEDScreen() {
         `;
         el.appendChild(pulse);
 
-        // Add pulse keyframes if not exists
         if (!document.getElementById('pulse-keyframes')) {
           const style = document.createElement('style');
           style.id = 'pulse-keyframes';
@@ -380,22 +428,6 @@ export default function LEDScreen() {
         const marker = new mapboxgl.Marker({ element: el, offset: [-7, -7] })
           .setLngLat([data.lng, data.lat])
           .addTo(map);
-
-        // Add name label
-        const label = document.createElement('div');
-        label.style.cssText = `
-          background: rgba(0,0,0,0.85);
-          color: white;
-          padding: 4px 8px;
-          border-radius: 6px;
-          font-size: 11px;
-          font-weight: 700;
-          white-space: nowrap;
-          pointer-events: none;
-          margin-top: 6px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        `;
-        label.textContent = data.name || data.bibNumber || '';
 
         markersRef.current.set(data.participantId, marker);
       }
@@ -444,7 +476,7 @@ export default function LEDScreen() {
 
     socketRef.current = socket;
     return () => { socket.disconnect(); };
-  }, [currentCategory]);
+  }, [currentCategory, socketReady]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -468,6 +500,18 @@ export default function LEDScreen() {
     }, 15000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded()) return;
+    const routeForCategory = routesByCategoryRef.current.get(currentCategory);
+    if (routeForCategory && routeForCategory.length >= 2) {
+      routePointsRef.current = routeForCategory;
+      drawRoute(map, routeForCategory);
+    } else if (routePointsRef.current.length >= 2) {
+      drawRoute(map, routePointsRef.current);
+    }
+  }, [currentCategory]);
 
   return (
     <div className="w-screen h-screen bg-[#0a0f1a] text-white flex flex-col overflow-hidden select-none font-sans">

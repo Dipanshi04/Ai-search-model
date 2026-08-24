@@ -12,20 +12,31 @@ interface Company {
 
 export default function CompaniesPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [events, setEvents] = useState<any[]>([]);
+  const [eventId, setEventId] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ name: '', contactEmail: '', contactPhone: '' });
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  useEffect(() => { fetchCompanies(); }, []);
+  useEffect(() => {
+    api.getEvents().then((res) => {
+      if (res.success && res.data) setEvents(res.data);
+    });
+    fetchCompanies();
+  }, []);
 
   async function fetchCompanies() {
     try {
-      const res = await api.getCompanies();
+      const params: Record<string, string> = {};
+      if (eventId) params.eventId = eventId;
+      const res = await api.getCompanies(params);
       if (res.success && res.data) setCompanies(res.data);
     } catch (e) {
       console.error('Failed to fetch companies:', e);
     }
   }
+
+  useEffect(() => { fetchCompanies(); }, [eventId]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -67,12 +78,24 @@ export default function CompaniesPage() {
           <h1 className="text-2xl font-bold text-slate-950">Companies</h1>
           <p className="text-slate-500 text-sm">{companies.length} sponsors and partners</p>
         </div>
-        <button
-          onClick={() => { setForm({ name: '', contactEmail: '', contactPhone: '' }); setEditingId(null); setShowModal(true); }}
-          className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-3xl text-sm font-medium shadow-sm"
-        >
-          Add Company
-        </button>
+        <div className="flex gap-3">
+          <select
+            value={eventId}
+            onChange={(e) => setEventId(e.target.value)}
+            className="px-4 py-2 bg-white/80 border border-white/60 rounded-3xl text-slate-900 text-sm outline-none"
+          >
+            <option value="">All Events</option>
+            {events.map((ev) => (
+              <option key={ev.id} value={ev.id}>{ev.name}</option>
+            ))}
+          </select>
+          <button
+            onClick={() => { setForm({ name: '', contactEmail: '', contactPhone: '' }); setEditingId(null); setShowModal(true); }}
+            className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-3xl text-sm font-medium shadow-sm"
+          >
+            Add Company
+          </button>
+        </div>
       </div>
 
       <div className="glass rounded-[2rem] border border-white/20 overflow-hidden shadow-sm">

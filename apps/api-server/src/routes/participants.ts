@@ -148,10 +148,19 @@ participantsRouter.get('/leaderboard', async (req, res) => {
   }
 });
 
-participantsRouter.get('/companies', async (_req, res) => {
+participantsRouter.get('/companies', async (req, res) => {
   try {
+    const eventId = typeof req.query.eventId === 'string' ? req.query.eventId : undefined;
+    const where = eventId ? { participants: { some: { eventId } } } : {};
     const companies = await prisma.company.findMany({
-      include: { _count: { select: { participants: true } } },
+      where,
+      include: {
+        _count: {
+          select: {
+            participants: eventId ? { where: { eventId } } : true,
+          },
+        },
+      },
       orderBy: { name: 'asc' },
     });
     res.json({ success: true, data: companies });

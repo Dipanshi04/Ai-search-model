@@ -15,9 +15,12 @@ RUN pnpm install --frozen-lockfile
 
 FROM base AS builder
 ARG APP
+ARG VITE_API_URL=/api
+ARG VITE_MAPBOX_TOKEN
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-ENV VITE_API_URL=/api
+ENV VITE_API_URL=${VITE_API_URL}
+ENV VITE_MAPBOX_TOKEN=${VITE_MAPBOX_TOKEN}
 RUN pnpm --filter @isa/${APP} build
 
 FROM nginx:alpine AS runner

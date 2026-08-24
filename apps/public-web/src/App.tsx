@@ -20,8 +20,9 @@ function HomePage() {
               <Logo size="h-20 sm:h-30" />
             </div>
             
-            <div className="glass-dark inline-block px-4 py-1.5 sm:px-5 sm:py-2 rounded-full mb-4 sm:mb-6">
-              <span className="text-[10px] sm:text-xs font-semibold tracking-wider text-slate-800">INDORE SOFTWARE ASSOCIATION</span>
+            
+             <div className="inline-block px-5 py-1.5 sm:px-6 py-2 sm:py-2.5 rounded-full mb-4 sm:mb-6 border-2 text-slate-800 border-white/60 backdrop-blur-sm">
+              <span className="text-xs sm:text-sm text-slate-800 font-bold tracking-wider uppercase">INDORE SOFTWARE ASSOCIATION</span>
             </div>
             
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-black mb-3 sm:mb-4 tracking-tight text-slate-800 drop-shadow-lg leading-tight">
@@ -34,18 +35,18 @@ function HomePage() {
               Run for a <span className="font-semibold text-[oklch(0.53_0.16_147.15)]">Greener</span> Tomorrow
             </p>
             
-            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
-              <span 
-                className="white-btn w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 rounded-xl text-base sm:text-lg shadow-xl"
-              >
-                Coming Soon
-              </span>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black mb-6 sm:mb-8 tracking-tight leading-tight">
+              <span className="text-white drop-shadow-xl">Coming Soon</span>
+            </h2>
+            
+            <div className="mt-2 sm:mt-4 inline-block px-5 py-1.5 sm:px-6 py-2 sm:py-2.5 rounded-full mb-4 sm:mb-6 border-2 text-slate-800 border-white/60 backdrop-blur-sm">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+              <span className="text-xs sm:text-sm text-slate-800 font-bold tracking-wider uppercase">Open For Sponsors</span>
             </div>
             
-            
-            <div className="mt-6 sm:mt-8 glass-dark inline-block px-4 sm:px-5 py-1.5 sm:py-2 rounded-full">
+            {/* <div className="mt-6 sm:mt-8 glass-dark inline-block px-4 sm:px-5 py-1.5 sm:py-2 rounded-full">
               <span className="text-xs sm:text-sm text-slate-800 font-medium">September 27, 2026 - Indore, India</span>
-            </div>
+            </div> */}
           </div>
         </div>
       </div>

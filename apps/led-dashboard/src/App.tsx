@@ -35,29 +35,39 @@ interface LeaderboardEntry {
   pace: number | null;
 }
 
-interface Sponsor {
-  id: string;
-  name: string;
-  tier: string;
-  logoUrl?: string;
-  website?: string;
+const DUMMY_SPONSORS = [
+  { name: 'TechCorp', color: '#3B82F6' },
+  { name: 'GreenEdge', color: '#10B981' },
+  { name: 'InnoLab', color: '#8B5CF6' },
+  { name: 'DataFlow', color: '#F59E0B' },
+  { name: 'CloudNet', color: '#EC4899' },
+  { name: 'NextGen', color: '#06B6D4' },
+  { name: 'PixelWorks', color: '#EF4444' },
+  { name: 'SynergyAI', color: '#84CC16' },
+];
+
+function SponsorLogo({ name, color }: { name: string; color: string }) {
+  return (
+    <div className="flex items-center gap-3 shrink-0">
+      <div
+        className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-black text-lg"
+        style={{ background: color, boxShadow: `0 0 12px ${color}66` }}
+      >
+        {name[0]}
+      </div>
+      <span className="text-lg font-bold text-white/80">{name}</span>
+      <span className="text-slate-600 mx-3 text-2xl">|</span>
+    </div>
+  );
 }
 
-function SponsorTicker({ sponsors }: { sponsors: Sponsor[] }) {
-  if (sponsors.length === 0) return null;
-  const items = [...sponsors, ...sponsors, ...sponsors];
+function SponsorTicker() {
+  const items = [...DUMMY_SPONSORS, ...DUMMY_SPONSORS, ...DUMMY_SPONSORS];
   return (
     <div className="overflow-hidden whitespace-nowrap py-3">
       <div className="sponsor-ticker inline-flex items-center gap-10">
         {items.map((s, i) => (
-          <div key={`${s.id}-${i}`} className="flex items-center gap-3 shrink-0">
-            {s.logoUrl ? (
-              <img src={s.logoUrl} alt={s.name} className="h-8 w-auto object-contain" />
-            ) : (
-              <span className="text-sm text-slate-400 font-medium">{s.name}</span>
-            )}
-            <span className="text-slate-700 mx-2">|</span>
-          </div>
+          <SponsorLogo key={`${s.name}-${i}`} name={s.name} color={s.color} />
         ))}
       </div>
     </div>
@@ -73,7 +83,6 @@ export default function LEDScreen() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [currentCategory, setCurrentCategory] = useState('overall');
   const [announcement, setAnnouncement] = useState<{ title: string; message: string } | null>(null);
-  const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [socketReady, setSocketReady] = useState(false);
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -270,10 +279,6 @@ export default function LEDScreen() {
               drawRoute(map, routePointsRef.current);
             }
           }
-
-          const sponsorRes = await fetch(`${API_URL}/api/v1/sponsors?eventId=${eventId}`);
-          const sponsorData = await sponsorRes.json();
-          if (sponsorData.success) setSponsors(sponsorData.data);
 
           const greenRes = await fetch(`${API_URL}/api/v1/green/trees?eventId=${eventId}`);
           const greenData = await greenRes.json();
@@ -516,30 +521,30 @@ export default function LEDScreen() {
   return (
     <div className="w-screen h-screen bg-[#0a0f1a] text-white flex flex-col overflow-hidden select-none font-sans">
       {/* Header */}
-      <header className="h-[90px] bg-[#0d1320] border-b border-slate-800/60 flex items-center justify-between px-10 shrink-0 z-30">
-        <div className="flex items-center gap-6">
-          <Logo size="h-14" />
+      <header className="h-[120px] bg-[#0d1320] border-b border-slate-800/60 flex items-center justify-between px-12 shrink-0 z-30">
+        <div className="flex items-center gap-8">
+          <Logo size="h-18" />
         </div>
-        <div className="flex items-center gap-12">
+        <div className="flex items-center gap-16">
           <div className="text-center">
-            <p className="text-4xl font-mono font-black text-emerald-400 leading-none">{formatDuration(elapsedTime)}</p>
-            <p className="text-sm text-slate-400 uppercase tracking-widest mt-2">Elapsed</p>
+            <p className="text-6xl font-mono font-black text-emerald-400 leading-none">{formatDuration(elapsedTime)}</p>
+            <p className="text-base text-slate-400 uppercase tracking-widest mt-2">Elapsed</p>
           </div>
           <div className="text-center">
-            <p className="text-4xl font-black text-white leading-none">{totalRunners}</p>
-            <p className="text-sm text-slate-400 uppercase tracking-widest mt-2">Runners</p>
+            <p className="text-6xl font-black text-white leading-none">{totalRunners}</p>
+            <p className="text-base text-slate-400 uppercase tracking-widest mt-2">Runners</p>
           </div>
           <div className="text-center">
-            <p className="text-4xl font-black text-violet-400 leading-none">{totalFinished}</p>
-            <p className="text-sm text-slate-400 uppercase tracking-widest mt-2">Finished</p>
+            <p className="text-6xl font-black text-violet-400 leading-none">{totalFinished}</p>
+            <p className="text-base text-slate-400 uppercase tracking-widest mt-2">Finished</p>
           </div>
           <div className="text-center">
-            <p className="text-4xl font-black text-green-400 leading-none">{treeCount}</p>
-            <p className="text-sm text-green-400/80 uppercase tracking-widest mt-2">Trees</p>
+            <p className="text-6xl font-black text-green-400 leading-none">{treeCount}</p>
+            <p className="text-base text-green-400/80 uppercase tracking-widest mt-2">Trees</p>
           </div>
           <div className="text-center">
-            <p className="text-4xl font-black text-emerald-300 leading-none">{Math.round(co2Offset)}</p>
-            <p className="text-sm text-slate-400 uppercase tracking-widest mt-2">kg CO2</p>
+            <p className="text-6xl font-black text-emerald-300 leading-none">{Math.round(co2Offset)}</p>
+            <p className="text-base text-slate-400 uppercase tracking-widest mt-2">kg CO2</p>
           </div>
         </div>
       </header>
@@ -585,42 +590,42 @@ export default function LEDScreen() {
         </main>
 
         {/* Sidebar */}
-        <aside className="w-[400px] xl:w-[440px] bg-[#0d1320] border-l border-slate-800/60 flex flex-col shrink-0 overflow-y-auto">
+        <aside className="w-[480px] xl:w-[520px] bg-[#0d1320] border-l border-slate-800/60 flex flex-col shrink-0 overflow-y-auto">
           {/* Leaderboard */}
-          <div className="p-5 border-b border-slate-800/40">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-extrabold text-amber-400 uppercase tracking-widest">Leaderboard</h2>
-              <span className="text-xs bg-slate-800 text-slate-400 px-3 py-1 rounded-full font-semibold uppercase tracking-wider">
+          <div className="p-6 border-b border-slate-800/40">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-extrabold text-amber-400 uppercase tracking-widest">Leaderboard</h2>
+              <span className="text-sm bg-slate-800 text-slate-400 px-4 py-1.5 rounded-full font-semibold uppercase tracking-wider">
                 {CATEGORY_LABELS[currentCategory]}
               </span>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               {leaderboard.map((entry) => (
                 <div
                   key={entry.rank}
-                  className={`flex items-center gap-4 px-4 py-3 rounded-lg transition-all ${
+                  className={`flex items-center gap-4 px-5 py-3.5 rounded-lg transition-all ${
                     entry.rank === 1 ? 'bg-amber-500/10 border border-amber-500/30' :
                     entry.rank <= 3 ? 'bg-slate-800/60 border border-slate-700/50' :
                     'bg-slate-900/40 hover:bg-slate-800/40'
                   }`}
                 >
-                  <span className={`text-sm font-bold w-7 text-center shrink-0 ${
+                  <span className={`text-lg font-bold w-8 text-center shrink-0 ${
                     entry.rank === 1 ? 'text-amber-400' :
                     entry.rank === 2 ? 'text-slate-300' :
                     entry.rank === 3 ? 'text-orange-400' : 'text-slate-400'
                   }`}>{entry.rank}</span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-base font-bold truncate leading-tight text-white">{entry.name}</p>
-                    <p className="text-sm text-slate-400 truncate">
+                    <p className="text-lg font-bold truncate leading-tight text-white">{entry.name}</p>
+                    <p className="text-base text-slate-400 truncate">
                       #{entry.bibNumber}{entry.companyName ? ` · ${entry.companyName}` : ''}
                     </p>
                   </div>
-                  <span className="text-sm font-mono font-bold text-emerald-400 shrink-0">{entry.distance.toFixed(2)} km</span>
+                  <span className="text-lg font-mono font-bold text-emerald-400 shrink-0">{entry.distance.toFixed(2)} km</span>
                 </div>
               ))}
               {leaderboard.length === 0 && (
-                <div className="h-24 flex items-center justify-center">
-                  <p className="text-slate-500 text-base">Waiting for race...</p>
+                <div className="h-32 flex items-center justify-center">
+                  <p className="text-slate-500 text-xl">Waiting for race...</p>
                 </div>
               )}
             </div>
@@ -630,16 +635,16 @@ export default function LEDScreen() {
 
       {/* Announcement Banner */}
       {announcement && (
-        <div className="h-14 bg-gradient-to-r from-amber-500/20 via-amber-500/30 to-amber-500/20 border-t border-amber-500/30 flex items-center justify-center px-10 shrink-0">
-          <span className="text-amber-400 font-bold mr-3 text-base">{announcement.title}:</span>
-          <span className="text-amber-200/80 text-sm">{announcement.message}</span>
+        <div className="h-16 bg-gradient-to-r from-amber-500/20 via-amber-500/30 to-amber-500/20 border-t border-amber-500/30 flex items-center justify-center px-12 shrink-0">
+          <span className="text-amber-400 font-bold mr-4 text-xl">{announcement.title}:</span>
+          <span className="text-amber-200/80 text-lg">{announcement.message}</span>
         </div>
       )}
 
       {/* Sponsors Ticker */}
-      <div className="h-16 bg-[#0d1320] border-t border-slate-800/40 flex items-center px-10 shrink-0">
-        <span className="text-xs font-extrabold text-slate-500 uppercase tracking-widest mr-6 shrink-0">Sponsors</span>
-        <SponsorTicker sponsors={sponsors} />
+      <div className="h-20 bg-[#0d1320] border-t border-slate-800/40 flex items-center px-12 shrink-0">
+        <span className="text-sm font-extrabold text-slate-500 uppercase tracking-widest mr-8 shrink-0">Sponsors</span>
+        <SponsorTicker />
       </div>
     </div>
   );

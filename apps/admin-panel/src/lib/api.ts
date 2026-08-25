@@ -34,9 +34,13 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
       ...((options.headers as Record<string, string>) || {}),
     };
+
+    // Don't set Content-Type for FormData - fetch will set it automatically with boundary
+    if (!(options.body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
 
     if (this.token) {
       headers['Authorization'] = `Bearer ${this.token}`;
@@ -271,6 +275,29 @@ class ApiClient {
 
   async deleteBulkRegistration(id: string) {
     return this.request<void>(`/api/v1/bulk-registration/${id}`, { method: 'DELETE' });
+  }
+
+  async getSponsors(params?: Record<string, string>) {
+    const query = params ? '?' + new URLSearchParams(params).toString() : '';
+    return this.request<any[]>(`/api/v1/sponsors${query}`);
+  }
+
+  async createSponsor(data: FormData) {
+    return this.request<any>('/api/v1/sponsors', {
+      method: 'POST',
+      body: data,
+    });
+  }
+
+  async updateSponsor(id: string, data: FormData) {
+    return this.request<any>(`/api/v1/sponsors/${id}`, {
+      method: 'PUT',
+      body: data,
+    });
+  }
+
+  async deleteSponsor(id: string) {
+    return this.request<void>(`/api/v1/sponsors/${id}`, { method: 'DELETE' });
   }
 }
 

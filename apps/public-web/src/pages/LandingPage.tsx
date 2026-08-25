@@ -1,6 +1,47 @@
 import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+
+const API_URL = import.meta.env.VITE_API_URL || '';
+
+function useCountdown(targetDate: Date) {
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 });
+
+  useEffect(() => {
+    function calc() {
+      const now = new Date().getTime();
+      const diff = targetDate.getTime() - now;
+      if (diff <= 0) return { days: 0, hours: 0, minutes: 0, seconds: 0 };
+      return {
+        days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((diff / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((diff / (1000 * 60)) % 60),
+        seconds: Math.floor((diff / 1000) % 60),
+      };
+    }
+    setTimeLeft(calc());
+    const timer = setInterval(() => setTimeLeft(calc()), 1000);
+    return () => clearInterval(timer);
+  }, [targetDate]);
+
+  return timeLeft;
+}
 
 export default function LandingPage() {
+  const [topCompanies, setTopCompanies] = useState<any[]>([]);
+  const raceDate = new Date('2026-09-27T06:00:00');
+  const { days, hours, minutes, seconds } = useCountdown(raceDate);
+
+  useEffect(() => {
+    console.log('[Landing] Fetching companies from:', `${API_URL}/api/v1/analytics/company-participation`);
+    fetch(`${API_URL}/api/v1/analytics/company-participation`)
+      .then(r => r.json())
+      .then(res => {
+        console.log('[Landing] Companies response:', res);
+        if (res.success) setTopCompanies(res.data.slice(0, 5));
+      })
+      .catch(err => console.error('[Landing] Companies fetch error:', err));
+  }, []);
+
   return (
     <div className="bg-marathon min-h-screen">
       {/* Hero Section */}
@@ -20,6 +61,21 @@ export default function LandingPage() {
             Run for a <span className="text-pink-600 font-semibold">Greener</span> Tomorrow. 
             Every kilometer you run plants a tree.
           </p>
+
+          {/* Countdown Timer */}
+          <div className="flex justify-center gap-3 sm:gap-4 mb-8 sm:mb-10">
+            {[
+              { value: days, label: 'Days' },
+              { value: hours, label: 'Hours' },
+              { value: minutes, label: 'Min' },
+              { value: seconds, label: 'Sec' },
+            ].map((item) => (
+              <div key={item.label} className="glass-dark rounded-2xl px-4 sm:px-5 py-3 sm:py-4 min-w-[70px] sm:min-w-[80px]">
+                <p className="text-2xl sm:text-3xl font-black text-slate-800">{String(item.value).padStart(2, '0')}</p>
+                <p className="text-xs text-slate-500 font-medium">{item.label}</p>
+              </div>
+            ))}
+          </div>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center px-4">
             <Link
@@ -167,6 +223,42 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* Top Companies */}
+      {topCompanies.length > 0 && (
+        <section className="py-16 sm:py-20 px-4 relative z-10">
+          <div className="max-w-4xl mx-auto">
+            <div className="text-center mb-12 sm:mb-16">
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-black text-slate-800 mb-4">
+                Top <span className="gradient-text">Companies</span>
+              </h2>
+              <p className="text-slate-600 text-base sm:text-lg">Companies leading the charge</p>
+            </div>
+
+            <div className="space-y-4">
+              {topCompanies.map((company: any, i: number) => {
+                const medals = ['from-yellow-400 to-amber-500', 'from-slate-300 to-slate-400', 'from-orange-400 to-amber-600'];
+                const isTop3 = i < 3;
+                return (
+                  <div key={company.companyId} className="glass rounded-2xl p-4 sm:p-5 flex items-center gap-4 hover:scale-[1.02] transition-transform">
+                    <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center font-black text-lg sm:text-xl shrink-0 ${isTop3 ? `bg-gradient-to-br ${medals[i]} text-white` : 'glass-dark text-slate-600'}`}>
+                      {i + 1}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-slate-800 font-bold text-base sm:text-lg truncate">{company.companyName}</p>
+                      <p className="text-slate-500 text-xs sm:text-sm">{company.totalParticipants} participants</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-slate-800 font-bold text-base sm:text-lg">{company.totalDistance.toFixed(1)} km</p>
+                      <p className="text-slate-500 text-xs sm:text-sm">total distance</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* CTA Section */}
       <section className="py-16 sm:py-20 px-4 relative z-10">

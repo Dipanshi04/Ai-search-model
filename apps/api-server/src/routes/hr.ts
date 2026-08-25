@@ -1,10 +1,11 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../config/database.js';
 import { logger } from '../config/logger.js';
-import { comparePassword, generateAccessToken, hashPassword, verifyToken } from '../utils/jwt.js';
+import { comparePassword, generateAccessToken, hashPassword, verifyToken, generateResetToken, verifyResetToken } from '../utils/jwt.js';
 import { generateQRCode } from '../utils/qrcode.js';
 import multer from 'multer';
 import { parse } from 'csv-parse/sync';
+import { sendPinEmail, sendWelcomeEmail } from '../services/email.js';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
@@ -76,6 +77,106 @@ hrRouter.post('/login', async (req: Request, res: Response) => {
   }
 });
 
+hrRouter.post('/forgot-password', async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body as { email: string };
+    if (!email) {
+      res.status(400).json({ success: false, message: 'Email required' });
+      return;
+    }
+
+    const bulkReg = await prisma.bulkRegistration.findUnique({ where: { hrEmail: email } });
+    
+    // Always return success to prevent email enumeration
+    if (!bulkReg) {
+      res.json({ success: true, message: 'If the email exists, a reset link has been sent' });
+      return;
+    }
+
+    // Generate reset token
+    const resetToken = generateResetToken({
+      hrId: bulkReg.id,
+      email: bulkReg.hrEmail,
+      type: 'hr_password_reset',
+    });
+
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/hr-reset-password?token=${resetToken}`;
+
+    // Send reset email
+    const html = `
+      <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
+        <div style="text-align: center; margin-bottom: 32px;">
+          <h1 style="margin: 0; font-size: 28px; font-weight: 800; background: linear-gradient(135deg, #E91E8C 0%, #9C27B0 50%, #2196F3 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">ISA MARATHON</h1>
+        </div>
+        <div style="background: #f8fafc; border-radius: 16px; padding: 32px; text-align: center;">
+          <p style="margin: 0 0 16px; font-size: 18px; color: #1e293b;">Reset Your HR Portal Password</p>
+          <p style="margin: 0 0 8px; font-size: 14px; color: #64748b;">Hello <strong>${bulkReg.hrName}</strong>,</p>
+          <p style="margin: 0 0 24px; font-size: 14px; color: #64748b;">Click the button below to reset your HR Portal password. This link expires in 1 hour.</p>
+          <a href="${resetUrl}" style="display: inline-block; background: linear-gradient(135deg, #E91E8C 0%, #9C27B0 50%, #2196F3 100%); padding: 16px 32px; border-radius: 10px; color: #fff; font-weight: 700; text-decoration: none;">Reset Password</a>
+          <p style="margin: 24px 0 0; font-size: 12px; color: #94a3b8;">If you didn't request this, please ignore this email.</p>
+        </div>
+        <p style="margin: 24px 0 0; text-align: center; font-size: 12px; color: #94a3b8;">© 2026 ISA Marathon. All rights reserved.</p>
+      </div>
+    `;
+
+    const { sendEmail } = await import('../services/email.js');
+    await sendEmail({ 
+      to: bulkReg.hrEmail, 
+      subject: 'Reset Your ISA Marathon HR Portal Password', 
+      html 
+    });
+
+    logger.info(`HR password reset requested: ${email}`);
+
+    res.json({ success: true, message: 'If the email exists, a reset link has been sent' });
+  } catch (error) {
+    logger.error('HR forgot password error:', error);
+    res.status(500).json({ success: false, message: 'Failed to process request' });
+  }
+});
+
+hrRouter.post('/reset-password', async (req: Request, res: Response) => {
+  try {
+    const { token, password } = req.body as { token: string; password: string };
+    if (!token || !password) {
+      res.status(400).json({ success: false, message: 'Token and password required' });
+      return;
+    }
+
+    let payload;
+    try {
+      payload = verifyResetToken(token);
+    } catch {
+      res.status(400).json({ success: false, message: 'Invalid or expired reset token' });
+      return;
+    }
+
+    if (payload.type !== 'hr_password_reset') {
+      res.status(400).json({ success: false, message: 'Invalid reset token' });
+      return;
+    }
+
+    if (password.length < 6) {
+      res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+      return;
+    }
+
+    const passwordHash = await hashPassword(password);
+    
+    await prisma.bulkRegistration.update({
+      where: { id: payload.hrId },
+      data: { hrPasswordHash: passwordHash },
+    });
+
+    logger.info(`HR password reset completed: ${payload.email}`);
+
+    res.json({ success: true, message: 'Password reset successfully' });
+  } catch (error) {
+    logger.error('HR reset password error:', error);
+    res.status(500).json({ success: false, message: 'Failed to reset password' });
+  }
+});
+
 hrRouter.get('/me', hrAuth, async (req: Request, res: Response) => {
   try {
     const hrId = (req as any).hr.userId;
@@ -118,7 +219,7 @@ hrRouter.get('/me', hrAuth, async (req: Request, res: Response) => {
 hrRouter.get('/event/current', hrAuth, async (req: Request, res: Response) => {
   try {
     const event = await prisma.event.findFirst({
-      where: { status: { in: ['UPCOMING'] } },
+      where: { status: { in: ['UPCOMING', 'ACTIVE'] } },
       orderBy: { date: 'asc' },
       select: { id: true, name: true, status: true, date: true, registrationOpen: true },
     });
@@ -136,16 +237,30 @@ hrRouter.get('/event/current', hrAuth, async (req: Request, res: Response) => {
 hrRouter.get('/participants', hrAuth, async (req: Request, res: Response) => {
   try {
     const hrId = (req as any).hr.userId;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 20;
+    const skip = (page - 1) * limit;
 
-    const participants = await prisma.participant.findMany({
-      where: { bulkRegistrationId: hrId },
-      include: {
-        user: { select: { name: true, email: true, phone: true } },
-      },
-      orderBy: { createdAt: 'desc' },
+    const [participants, total] = await Promise.all([
+      prisma.participant.findMany({
+        where: { bulkRegistrationId: hrId },
+        include: {
+          user: { select: { name: true, email: true, phone: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      prisma.participant.count({
+        where: { bulkRegistrationId: hrId },
+      }),
+    ]);
+
+    res.json({
+      success: true,
+      data: participants,
+      pagination: { total, totalPages: Math.ceil(total / limit), page, limit },
     });
-
-    res.json({ success: true, data: participants });
   } catch (error) {
     logger.error('HR participants error:', error);
     res.status(500).json({ success: false, message: 'Failed to fetch participants' });
@@ -155,9 +270,9 @@ hrRouter.get('/participants', hrAuth, async (req: Request, res: Response) => {
 hrRouter.post('/participants', hrAuth, async (req: Request, res: Response) => {
   try {
     const hrId = (req as any).hr.userId;
-    const { name, email, phone, category, gender, eventId: reqEventId, emergencyContact, emergencyPhone, bloodGroup, tshirtSize } = req.body as {
+    const { name, email, phone, category, gender, eventId: reqEventId, emergencyContact, emergencyPhone, bloodGroup, bloodDonation, tshirtSize } = req.body as {
       name: string; email: string; phone: string; category: string; gender: string; eventId?: string;
-      emergencyContact?: string; emergencyPhone?: string; bloodGroup?: string; tshirtSize?: string;
+      emergencyContact?: string; emergencyPhone?: string; bloodGroup?: string; bloodDonation?: boolean; tshirtSize?: string;
     };
 
     if (!name || !email || !phone || !category || !gender) {
@@ -189,6 +304,8 @@ hrRouter.post('/participants', hrAuth, async (req: Request, res: Response) => {
     }
 
     let user = await prisma.user.findUnique({ where: { email } });
+    let isNewUser = false;
+    let pin = '';
     if (!user) {
       const phoneUser = await prisma.user.findUnique({ where: { phone } });
       if (phoneUser) {
@@ -196,7 +313,19 @@ hrRouter.post('/participants', hrAuth, async (req: Request, res: Response) => {
         return;
       }
       const passwordHash = await hashPassword('marathon2026');
-      user = await prisma.user.create({ data: { email, phone, name, passwordHash } });
+      pin = String(Math.floor(1000 + Math.random() * 9000));
+      const pinHash = await hashPassword(pin);
+      user = await prisma.user.create({ data: { email, phone, name, passwordHash, pinHash } });
+      isNewUser = true;
+    } else if (!user.pinHash) {
+      // Existing user without PIN - generate one
+      pin = String(Math.floor(1000 + Math.random() * 9000));
+      const pinHash = await hashPassword(pin);
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { pinHash },
+      });
+      isNewUser = true;
     }
 
     let bibNumber = '';
@@ -226,6 +355,7 @@ hrRouter.post('/participants', hrAuth, async (req: Request, res: Response) => {
         emergencyContact: emergencyContact || null,
         emergencyPhone: emergencyPhone || null,
         bloodGroup: bloodGroup || null,
+        bloodDonation: bloodDonation === true,
         tshirtSize: tshirtSize || null,
       },
       include: {
@@ -240,6 +370,12 @@ hrRouter.post('/participants', hrAuth, async (req: Request, res: Response) => {
     });
 
     logger.info(`HR bulk registration: ${bibNumber} - ${name} by ${bulkReg.hrEmail}`);
+
+    // Send welcome email and PIN email (async)
+    if (isNewUser && pin) {
+      sendWelcomeEmail(user.email, user.name, bibNumber, category).catch((e) => logger.error('Welcome email failed:', e));
+      sendPinEmail(user.email, user.name, pin).catch((e) => logger.error('PIN email failed:', e));
+    }
 
     res.status(201).json({
       success: true,
@@ -337,6 +473,7 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
       const emergencyContact = record.emergencycontact?.trim() || record.emergency_contact?.trim() || null;
       const emergencyPhone = record.emergencyphone?.trim() || record.emergency_phone?.trim() || null;
       const bloodGroup = record.bloodgroup?.trim() || record.blood_group?.trim() || null;
+      const bloodDonation = record.blooddonation === 'true' || record.blood_donation === 'true' || record.blooddonation === 'TRUE' || record.blood_donation === 'TRUE';
       const tshirtSize = record.tshirtsize?.trim() || record.tshirt_size?.trim() || null;
 
       if (!name || !email || !phone || !gender) {
@@ -376,6 +513,8 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
 
       try {
         let user = await prisma.user.findUnique({ where: { email } });
+        let isNewUser = false;
+        let pin = '';
         if (!user) {
           const phoneUser = await prisma.user.findUnique({ where: { phone } });
           if (phoneUser) {
@@ -383,7 +522,19 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
             continue;
           }
           const passwordHash = await hashPassword('marathon2026');
-          user = await prisma.user.create({ data: { email, phone, name, passwordHash } });
+          pin = String(Math.floor(1000 + Math.random() * 9000));
+          const pinHash = await hashPassword(pin);
+          user = await prisma.user.create({ data: { email, phone, name, passwordHash, pinHash } });
+          isNewUser = true;
+        } else if (!user.pinHash) {
+          // Existing user without PIN - generate one
+          pin = String(Math.floor(1000 + Math.random() * 9000));
+          const pinHash = await hashPassword(pin);
+          user = await prisma.user.update({
+            where: { id: user.id },
+            data: { pinHash },
+          });
+          isNewUser = true;
         }
 
         lastNum++;
@@ -411,6 +562,7 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
             emergencyContact,
             emergencyPhone,
             bloodGroup,
+            bloodDonation,
             tshirtSize,
           },
         });
@@ -420,6 +572,12 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
 
         results.push({ success: true, name, email, bibNumber });
         created++;
+
+        // Send welcome email and PIN email (async)
+        if (isNewUser && pin) {
+          sendWelcomeEmail(user.email, user.name, bibNumber, category).catch((e) => logger.error('Welcome email failed:', e));
+          sendPinEmail(user.email, user.name, pin).catch((e) => logger.error('PIN email failed:', e));
+        }
       } catch (err: any) {
         if (err.code === 'P2002') {
           results.push({ success: false, name, email, error: 'Duplicate entry' });

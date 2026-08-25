@@ -61,6 +61,7 @@ model User {
   phone         String        @unique
   name          String
   passwordHash  String        @map("password_hash")
+  pinHash       String?       @map("pin_hash")
   avatarUrl     String?       @map("avatar_url")
   role          UserRole      @default(PARTICIPANT)
   createdAt     DateTime      @default(now())
@@ -110,6 +111,7 @@ model Participant {
   emergencyContact String?         @map("emergency_contact")
   emergencyPhone  String?          @map("emergency_phone")
   bloodGroup      String?          @map("blood_group")
+  bloodDonation   Boolean          @default(false) @map("blood_donation")
   tshirtSize      String?          @map("tshirt_size")
   bulkRegistrationId String?       @map("bulk_registration_id")
   createdAt       DateTime         @default(now())
@@ -184,8 +186,8 @@ model Checkpoint {
 model Sponsor {
   id           String   @id @default(cuid())
   eventId      String   @map("event_id")
-  name         String
-  tier         String
+  name         String?
+  tier         String?
   logoUrl      String?  @map("logo_url")
   website      String?
   displayOrder Int      @default(0) @map("display_order")

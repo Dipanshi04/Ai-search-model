@@ -24,8 +24,8 @@ body {
 
 /* Global Background */
 .bg-marathon {
-  background-image: url('https://i.pinimg.com/736x/cf/d5/93/cfd593e107cb2ef49af2451c6bb7869e.jpg');
-  background: linear-gradient(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.05)), 
+  background-image: url('https://i.pinimg.com/736x/cf/d5/93/cfd593e107cb2ef49af2451c6bb7869e.jpg'); 
+  background: linear-gradient(rgba(0, 0, 0, 0.05), rgba(0, 0, 0, 0.05)),
               url('https://i.pinimg.com/736x/cf/d5/93/cfd593e107cb2ef49af2451c6bb7869e.jpg');
   background-size: cover;
   background-position: center;
@@ -46,7 +46,7 @@ body {
 }
 
 .glass-strong {
-  background: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.50);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.4);
@@ -124,4 +124,21 @@ body {
   .bg-marathon {
     background-attachment: scroll;
   }
+}
+
+/* Animated checkmark draw effect */
+@keyframes check-draw {
+  0% { stroke-dasharray: 24; stroke-dashoffset: 24; }
+  100% { stroke-dasharray: 24; stroke-dashoffset: 0; }
+}
+
+.animate-check {
+  stroke-dasharray: 24;
+  stroke-dashoffset: 24;
+  animation: check-draw 0.4s ease-out 0.1s forwards;
+}
+
+/* Button width transition */
+button {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }

@@ -26,6 +26,7 @@ export default function RegisterPage() {
     emergencyContact: '',
     emergencyPhone: '',
     bloodGroup: '',
+    bloodDonation: false,
     tshirtSize: 'M',
   });
   const [loading, setLoading] = useState(false);
@@ -87,7 +88,6 @@ export default function RegisterPage() {
     const res = await api.register(form);
     if (res.success) {
       setResult(res.data);
-      api.setToken(res.data.tokens.accessToken);
       setStep('payment');
     } else {
       setError(res.message || 'Registration failed');
@@ -184,12 +184,20 @@ export default function RegisterPage() {
             Registration Complete!
           </h2>
           <p className="text-slate-600 mb-6 sm:mb-8 text-base sm:text-lg">Welcome, {result.participant?.user?.name}</p>
-          <div className="glass-dark rounded-2xl p-5 sm:p-6 mb-6">
+          <div className="glass-dark rounded-2xl p-5 sm:p-6 mb-4">
             <p className="text-sm text-slate-500 mb-2">Your BIB Number</p>
             <p className="text-3xl sm:text-4xl font-black text-slate-800 font-mono tracking-wider">{result.participant?.bibNumber || result.bibNumber}</p>
           </div>
+          <div className="glass-dark rounded-2xl p-5 sm:p-6 mb-4">
+            <p className="text-sm text-slate-500 mb-2">Your 4-Digit Login PIN</p>
+            <p className="text-2xl sm:text-3xl font-black text-emerald-600 font-mono tracking-widest">Sent to Email</p>
+          </div>
           <div className="glass-dark rounded-2xl p-4 mb-6 border border-green-500/30">
             <p className="text-green-700 text-sm">Payment confirmed! You're all set for race day.</p>
+          </div>
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-6 text-left">
+            <p className="text-emerald-800 text-sm font-semibold mb-1">Check your email for your PIN</p>
+            <p className="text-emerald-700 text-xs">Use your email and the 4-digit PIN sent to you to log into the Runner App at <strong>localhost:3001</strong>.</p>
           </div>
           <p className="text-xs text-slate-500 mb-6">
             Save this BIB number. You will need it for check-in on race day.
@@ -373,6 +381,18 @@ export default function RegisterPage() {
                 <option value="AB-">AB-</option>
               </select>
             </div>
+          </div>
+
+          <div className="mb-4">
+            <label className="flex items-center gap-3 glass-dark rounded-lg px-3 py-2.5 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.bloodDonation}
+                onChange={(e) => setForm({ ...form, bloodDonation: e.target.checked })}
+                className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+              />
+              <span className="text-sm text-slate-700">I am interested in blood donation</span>
+            </label>
           </div>
 
           <div className="grid grid-cols-2 gap-3 mb-4">

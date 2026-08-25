@@ -3,6 +3,8 @@ import { prisma } from '../config/database.js';
 import { logger } from '../config/logger.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { hashPassword } from '../utils/jwt.js';
+import bcrypt from 'bcryptjs';
+import { sendPinEmail, sendWelcomeEmail } from '../services/email.js';
 
 export const bulkRegistrationRouter: Router = Router();
 
@@ -74,6 +76,9 @@ bulkRegistrationRouter.post('/', async (req: Request, res: Response) => {
 
     const hrPasswordHash = await hashPassword(hrPassword);
 
+    const pin = String(Math.floor(1000 + Math.random() * 9000));
+    const pinHash = await bcrypt.hash(pin, 12);
+
     let linkedCompanyId = companyId || null;
     if (!linkedCompanyId && companyName) {
       let company = await prisma.company.findUnique({ where: { name: companyName } });
@@ -96,6 +101,20 @@ bulkRegistrationRouter.post('/', async (req: Request, res: Response) => {
     });
 
     logger.info(`Bulk registration created: ${companyName} (${hrEmail}) - ${numberOfRegistrations} slots`);
+
+    const hrUser = await prisma.user.create({
+      data: {
+        email: hrEmail,
+        name: hrName,
+        phone: '',
+        passwordHash: hrPasswordHash,
+        pinHash,
+        role: 'HR',
+      },
+    });
+
+    sendWelcomeEmail(hrEmail, hrName, 'BULK-HR', 'HR').catch((e) => logger.error('Welcome email failed:', e));
+    sendPinEmail(hrEmail, hrName, pin).catch((e) => logger.error('PIN email failed:', e));
 
     res.status(201).json({
       success: true,

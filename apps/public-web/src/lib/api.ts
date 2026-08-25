@@ -118,11 +118,15 @@ class ApiClient {
     return response.json();
   }
 
-  async hrGetParticipants() {
+  async hrGetParticipants(params?: { page?: number; limit?: number }) {
     const headers: Record<string, string> = {};
     const hrToken = localStorage.getItem('hr_token');
     if (hrToken) headers['Authorization'] = `Bearer ${hrToken}`;
-    const response = await fetch(`${API_URL}/api/v1/hr/participants`, { headers });
+    const query = new URLSearchParams();
+    if (params?.page) query.set('page', params.page.toString());
+    if (params?.limit) query.set('limit', params.limit.toString());
+    const qs = query.toString();
+    const response = await fetch(`${API_URL}/api/v1/hr/participants${qs ? '?' + qs : ''}`, { headers });
     return response.json();
   }
 
@@ -176,6 +180,24 @@ class ApiClient {
     a.download = 'sample-participants.csv';
     a.click();
     window.URL.revokeObjectURL(url);
+  }
+
+  async hrForgotPassword(email: string) {
+    const response = await fetch(`${API_URL}/api/v1/hr/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    return response.json();
+  }
+
+  async hrResetPassword(token: string, password: string) {
+    const response = await fetch(`${API_URL}/api/v1/hr/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, password }),
+    });
+    return response.json();
   }
 }
 

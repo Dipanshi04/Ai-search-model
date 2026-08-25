@@ -131,13 +131,15 @@ participantsRouter.get('/', async (req, res) => {
 
 participantsRouter.get('/leaderboard', async (req, res) => {
   try {
-    const { eventId, limit = '100' } = req.query;
+    const { eventId, category, limit = '100' } = req.query;
     if (!eventId) {
       res.json({ success: true, data: [] });
       return;
     }
+    const where: any = { eventId: eventId as string };
+    if (category) where.category = category;
     const participants = await prisma.participant.findMany({
-      where: { eventId: eventId as string },
+      where,
       include: { user: true },
       orderBy: { totalDistance: 'desc' },
       take: parseInt(limit as string),

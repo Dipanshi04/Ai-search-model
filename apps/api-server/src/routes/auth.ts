@@ -7,6 +7,8 @@ import {
 import { authenticate } from '../middleware/auth.js';
 import { prisma } from '../config/database.js';
 import { logger } from '../config/logger.js';
+import bcrypt from 'bcryptjs';
+import { sendPinEmail } from '../services/email.js';
 
 export const authRouter: Router = Router();
 
@@ -14,15 +16,15 @@ authRouter.post(
   '/login',
   async (req: Request, res: Response) => {
     try {
-      const { email, password } = req.body;
-      if (!email || !password) {
-        res.status(400).json({ success: false, message: 'Email and password required' });
+      const { email, pin } = req.body;
+      if (!email || !pin) {
+        res.status(400).json({ success: false, message: 'Email and PIN required' });
         return;
       }
 
       const user = await prisma.user.findUnique({
         where: { email },
-        select: { id: true, email: true, name: true, phone: true, passwordHash: true, role: true },
+        select: { id: true, email: true, name: true, phone: true, pinHash: true, role: true },
       });
 
       if (!user) {
@@ -30,9 +32,14 @@ authRouter.post(
         return;
       }
 
-      const isValid = await comparePassword(password, user.passwordHash);
+      if (!user.pinHash) {
+        res.status(401).json({ success: false, message: 'No PIN set. Use "Reset PIN" to get a new PIN.' });
+        return;
+      }
+
+      const isValid = await comparePassword(pin, user.pinHash);
       if (!isValid) {
-        res.status(401).json({ success: false, message: 'Invalid credentials' });
+        res.status(401).json({ success: false, message: 'Invalid PIN' });
         return;
       }
 
@@ -125,6 +132,49 @@ authRouter.post(
     } catch (error) {
       logger.error('Admin login error:', error);
       res.status(500).json({ success: false, message: 'Admin login failed' });
+    }
+  }
+);
+
+authRouter.post(
+  '/reset-pin',
+  async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        res.status(400).json({ success: false, message: 'Email required' });
+        return;
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { email },
+        select: { id: true, name: true, email: true },
+      });
+
+      // Always return success to prevent email enumeration
+      if (!user) {
+        res.json({ success: true, message: 'If the email exists, a new PIN has been sent' });
+        return;
+      }
+
+      // Generate 4-digit PIN
+      const pin = String(Math.floor(1000 + Math.random() * 9000));
+      const pinHash = await bcrypt.hash(pin, 12);
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { pinHash },
+      });
+
+      // Send PIN email
+      await sendPinEmail(user.email, user.name, pin);
+
+      logger.info(`PIN reset for: ${email}`);
+
+      res.json({ success: true, message: 'If the email exists, a new PIN has been sent' });
+    } catch (error) {
+      logger.error('Reset PIN error:', error);
+      res.status(500).json({ success: false, message: 'Failed to reset PIN' });
     }
   }
 );

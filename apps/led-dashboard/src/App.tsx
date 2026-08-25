@@ -5,6 +5,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { formatDuration } from '@isa/utils';
 import logoDark from './components/logo-dark.png';
 import logoLight from './components/logo-light.png';
+import liseInfoTechLogo from './components/Lise Logo 2.png';
 
 const Logo = ({ size = 'h-18', theme = 'dark' }: { size?: string; theme?: 'light' | 'dark' }) => (
   <img src={theme === 'dark' ? logoLight : logoDark} alt="ISA Marathon" className={`${size} w-auto max-w-full object-contain drop-shadow-md`} />
@@ -13,6 +14,13 @@ const Logo = ({ size = 'h-18', theme = 'dark' }: { size?: string; theme?: 'light
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
 const API_URL = import.meta.env.VITE_API_URL || '';
 const EVENT_ID = import.meta.env.VITE_EVENT_ID || '';
+
+function getImageUrl(url: string | undefined): string {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('/')) return `${API_URL}${url}`;
+  return `${API_URL}/${url}`;
+}
 
 const RUNNER_COLORS = [
   '#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6',
@@ -35,17 +43,6 @@ interface LeaderboardEntry {
   pace: number | null;
 }
 
-const DUMMY_SPONSORS = [
-  { name: 'TechCorp', color: '#3B82F6' },
-  { name: 'GreenEdge', color: '#10B981' },
-  { name: 'InnoLab', color: '#8B5CF6' },
-  { name: 'DataFlow', color: '#F59E0B' },
-  { name: 'CloudNet', color: '#EC4899' },
-  { name: 'NextGen', color: '#06B6D4' },
-  { name: 'PixelWorks', color: '#EF4444' },
-  { name: 'SynergyAI', color: '#84CC16' },
-];
-
 function SponsorLogo({ name, color }: { name: string; color: string }) {
   return (
     <div className="flex items-center gap-3 shrink-0">
@@ -61,15 +58,70 @@ function SponsorLogo({ name, color }: { name: string; color: string }) {
   );
 }
 
-function SponsorTicker() {
-  const items = [...DUMMY_SPONSORS, ...DUMMY_SPONSORS, ...DUMMY_SPONSORS];
-  return (
-    <div className="overflow-hidden whitespace-nowrap py-3">
-      <div className="sponsor-ticker inline-flex items-center gap-10">
-        {items.map((s, i) => (
-          <SponsorLogo key={`${s.name}-${i}`} name={s.name} color={s.color} />
-        ))}
+function SponsorTicker({ sponsors }: { sponsors: { id: string; name: string; logoUrl?: string; tier?: string }[] }) {
+  const validSponsors = sponsors.filter(s => (s.name && s.name !== 'null' && s.name !== 'undefined') || s.logoUrl);
+  if (validSponsors.length === 0) return null;
+  const renderItem = (s: { id: string; name: string; logoUrl?: string; tier?: string }, i: number) => {
+    const imgUrl = getImageUrl(s.logoUrl);
+    const label = (s.name && s.name !== 'null' && s.name !== 'undefined') ? s.name : 'Sponsor';
+    return (
+      <div key={`${s.id}-${i}`} className="flex items-center shrink-0">
+        {imgUrl ? (
+          <img src={imgUrl} alt={label} className="h-14 w-auto max-w-[160px] object-contain" />
+        ) : (
+          <div className="h-12 px-6 rounded-lg flex items-center justify-center text-white font-bold text-lg tracking-wide" style={{ background: s.tier === 'Platinum' ? '#E5E7EB' : s.tier === 'Gold' ? '#FDE047' : s.tier === 'Silver' ? '#94A3B8' : s.tier === 'Bronze' ? '#CD7F32' : '#6B7280' }}>
+            {label}
+          </div>
+        )}
       </div>
+    );
+  };
+  return (
+    <div className="overflow-hidden whitespace-nowrap py-3 flex-1 min-w-0 flex items-center">
+      <span className="text-sm font-extrabold text-slate-500 uppercase tracking-[0.3em] shrink-0 pl-2">SPONSORS</span>
+      <div className="overflow-hidden flex-1 min-w-0 mx-6">
+        <div className="sponsor-ticker inline-flex items-center gap-16" style={{ width: 'max-content' }}>
+          {validSponsors.map((s, i) => renderItem(s, i))}
+          {validSponsors.map((s, i) => renderItem(s, i + validSponsors.length))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SponsorGrid({ sponsors }: { sponsors: { id: string; name: string; logoUrl?: string; tier?: string }[] }) {
+  const valid = sponsors.filter(s => s.name || s.logoUrl);
+  const count = valid.length;
+  const cols = count <= 4 ? 2 : count <= 9 ? 3 : 3;
+  const gap = count <= 4 ? 'gap-4' : count <= 9 ? 'gap-3' : 'gap-2';
+
+  return (
+    <div className={`grid ${gap} h-full`} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gridAutoRows: '1fr' }}>
+      {valid.map((s) => {
+        const imgUrl = getImageUrl(s.logoUrl);
+        const tierKey = (s.tier || '').toUpperCase();
+        const isLightTier = tierKey === 'PLATINUM' || tierKey === 'GOLD';
+        const tierBg: Record<string, string> = {
+          PLATINUM: 'linear-gradient(135deg, #e2e8f0, #f8fafc)',
+          GOLD: 'linear-gradient(135deg, #fbbf24, #fde68a)',
+          SILVER: 'linear-gradient(135deg, #94a3b8, #cbd5e1)',
+          BRONZE: 'linear-gradient(135deg, #f97316, #fed7aa)',
+        };
+        const bg = tierBg[tierKey] || 'linear-gradient(135deg, #1e293b, #334155)';
+
+        return (
+          <div key={s.id} className="relative rounded-xl overflow-hidden border border-slate-700/50 flex flex-col items-center justify-center p-3 hover:scale-[1.03] transition-transform" style={{ background: bg, minHeight: count > 9 ? '80px' : count > 4 ? '100px' : '120px' }}>
+            {imgUrl ? (
+              <img src={imgUrl} alt={s.name || 'Sponsor'} className={`object-contain drop-shadow-lg ${count > 9 ? 'h-8 w-auto' : count > 4 ? 'h-10 w-auto' : 'h-14 w-auto'}`} />
+            ) : (
+              <div className={`rounded-xl flex items-center justify-center font-black text-white ${count > 9 ? 'w-8 h-8 text-sm' : count > 4 ? 'w-10 h-10 text-base' : 'w-14 h-14 text-xl'}`} style={{ background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(8px)' }}>
+                {(s.name || 'S')[0]}
+              </div>
+            )}
+            {s.name && count <= 9 && <p className={`font-bold text-center leading-tight mt-2 ${count > 4 ? 'text-xs' : 'text-sm'}`} style={{ color: isLightTier ? '#1e293b' : '#e2e8f0' }}>{s.name}</p>}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -83,6 +135,9 @@ export default function LEDScreen() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [currentCategory, setCurrentCategory] = useState('overall');
   const [announcement, setAnnouncement] = useState<{ title: string; message: string } | null>(null);
+  const [sponsors, setSponsors] = useState<{ id: string; name: string; logoUrl?: string; tier?: string }[]>([]);
+  const [sidebarView, setSidebarView] = useState<'leaderboard' | 'sponsors'>('leaderboard');
+  const [fadeSidebar, setFadeSidebar] = useState(false);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [socketReady, setSocketReady] = useState(false);
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -280,11 +335,17 @@ export default function LEDScreen() {
             }
           }
 
-          const greenRes = await fetch(`${API_URL}/api/v1/green/trees?eventId=${eventId}`);
+          const greenRes = await fetch(`${API_URL}/api/v1/trees?eventId=${eventId}`);
           const greenData = await greenRes.json();
           if (greenData.success) {
             setTreeCount(greenData.data.totalTrees);
             setCo2Offset(greenData.data.totalCO2);
+          }
+
+          const sponsorRes = await fetch(`${API_URL}/api/v1/sponsors?eventId=${eventId}`);
+          const sponsorData = await sponsorRes.json();
+          if (sponsorData.success) {
+            setSponsors(sponsorData.data);
           }
 
         const lbRes = await fetch(`${API_URL}/api/v1/participants/leaderboard?limit=10`);
@@ -518,6 +579,48 @@ export default function LEDScreen() {
     }
   }, [currentCategory]);
 
+  useEffect(() => {
+    if (sponsors.length === 0) return;
+    const interval = setInterval(() => {
+      setFadeSidebar(true);
+      setTimeout(() => {
+        setSidebarView(v => {
+          if (v === 'leaderboard3k') return 'leaderboard5k';
+          if (v === 'leaderboard5k') return 'sponsors';
+          return 'leaderboard3k';
+        });
+        setFadeSidebar(false);
+      }, 400);
+    }, 7000);
+    return () => clearInterval(interval);
+  }, [sponsors.length]);
+
+  const [leaderboard3k, setLeaderboard3k] = useState<LeaderboardEntry[]>([]);
+  const [leaderboard5k, setLeaderboard5k] = useState<LeaderboardEntry[]>([]);
+
+  const mapLeaderboard = (data: any[]): LeaderboardEntry[] =>
+    data.map((p, i) => ({
+      rank: i + 1,
+      name: p.user?.name || p.user?.email || 'Unknown',
+      bibNumber: p.bibNumber || '',
+      companyName: p.user?.companyName,
+      distance: p.totalDistance ?? 0,
+      pace: null,
+    }));
+
+  useEffect(() => {
+    const eventId = resolvedEventIdRef.current || EVENT_ID;
+    if (!eventId) return;
+    fetch(`${API_URL}/api/v1/participants/leaderboard?eventId=${eventId}&category=RUN_3K&limit=10`)
+      .then(r => r.json())
+      .then(res => { if (res.success) setLeaderboard3k(mapLeaderboard(res.data)); })
+      .catch(() => {});
+    fetch(`${API_URL}/api/v1/participants/leaderboard?eventId=${eventId}&category=RUN_5K&limit=10`)
+      .then(r => r.json())
+      .then(res => { if (res.success) setLeaderboard5k(mapLeaderboard(res.data)); })
+      .catch(() => {});
+  }, [sponsors, socketReady]);
+
   return (
     <div className="w-screen h-screen bg-[#0a0f1a] text-white flex flex-col overflow-hidden select-none font-sans">
       {/* Header */}
@@ -590,47 +693,82 @@ export default function LEDScreen() {
         </main>
 
         {/* Sidebar */}
-        <aside className="w-[480px] xl:w-[520px] bg-[#0d1320] border-l border-slate-800/60 flex flex-col shrink-0 overflow-y-auto">
-          {/* Leaderboard */}
-          <div className="p-6 border-b border-slate-800/40">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-lg font-extrabold text-amber-400 uppercase tracking-widest">Leaderboard</h2>
-              <span className="text-sm bg-slate-800 text-slate-400 px-4 py-1.5 rounded-full font-semibold uppercase tracking-wider">
-                {CATEGORY_LABELS[currentCategory]}
-              </span>
+        <aside className="w-[480px] xl:w-[520px] bg-[#0d1320] border-l border-slate-800/60 flex flex-col shrink-0">
+          <div className="flex-1 min-h-0 relative">
+            {/* 3K Leaderboard */}
+            <div className={`absolute inset-0 transition-all duration-400 ${sidebarView === 'leaderboard3k' && !fadeSidebar ? 'opacity-100 translate-x-0' : sidebarView === 'leaderboard3k' ? 'opacity-0 translate-x-4' : 'opacity-0 -translate-x-4 pointer-events-none'}`} style={{ transitionDuration: '400ms' }}>
+              <div className="p-6 h-full flex flex-col">
+                <div className="flex items-center justify-between mb-5 shrink-0">
+                  <h2 className="text-lg font-extrabold text-amber-400 uppercase tracking-widest">Leaderboard</h2>
+                  <span className="text-sm bg-slate-800 text-slate-400 px-4 py-1.5 rounded-full font-semibold uppercase tracking-wider">3K</span>
+                </div>
+                <div className="space-y-2.5 flex-1 min-h-0 overflow-hidden">
+                  {leaderboard3k.map((entry) => (
+                    <div key={entry.rank} className={`flex items-center gap-4 px-5 py-3.5 rounded-lg ${entry.rank === 1 ? 'bg-amber-500/10 border border-amber-500/30' : entry.rank <= 3 ? 'bg-slate-800/60 border border-slate-700/50' : 'bg-slate-900/40'}`}>
+                      <span className={`text-lg font-bold w-8 text-center shrink-0 ${entry.rank === 1 ? 'text-amber-400' : entry.rank === 2 ? 'text-slate-300' : entry.rank === 3 ? 'text-orange-400' : 'text-slate-400'}`}>{entry.rank}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-lg font-bold truncate leading-tight text-white">{entry.name}</p>
+                        <p className="text-base text-slate-400 truncate">#{entry.bibNumber}{entry.companyName ? ` · ${entry.companyName}` : ''}</p>
+                      </div>
+                      <span className="text-lg font-mono font-bold text-emerald-400 shrink-0">{entry.distance.toFixed(2)} km</span>
+                    </div>
+                  ))}
+                  {leaderboard3k.length === 0 && <div className="h-32 flex items-center justify-center"><p className="text-slate-500 text-xl">Waiting for race...</p></div>}
+                </div>
+              </div>
             </div>
-            <div className="space-y-2.5">
-              {leaderboard.map((entry) => (
-                <div
-                  key={entry.rank}
-                  className={`flex items-center gap-4 px-5 py-3.5 rounded-lg transition-all ${
-                    entry.rank === 1 ? 'bg-amber-500/10 border border-amber-500/30' :
-                    entry.rank <= 3 ? 'bg-slate-800/60 border border-slate-700/50' :
-                    'bg-slate-900/40 hover:bg-slate-800/40'
-                  }`}
-                >
-                  <span className={`text-lg font-bold w-8 text-center shrink-0 ${
-                    entry.rank === 1 ? 'text-amber-400' :
-                    entry.rank === 2 ? 'text-slate-300' :
-                    entry.rank === 3 ? 'text-orange-400' : 'text-slate-400'
-                  }`}>{entry.rank}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-lg font-bold truncate leading-tight text-white">{entry.name}</p>
-                    <p className="text-base text-slate-400 truncate">
-                      #{entry.bibNumber}{entry.companyName ? ` · ${entry.companyName}` : ''}
-                    </p>
-                  </div>
-                  <span className="text-lg font-mono font-bold text-emerald-400 shrink-0">{entry.distance.toFixed(2)} km</span>
+
+            {/* 5K Leaderboard */}
+            <div className={`absolute inset-0 transition-all duration-400 ${sidebarView === 'leaderboard5k' && !fadeSidebar ? 'opacity-100 translate-x-0' : sidebarView === 'leaderboard5k' ? 'opacity-0 translate-x-4' : 'opacity-0 -translate-x-4 pointer-events-none'}`} style={{ transitionDuration: '400ms' }}>
+              <div className="p-6 h-full flex flex-col">
+                <div className="flex items-center justify-between mb-5 shrink-0">
+                  <h2 className="text-lg font-extrabold text-amber-400 uppercase tracking-widest">Leaderboard</h2>
+                  <span className="text-sm bg-slate-800 text-slate-400 px-4 py-1.5 rounded-full font-semibold uppercase tracking-wider">5K</span>
                 </div>
-              ))}
-              {leaderboard.length === 0 && (
-                <div className="h-32 flex items-center justify-center">
-                  <p className="text-slate-500 text-xl">Waiting for race...</p>
+                <div className="space-y-2.5 flex-1 min-h-0 overflow-hidden">
+                  {leaderboard5k.map((entry) => (
+                    <div key={entry.rank} className={`flex items-center gap-4 px-5 py-3.5 rounded-lg ${entry.rank === 1 ? 'bg-amber-500/10 border border-amber-500/30' : entry.rank <= 3 ? 'bg-slate-800/60 border border-slate-700/50' : 'bg-slate-900/40'}`}>
+                      <span className={`text-lg font-bold w-8 text-center shrink-0 ${entry.rank === 1 ? 'text-amber-400' : entry.rank === 2 ? 'text-slate-300' : entry.rank === 3 ? 'text-orange-400' : 'text-slate-400'}`}>{entry.rank}</span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-lg font-bold truncate leading-tight text-white">{entry.name}</p>
+                        <p className="text-base text-slate-400 truncate">#{entry.bibNumber}{entry.companyName ? ` · ${entry.companyName}` : ''}</p>
+                      </div>
+                      <span className="text-lg font-mono font-bold text-emerald-400 shrink-0">{entry.distance.toFixed(2)} km</span>
+                    </div>
+                  ))}
+                  {leaderboard5k.length === 0 && <div className="h-32 flex items-center justify-center"><p className="text-slate-500 text-xl">Waiting for race...</p></div>}
                 </div>
-              )}
+              </div>
+            </div>
+
+            {/* Sponsors */}
+            <div className={`absolute inset-0 transition-all duration-400 ${sidebarView === 'sponsors' && !fadeSidebar ? 'opacity-100 translate-x-0' : sidebarView === 'sponsors' ? 'opacity-0 translate-x-4' : 'opacity-0 -translate-x-4 pointer-events-none'}`} style={{ transitionDuration: '400ms' }}>
+              <div className="p-6 h-full flex flex-col">
+                <div className="flex items-center justify-between mb-4 shrink-0">
+                  <h2 className="text-lg font-extrabold text-emerald-400 uppercase tracking-widest">Our Sponsors</h2>
+                  <span className="text-sm bg-emerald-500/20 text-emerald-400 px-4 py-1.5 rounded-full font-semibold uppercase tracking-wider">{sponsors.length} Partners</span>
+                </div>
+                <div className="flex-1 min-h-0 overflow-hidden">
+                  <SponsorGrid sponsors={sponsors} />
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* Developer Credit */}
+          <div className="mt-auto p-5 shrink-0">
+            <div className="flex items-center justify-center gap-3 px-5 py-3 rounded-lg border border-slate-700/60 bg-[#0a0f1a]/80">
+              <span className="text-sm sm:text-base text-slate-400 whitespace-nowrap">
+                Technology Partner
+              </span>
+              <img
+                src={liseInfoTechLogo}
+                alt="Lise InfoTech"
+                className="h-8 sm:h-10 w-auto max-w-[120px] object-contain"
+              />
             </div>
           </div>
           </aside>
+          
         </div>
 
       {/* Announcement Banner */}
@@ -642,9 +780,9 @@ export default function LEDScreen() {
       )}
 
       {/* Sponsors Ticker */}
-      <div className="h-20 bg-[#0d1320] border-t border-slate-800/40 flex items-center px-12 shrink-0">
-        <span className="text-sm font-extrabold text-slate-500 uppercase tracking-widest mr-8 shrink-0">Sponsors</span>
-        <SponsorTicker />
+      <div className="h-24 bg-[#0d1320] border-t border-slate-800/40 flex items-center px-12 shrink-0">
+        {/* <span className="text-sm font-extrabold text-slate-500 uppercase tracking-widest mr-8 shrink-0">Sponsors</span> */}
+        <SponsorTicker sponsors={sponsors} />
       </div>
     </div>
   );

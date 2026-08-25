@@ -29,9 +29,10 @@ interface Props {
   bibNumber?: string;
   category: string;
   eventId: string;
+  onHome: () => void;
 }
 
-export default function RunnerDashboard({ participantId, token, category, eventId }: Props) {
+export default function RunnerDashboard({ participantId, token, category, eventId, onHome }: Props) {
   const [state, setState] = useState<RunnerState>({
     isTracking: false, distance: 0, pace: null, rank: null,
     status: 'REGISTERED', accuracy: null, speed: null, pointCount: 0,
@@ -280,6 +281,42 @@ export default function RunnerDashboard({ participantId, token, category, eventI
     <div style={{ height: '100dvh', position: 'relative', overflow: 'hidden', fontFamily: '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif' }}>
 
       <div ref={mapContainer} style={{ position: 'absolute', inset: 0 }} />
+
+      {/* Home button */}
+      <button
+        onClick={() => { pauseTracking(); onHome(); }}
+        style={{
+          position: 'absolute',
+          top: 'calc(16px + env(safe-area-inset-top))',
+          right: '16px',
+          zIndex: 10,
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          padding: '10px 18px',
+          borderRadius: '999px',
+          border: '1px solid rgba(255,255,255,0.15)',
+          background: 'rgba(10,15,26,0.85)',
+          backdropFilter: 'blur(10px)',
+          color: '#fff',
+          fontSize: '14px',
+          fontWeight: 600,
+          cursor: 'pointer',
+          boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
+          transition: 'transform 0.15s ease, background 0.2s',
+          touchAction: 'manipulation',
+        }}
+        onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.94)'; }}
+        onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(16,185,129,0.85)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(10,15,26,0.85)'; }}
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 10.5L12 3l9 7.5" />
+          <path d="M5 9.5V21h14V9.5" />
+        </svg>
+        Home
+      </button>
 
       <div style={{
         position: 'absolute', bottom: 0, left: 0, right: 0,

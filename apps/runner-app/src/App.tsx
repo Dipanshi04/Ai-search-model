@@ -1,15 +1,9 @@
 import { useState, useEffect } from 'react';
 import RunnerDashboard from './pages/RunnerDashboard';
+import RunnerHome from './pages/RunnerHome';
 import LoginPage from './pages/LoginPage';
 import { api } from './lib/api';
-
-const Logo = ({ size = 'h-14', theme = 'dark' }: { size?: string; theme?: 'light' | 'dark' }) => (
-  <img 
-    src={theme === 'dark' ? '/logo-light.png' : '/logo-dark.png'} 
-    alt="ISA Marathon" 
-    className={`${size} w-auto max-w-[200px] object-contain drop-shadow-md mx-auto block`} 
-  />
-);
+import logo from './components/logo-dark.png';
 
 interface ParticipantInfo {
   participantId: string;
@@ -21,10 +15,14 @@ interface ParticipantInfo {
 
 export default function App() {
   const [participant, setParticipant] = useState<ParticipantInfo | null>(null);
+  const [raceStarted, setRaceStarted] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [splashDone, setSplashDone] = useState(false);
 
   useEffect(() => {
+    const timer = setTimeout(() => setSplashDone(true), 2200);
     checkAuth();
+    return () => clearTimeout(timer);
   }, []);
 
   async function checkAuth() {
@@ -48,19 +46,47 @@ export default function App() {
     setLoading(false);
   }
 
-  if (loading) {
+  if (!splashDone || loading) {
     return (
-      <div className="min-h-screen min-h-[100dvh] flex items-center justify-center bg-[#0a0f1a]">
-        <div className="flex flex-col items-center gap-3">
-          <Logo size="h-8" />
-          <div className="w-5 h-5 border-2 border-emerald-500/30 border-t-emerald-500 rounded-full animate-spin" />
-        </div>
+      <div style={{
+        minHeight: '100dvh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: '#f0f4f8',
+        flexDirection: 'column',
+        gap: '32px',
+      }}>
+        <img
+          src={logo}
+          alt="ISA Marathon"
+          style={{ height: '140px', width: 'auto', maxWidth: '300px', objectFit: 'contain', filter: 'drop-shadow(0 4px 20px rgba(0,0,0,0.3))' }}
+        />
+        <div style={{
+          width: '36px',
+          height: '36px',
+          border: '3px solid rgba(16,185,129,0.2)',
+          borderTopColor: '#059669',
+          borderRadius: '50%',
+          animation: 'spin 0.8s linear infinite',
+        }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
   if (!participant) {
     return <LoginPage onLogin={() => checkAuth()} />;
+  }
+
+  if (!raceStarted) {
+    return (
+      <RunnerHome
+        bibNumber={participant.bibNumber}
+        category={participant.category}
+        onStart={() => setRaceStarted(true)}
+      />
+    );
   }
 
   return (
@@ -70,6 +96,7 @@ export default function App() {
       bibNumber={participant.bibNumber}
       category={participant.category}
       eventId={participant.eventId}
+      onHome={() => setRaceStarted(false)}
     />
   );
 }

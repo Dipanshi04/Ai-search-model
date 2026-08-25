@@ -48,10 +48,17 @@ class ApiClient {
     return data;
   }
 
-  async login(email: string, password: string) {
+  async login(email: string, pin: string) {
     return this.request<any>('/api/v1/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, pin }),
+    });
+  }
+
+  async resetPin(email: string) {
+    return this.request<any>('/api/v1/auth/reset-pin', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
     });
   }
 

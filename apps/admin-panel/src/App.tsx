@@ -13,6 +13,7 @@ import GreenMissionPage from './pages/GreenMissionPage';
 import CertificatesPage from './pages/CertificatesPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import CompaniesPage from './pages/CompaniesPage';
+import SponsorsPage from './pages/SponsorsPage';
 import AnnouncementsPage from './pages/AnnouncementsPage';
 import SettingsPage from './pages/SettingsPage';
 import BulkRegistrationPage from './pages/BulkRegistrationPage';
@@ -67,6 +68,7 @@ function AppRoutes() {
         <Route path="events" element={<EventsPage />} />
         <Route path="participants" element={<ParticipantsPage />} />
         <Route path="companies" element={<CompaniesPage />} />
+        <Route path="sponsors" element={<SponsorsPage />} />
         <Route path="bulk-registration" element={<BulkRegistrationPage />} />
         <Route path="checkin" element={<CheckinPage />} />
         <Route path="tracking" element={<RaceControlPage />} />

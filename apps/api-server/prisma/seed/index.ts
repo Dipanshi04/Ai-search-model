@@ -24,8 +24,8 @@ async function main() {
 
   // Create default race distances
   const distances = [
-    { name: '3K Fun Run', distanceKm: 3 },
-    { name: '5K Challenge', distanceKm: 5 },
+    { name: '3KM Fun Run', distanceKm: 3 },
+    { name: '5KM Challenge', distanceKm: 5 },
   ];
 
   for (const d of distances) {

@@ -3,12 +3,13 @@ import { prisma } from '../config/database.js';
 import { logger } from '../config/logger.js';
 import bcrypt from 'bcryptjs';
 import { generateQRCode } from '../utils/qrcode.js';
+import { sendPinEmail, sendWelcomeEmail } from '../services/email.js';
 
 export const registerRouter: Router = Router();
 
 registerRouter.post('/', async (req: Request, res: Response) => {
   try {
-    const { name, email, phone, category, gender, companyName, eventId: reqEventId, emergencyContact, emergencyPhone, bloodGroup, tshirtSize } = req.body;
+    const { name, email, phone, category, gender, companyName, eventId: reqEventId, emergencyContact, emergencyPhone, bloodGroup, bloodDonation, tshirtSize } = req.body;
 
     if (!name || !email || !phone || !category || !gender) {
       res.status(400).json({ success: false, message: 'Missing required fields' });
@@ -17,11 +18,25 @@ registerRouter.post('/', async (req: Request, res: Response) => {
 
     // Check if user exists
     let user = await prisma.user.findUnique({ where: { email } });
+    let isNewUser = false;
+    let pin = '';
     if (!user) {
       const passwordHash = await bcrypt.hash('marathon2026', 12);
+      pin = String(Math.floor(1000 + Math.random() * 9000));
+      const pinHash = await bcrypt.hash(pin, 12);
       user = await prisma.user.create({
-        data: { email, phone, name, passwordHash },
+        data: { email, phone, name, passwordHash, pinHash },
       });
+      isNewUser = true;
+    } else if (!user.pinHash) {
+      // Existing user without PIN - generate one
+      pin = String(Math.floor(1000 + Math.random() * 9000));
+      const pinHash = await bcrypt.hash(pin, 12);
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: { pinHash },
+      });
+      isNewUser = true;
     }
 
     // Get event
@@ -73,6 +88,7 @@ registerRouter.post('/', async (req: Request, res: Response) => {
         emergencyContact,
         emergencyPhone,
         bloodGroup: bloodGroup || null,
+        bloodDonation: bloodDonation === true,
         tshirtSize: tshirtSize || null,
       },
       include: {
@@ -89,6 +105,13 @@ registerRouter.post('/', async (req: Request, res: Response) => {
     });
 
     logger.info(`New registration: ${bibNumber} - ${name}`);
+
+    // Send welcome email and PIN email (async, don't block response)
+    if (isNewUser && pin) {
+      sendWelcomeEmail(user.email, user.name, bibNumber, category).catch((e) => logger.error('Welcome email failed:', e));
+      sendPinEmail(user.email, user.name, pin).catch((e) => logger.error('PIN email failed:', e));
+    }
+
     res.json({
       success: true,
       data: {

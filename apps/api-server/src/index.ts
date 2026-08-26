@@ -36,7 +36,7 @@ import { paymentRouter } from './routes/payment.js';
 import { bulkRegistrationRouter } from './routes/bulk-registration.js';
 import { hrRouter } from './routes/hr.js';
 
-const PORT = process.env.PORT || 4000;
+const PORT = parseInt(process.env.PORT || '4000', 10);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';
 
 const app: ReturnType<typeof express> = express();

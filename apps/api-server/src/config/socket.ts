@@ -100,7 +100,10 @@ export function setupSocketIO(io: SocketIOServer): void {
             
             const top10 = await prisma.participant.findMany({
               where,
-              include: { user: { select: { name: true, email: true, companyName: true, gender: true } } },
+              include: { 
+                user: { select: { name: true, email: true } },
+                company: { select: { name: true } },
+              },
               orderBy: { totalDistance: 'desc' },
               take: 10,
             });
@@ -113,8 +116,8 @@ export function setupSocketIO(io: SocketIOServer): void {
                 id: p.id,
                 bibNumber: p.bibNumber,
                 name: p.user?.name || p.bibNumber,
-                companyName: p.user?.companyName,
-                gender: p.user?.gender,
+                companyName: p.company?.name,
+                gender: p.gender,
                 category: p.category,
                 distance: p.totalDistance,
                 totalDistance: p.totalDistance,

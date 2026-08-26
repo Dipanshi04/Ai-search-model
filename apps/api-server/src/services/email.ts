@@ -45,7 +45,7 @@ function getTransporter(): nodemailer.Transporter | null {
   console.log('[EMAIL] Creating transporter...');
   transporter = nodemailer.createTransport(config);
   
-  transporter.verify((err) => {
+  transporter.verify((err: Error | null) => {
     if (err) {
       console.error('[EMAIL] Transporter verification FAILED:', err);
     } else {

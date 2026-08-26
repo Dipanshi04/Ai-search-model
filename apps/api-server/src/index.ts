@@ -91,7 +91,7 @@ const io = new SocketIOServer(httpServer, {
 setupSocketIO(io);
 
 async function start() {
-  httpServer.listen(PORT, '0.0.0.0', () => {
+  httpServer.listen({ port: PORT, host: '0.0.0.0' }, () => {
     logger.info(`ISA Marathon API on port ${PORT}`);
     logger.info(`Socket.IO ready`);
     logger.info(`CORS: ${CORS_ORIGIN}`);

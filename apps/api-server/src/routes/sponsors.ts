@@ -70,7 +70,7 @@ sponsorsRouter.post('/', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'
     }
 
     const sponsor = await prisma.sponsor.create({
-      data: { eventId, name, tier: tier || '', logoUrl, website, displayOrder: displayOrder || 0 },
+      data: { eventId, name: name || '', tier: tier || '', logoUrl, website, displayOrder: displayOrder || 0 },
     });
 
     res.status(201).json({ success: true, data: sponsor });

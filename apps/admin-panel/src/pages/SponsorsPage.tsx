@@ -64,12 +64,14 @@ export default function SponsorsPage() {
     if (file) {
       setLogoFile(file);
       setLogoPreview(URL.createObjectURL(file));
+      setForm({ ...form, logoUrl: '' });
     }
   }
 
   function clearLogo() {
     setLogoFile(null);
     setLogoPreview(null);
+    setForm({ ...form, logoUrl: '' });
     if (fileInputRef.current) fileInputRef.current.value = '';
   }
 
@@ -209,23 +211,33 @@ export default function SponsorsPage() {
               <div>
                 <label className="block text-slate-600 text-sm mb-1">Logo *</label>
                 <div className="space-y-3">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
-                    onChange={handleLogoChange}
-                    className="block w-full text-sm text-slate-600 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-medium file:bg-violet-600 file:text-white hover:file:bg-violet-700 cursor-pointer"
-                  />
+                  <div className="flex gap-2">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/jpg,image/webp,image/svg+xml"
+                      onChange={handleLogoChange}
+                      className="flex-1 text-sm text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-medium file:bg-violet-600 file:text-white hover:file:bg-violet-700 cursor-pointer"
+                    />
+                    <span className="text-slate-400 text-sm self-center">or</span>
+                    <input
+                      type="url"
+                      value={form.logoUrl}
+                      onChange={(e) => { setForm({ ...form, logoUrl: e.target.value }); setLogoFile(null); setLogoPreview(null); }}
+                      placeholder="Paste image URL"
+                      className="flex-1 px-3 py-2 bg-white/80 border border-white/70 rounded-xl text-slate-950 text-sm focus:ring-2 focus:ring-violet-200 outline-none"
+                    />
+                  </div>
                   {(logoPreview || form.logoUrl) && (
                     <div className="flex items-center gap-3">
-                      <img src={logoPreview || form.logoUrl} alt="Logo preview" className="h-16 w-auto rounded-lg object-contain border border-slate-200" />
+                      <img src={logoPreview || getImageUrl(form.logoUrl)} alt="Logo preview" className="h-16 w-auto rounded-lg object-contain border border-slate-200" />
                       <button type="button" onClick={clearLogo}
                         className="px-3 py-1.5 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-xl hover:bg-red-100 transition">
                         Remove
                       </button>
                     </div>
                   )}
-                  <p className="text-xs text-slate-500">Upload PNG, JPG, WebP, or SVG. Max 2MB.</p>
+                  <p className="text-xs text-slate-500">Upload a file (PNG, JPG, WebP, SVG, max 2MB) or paste an image URL.</p>
                 </div>
               </div>
               <div>

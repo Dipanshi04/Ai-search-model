@@ -31,6 +31,18 @@ body {
   100% { transform: translateX(-50%); }
 }
 
+.ticker-wrapper {
+  display: flex;
+  width: max-content;
+}
+.ticker-wrapper > div {
+  display: flex;
+  align-items: center;
+  gap: 4rem;
+  padding-right: 4rem;
+  flex-shrink: 0;
+}
+
 @keyframes slide-down {
   0% {
     opacity: 0;
@@ -52,8 +64,7 @@ body {
 }
 
 .sponsor-ticker {
-  animation: ticker-scroll 10s linear infinite;
-  width: max-content;
+  animation: ticker-scroll 12s linear infinite;
 }
 
 .sponsor-ticker-fast {

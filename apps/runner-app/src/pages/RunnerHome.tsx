@@ -122,7 +122,6 @@ export default function RunnerHome({ bibNumber, category, onStart }: Props) {
               fontSize: '16px',
               color: '#1e293b',
               fontWeight: 600,
-              marginTop: '8px',
               margin: 0,
               marginTop: '8px',
             }}>
@@ -229,7 +228,7 @@ export default function RunnerHome({ bibNumber, category, onStart }: Props) {
             START RACE
           </button>
 
-          <p style={{ textAlign: 'center', fontSize: '11px', color: '#94a3b8', marginTop: '16px', margin: 0, marginTop: '16px' }}>
+          <p style={{ textAlign: 'center', fontSize: '11px', color: '#94a3b8', margin: 0, marginTop: '16px' }}>
             Make sure GPS is enabled before starting
           </p>
         </div>

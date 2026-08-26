@@ -9,12 +9,6 @@ interface Announcement {
   createdAt: string;
 }
 
-const PRIORITY_STYLES: Record<string, string> = {
-  low: 'bg-slate-100 text-slate-600',
-  medium: 'bg-amber-50 text-amber-700 border border-amber-200',
-  high: 'bg-red-50 text-red-700 border border-red-200',
-};
-
 export default function AnnouncementsPage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [showForm, setShowForm] = useState(false);

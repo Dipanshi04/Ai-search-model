@@ -180,11 +180,11 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                       setPin(newPin);
                       setError('');
                       setResetSent(false);
-                      if (val && i < 3) pinRefs[i + 1].current?.focus();
+                      if (val && i < 3) pinRefs[i + 1]?.current?.focus();
                     }}
                     onKeyDown={(e) => {
                       if (e.key === 'Backspace' && !pin[i] && i > 0) {
-                        pinRefs[i - 1].current?.focus();
+                        pinRefs[i - 1]?.current?.focus();
                       }
                     }}
                     onPaste={(e) => {
@@ -194,7 +194,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                         const newPin = pasted.split('').concat(Array(4).fill('')).slice(0, 4);
                         setPin(newPin);
                         const focusIdx = Math.min(pasted.length, 3);
-                        pinRefs[focusIdx].current?.focus();
+                        pinRefs[focusIdx]?.current?.focus();
                       }
                     }}
                     style={{

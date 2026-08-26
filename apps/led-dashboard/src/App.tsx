@@ -27,13 +27,6 @@ const RUNNER_COLORS = [
   '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#a855f7',
 ];
 
-const CATEGORY_LABELS: Record<string, string> = {
-  overall: 'OVERALL',
-  RUN_3K: '3K',
-  RUN_5K: '5K',
-  company: 'COMPANY',
-};
-
 interface LeaderboardEntry {
   rank: number;
   name: string;
@@ -41,21 +34,6 @@ interface LeaderboardEntry {
   companyName?: string;
   distance: number;
   pace: number | null;
-}
-
-function SponsorLogo({ name, color }: { name: string; color: string }) {
-  return (
-    <div className="flex items-center gap-3 shrink-0">
-      <div
-        className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-black text-lg"
-        style={{ background: color, boxShadow: `0 0 12px ${color}66` }}
-      >
-        {name[0]}
-      </div>
-      <span className="text-lg font-bold text-white/80">{name}</span>
-      <span className="text-slate-600 mx-3 text-2xl">|</span>
-    </div>
-  );
 }
 
 function SponsorTicker({ sponsors }: { sponsors: { id: string; name: string; logoUrl?: string; tier?: string }[] }) {
@@ -104,7 +82,6 @@ function SponsorGrid({ sponsors }: { sponsors: { id: string; name: string; logoU
       {valid.map((s) => {
         const imgUrl = getImageUrl(s.logoUrl);
         const tierKey = (s.tier || '').toUpperCase();
-        const isLightTier = tierKey === 'PLATINUM' || tierKey === 'GOLD';
         const tierBg: Record<string, string> = {
           PLATINUM: 'linear-gradient(135deg, #e2e8f0, #f8fafc)',
           GOLD: 'linear-gradient(135deg, #fbbf24, #fde68a)',
@@ -135,11 +112,11 @@ export default function LEDScreen() {
   const [totalFinished, setTotalFinished] = useState(0);
   const [treeCount, setTreeCount] = useState(0);
   const [co2Offset, setCo2Offset] = useState(0);
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [_leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [currentCategory, setCurrentCategory] = useState('overall');
   const [announcement, setAnnouncement] = useState<{ title: string; message: string } | null>(null);
   const [sponsors, setSponsors] = useState<{ id: string; name: string; logoUrl?: string; tier?: string }[]>([]);
-  const [sidebarView, setSidebarView] = useState<'leaderboard' | 'sponsors'>('leaderboard');
+  const [sidebarView, setSidebarView] = useState<'leaderboard3k' | 'leaderboard5k' | 'sponsors'>('leaderboard3k');
   const [fadeSidebar, setFadeSidebar] = useState(false);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [socketReady, setSocketReady] = useState(false);

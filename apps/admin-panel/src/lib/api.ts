@@ -299,6 +299,21 @@ class ApiClient {
   async deleteSponsor(id: string) {
     return this.request<void>(`/api/v1/sponsors/${id}`, { method: 'DELETE' });
   }
+
+  async getAnnouncements() {
+    return this.request<any[]>('/api/v1/announcements');
+  }
+
+  async sendAnnouncement(data: { eventId: string; title: string; message: string }) {
+    return this.request<any>('/api/v1/announcements', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteAnnouncement(id: string) {
+    return this.request<void>(`/api/v1/announcements/${id}`, { method: 'DELETE' });
+  }
 }
 
 export const api = new ApiClient();

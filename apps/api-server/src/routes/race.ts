@@ -142,6 +142,14 @@ raceRouter.post('/start', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER
       io.to(`event:${eventId}`).emit('race:status', { status: 'ACTIVE', eventId, message: wasPaused ? 'Race resumed' : 'Race started', elapsedMs: event.accumulatedElapsedMs });
       io.to(`tracking:${eventId}`).emit('race:status', { status: 'ACTIVE', eventId, message: wasPaused ? 'Race resumed' : 'Race started', elapsedMs: event.accumulatedElapsedMs });
       io.to(`leaderboard:${eventId}`).emit('race:status', { status: 'ACTIVE', eventId, message: wasPaused ? 'Race resumed' : 'Race started', elapsedMs: event.accumulatedElapsedMs });
+      
+      // Emit race:start for LED dashboard
+      const totalParticipants = await prisma.participant.count({ where: { eventId } });
+      io.to(`event:${eventId}`).emit('race:start', { 
+        startedAt: effectiveStartAt.toISOString(), 
+        totalParticipants,
+        eventId 
+      });
     } catch {}
 
     res.json({ success: true, data: { event: updated, message: wasPaused ? 'Race resumed' : 'Race started', elapsedMs: event.accumulatedElapsedMs } });

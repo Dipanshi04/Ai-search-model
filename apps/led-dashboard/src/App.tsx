@@ -77,12 +77,16 @@ function SponsorTicker({ sponsors }: { sponsors: { id: string; name: string; log
     );
   };
   return (
-    <div className="overflow-hidden whitespace-nowrap py-3 flex-1 min-w-0 flex items-center">
-      <span className="text-sm font-extrabold text-slate-500 uppercase tracking-[0.3em] shrink-0 pl-2">SPONSORS</span>
-      <div className="overflow-hidden flex-1 min-w-0 mx-6">
-        <div className="sponsor-ticker inline-flex items-center gap-16" style={{ width: 'max-content' }}>
-          {validSponsors.map((s, i) => renderItem(s, i))}
-          {validSponsors.map((s, i) => renderItem(s, i + validSponsors.length))}
+    <div className="overflow-hidden flex-1 min-w-0 flex items-center">
+      <span className="text-sm font-extrabold text-slate-500 uppercase tracking-[0.3em] shrink-0 pr-6">SPONSORS</span>
+      <div className="overflow-hidden flex-1 min-w-0">
+        <div className="sponsor-ticker" style={{ display: 'flex', width: 'max-content' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4rem', paddingRight: '4rem', flexShrink: 0 }}>
+            {validSponsors.map((s, i) => renderItem(s, i))}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4rem', flexShrink: 0 }}>
+            {validSponsors.map((s, i) => renderItem(s, i + validSponsors.length))}
+          </div>
         </div>
       </div>
     </div>
@@ -96,7 +100,7 @@ function SponsorGrid({ sponsors }: { sponsors: { id: string; name: string; logoU
   const gap = count <= 4 ? 'gap-4' : count <= 9 ? 'gap-3' : 'gap-2';
 
   return (
-    <div className={`grid ${gap} h-full`} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)`, gridAutoRows: '1fr' }}>
+    <div className={`grid ${gap} h-full items-center justify-items-center`} style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}>
       {valid.map((s) => {
         const imgUrl = getImageUrl(s.logoUrl);
         const tierKey = (s.tier || '').toUpperCase();
@@ -110,15 +114,14 @@ function SponsorGrid({ sponsors }: { sponsors: { id: string; name: string; logoU
         const bg = tierBg[tierKey] || 'linear-gradient(135deg, #1e293b, #334155)';
 
         return (
-          <div key={s.id} className="relative rounded-xl overflow-hidden border border-slate-700/50 flex flex-col items-center justify-center p-3 hover:scale-[1.03] transition-transform" style={{ background: bg, minHeight: count > 9 ? '80px' : count > 4 ? '100px' : '120px' }}>
+          <div key={s.id} className="relative rounded-xl overflow-hidden border border-slate-700/50 flex items-center justify-center aspect-square w-full hover:scale-[1.03] transition-transform" style={{ background: bg }}>
             {imgUrl ? (
-              <img src={imgUrl} alt={s.name || 'Sponsor'} className={`object-contain drop-shadow-lg ${count > 9 ? 'h-8 w-auto' : count > 4 ? 'h-10 w-auto' : 'h-14 w-auto'}`} />
+              <img src={imgUrl} alt={s.name || 'Sponsor'} className="w-3/4 h-3/4 object-contain drop-shadow-lg" />
             ) : (
-              <div className={`rounded-xl flex items-center justify-center font-black text-white ${count > 9 ? 'w-8 h-8 text-sm' : count > 4 ? 'w-10 h-10 text-base' : 'w-14 h-14 text-xl'}`} style={{ background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(8px)' }}>
+              <div className="w-3/5 h-3/5 rounded-xl flex items-center justify-center font-black text-white text-2xl" style={{ background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(8px)' }}>
                 {(s.name || 'S')[0]}
               </div>
             )}
-            {s.name && count <= 9 && <p className={`font-bold text-center leading-tight mt-2 ${count > 4 ? 'text-xs' : 'text-sm'}`} style={{ color: isLightTier ? '#1e293b' : '#e2e8f0' }}>{s.name}</p>}
           </div>
         );
       })}

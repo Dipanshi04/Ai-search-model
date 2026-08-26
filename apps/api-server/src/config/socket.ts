@@ -91,6 +91,38 @@ export function setupSocketIO(io: SocketIOServer): void {
             distance,
             timestamp: data.timestamp,
           });
+
+          // Emit leaderboard update for all categories
+          const categories = ['overall', participant.category];
+          for (const cat of categories) {
+            const where: any = { eventId: participant.eventId };
+            if (cat !== 'overall') where.category = cat;
+            
+            const top10 = await prisma.participant.findMany({
+              where,
+              include: { user: { select: { name: true, email: true, companyName: true, gender: true } } },
+              orderBy: { totalDistance: 'desc' },
+              take: 10,
+            });
+
+            io.to(`leaderboard:${participant.eventId}`).emit('leaderboard:update', {
+              category: cat,
+              top10: top10.map((p, i) => ({
+                rank: i + 1,
+                participantId: p.id,
+                id: p.id,
+                bibNumber: p.bibNumber,
+                name: p.user?.name || p.bibNumber,
+                companyName: p.user?.companyName,
+                gender: p.user?.gender,
+                category: p.category,
+                distance: p.totalDistance,
+                totalDistance: p.totalDistance,
+                pace: null,
+                status: p.status,
+              })),
+            });
+          }
         }
       } catch (error) {
         logger.error('[Socket] GPS processing error:', error);

@@ -56,6 +56,7 @@ export async function recalcTreeCounter(eventId: string): Promise<void> {
     const io = getSocketIO();
     io.to(`event:${eventId}`).emit('trees:update', { totalTrees, totalKm, totalCO2, increment: 0 });
     io.to(`tracking:${eventId}`).emit('trees:update', { totalTrees, totalKm, totalCO2, increment: 0 });
+    io.to(`leaderboard:${eventId}`).emit('trees:update', { totalTrees, totalKm, totalCO2, increment: 0 });
   } catch (error) {
     logger.error('[GreenMission] Error recalculating tree counter:', error);
   }

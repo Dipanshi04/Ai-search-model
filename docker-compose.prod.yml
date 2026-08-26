@@ -1,9 +1,7 @@
-version: '3.8'
-
 services:
   api:
     build:
-      context: ..
+      context: .
       dockerfile: infra/docker/api.Dockerfile
     environment:
       NODE_ENV: production
@@ -24,7 +22,7 @@ services:
       POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - pgdata:/var/lib/postgresql/data
-      - ../infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
     restart: unless-stopped
 
   redis:
@@ -38,7 +36,7 @@ services:
       - '80:80'
       - '443:443'
     volumes:
-      - ../infra/nginx/prod.conf:/etc/nginx/nginx.conf:ro
+      - ./infra/nginx/prod.conf:/etc/nginx/nginx.conf:ro
       - ./ssl:/etc/nginx/ssl:ro
     depends_on:
       - api

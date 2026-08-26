@@ -3,7 +3,8 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import path from 'path';
 
-export default defineConfig({
+export default defineConfig({ 
+  base: '/led-dashboard/',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

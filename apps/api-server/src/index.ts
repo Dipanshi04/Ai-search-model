@@ -40,6 +40,7 @@ const PORT = parseInt(process.env.PORT || '4000', 10);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';
 
 const app: ReturnType<typeof express> = express();
+app.set('trust proxy', 1);
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({ origin: CORS_ORIGIN.split(','), credentials: true }));

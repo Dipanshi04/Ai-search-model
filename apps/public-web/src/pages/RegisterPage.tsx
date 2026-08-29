@@ -503,6 +503,18 @@ export default function RegisterPage() {
                 </p>
               </div>
 
+              <div>
+                <h3 className="font-bold text-brand-orange mb-2">Registered Business Details</h3>
+                <p className="text-brand-navy/80">
+                  Business Name: INDOTECH SOFTWARE ASSOCIATION
+                  <br />
+                  Business Address: 4th Floor, B Zone Business Spaces, Nipania Main Road, Dewas Naka,
+                  Pipliya Kumar, Indore, Madhya Pradesh, India
+                  <br />
+                  Registration Number: 03/27/01/25174/23
+                </p>
+              </div>
+
               {!tacScrolledToBottom && (
                 <p className="text-center text-xs text-amber-600 animate-pulse">
                   Scroll down to read all terms...

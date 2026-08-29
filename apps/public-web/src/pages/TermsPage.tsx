@@ -457,6 +457,15 @@ export default function TermsPage() {
                 <br />
                 Website: <a href="https://www.theisa.in/" className="text-brand-orange hover:underline">theisa.in</a>
               </p>
+              <p className="font-semibold text-brand-navy mt-4">Registered Business Details</p>
+              <p className="text-brand-navy">
+                Business Name: INDOTECH SOFTWARE ASSOCIATION
+                <br />
+                Business Address: 4th Floor, B Zone Business Spaces, Nipania Main Road, Dewas Naka,
+                Pipliya Kumar, Indore, Madhya Pradesh, India
+                <br />
+                Registration Number: 03/27/01/25174/23
+              </p>
               <p>
                 By accessing or using the ISA website and services, you acknowledge that you have read,
                 understood, and agreed to these Terms & Conditions.

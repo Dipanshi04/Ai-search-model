@@ -112,11 +112,12 @@ export default function LEDScreen() {
   const [totalFinished, setTotalFinished] = useState(0);
   const [treeCount, setTreeCount] = useState(0);
   const [co2Offset, setCo2Offset] = useState(0);
-  const [_leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [currentCategory, setCurrentCategory] = useState('overall');
   const [announcement, setAnnouncement] = useState<{ title: string; message: string } | null>(null);
   const [sponsors, setSponsors] = useState<{ id: string; name: string; logoUrl?: string; tier?: string }[]>([]);
   const [sidebarView, setSidebarView] = useState<'leaderboard3k' | 'leaderboard5k' | 'sponsors'>('leaderboard3k');
+  const [leaderboard3k, setLeaderboard3k] = useState<LeaderboardEntry[]>([]);
+  const [leaderboard5k, setLeaderboard5k] = useState<LeaderboardEntry[]>([]);
   const [fadeSidebar, setFadeSidebar] = useState(false);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [socketReady, setSocketReady] = useState(false);
@@ -328,11 +329,7 @@ export default function LEDScreen() {
             setSponsors(sponsorData.data);
           }
 
-        const lbRes = await fetch(`${API_URL}/api/v1/participants/leaderboard?limit=10`);
-        const lbData = await lbRes.json();
-        if (lbData.success) setLeaderboard(lbData.data);
-
-        const allLbRes = await fetch(`${API_URL}/api/v1/participants/leaderboard?limit=500`);
+        const allLbRes = await fetch(`${API_URL}/api/v1/participants/leaderboard?limit=500&eventId=${eventId}`);
         const allLbData = await allLbRes.json();
         if (allLbData.success) {
           setTotalRunners(allLbData.data.length);
@@ -364,6 +361,14 @@ export default function LEDScreen() {
     });
 
     map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+    // Mapbox GL measures its container once at creation and never again on
+    // its own — without this, the canvas stays frozen at whatever size the
+    // container happened to be at that instant (e.g. mid layout-settle, or
+    // before a devtools/display resolution change), leaving it rendering
+    // into a fraction of a much larger container.
+    const resizeObserver = new ResizeObserver(() => map.resize());
+    if (mapContainer.current) resizeObserver.observe(mapContainer.current);
 
     map.on('load', () => {
       mapRef.current = map;
@@ -483,9 +488,8 @@ export default function LEDScreen() {
     });
 
     socket.on('leaderboard:update', (data: any) => {
-      if (data.category === currentCategory) {
-        setLeaderboard(data.top10);
-      }
+      if (data.category === 'RUN_3K') setLeaderboard3k(mapLeaderboard(data.top10));
+      else if (data.category === 'RUN_5K') setLeaderboard5k(mapLeaderboard(data.top10));
     });
 
     socket.on('trees:update', (data: any) => {
@@ -522,7 +526,7 @@ export default function LEDScreen() {
 
     socketRef.current = socket;
     return () => { socket.disconnect(); };
-  }, [currentCategory, socketReady]);
+  }, [socketReady]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -575,16 +579,16 @@ export default function LEDScreen() {
     return () => clearInterval(interval);
   }, [sponsors.length]);
 
-  const [leaderboard3k, setLeaderboard3k] = useState<LeaderboardEntry[]>([]);
-  const [leaderboard5k, setLeaderboard5k] = useState<LeaderboardEntry[]>([]);
-
+  // Normalizes two different shapes into one row: raw Prisma rows from the
+  // REST /leaderboard endpoint (nested user/company), and the flattened
+  // payload the server broadcasts over the leaderboard:update socket event.
   const mapLeaderboard = (data: any[]): LeaderboardEntry[] =>
     data.map((p, i) => ({
       rank: i + 1,
-      name: p.user?.name || p.user?.email || 'Unknown',
+      name: p.user?.name || p.name || p.user?.email || 'Unknown',
       bibNumber: p.bibNumber || '',
-      companyName: p.user?.companyName,
-      distance: p.totalDistance ?? 0,
+      companyName: p.company?.name || p.companyName,
+      distance: p.totalDistance ?? p.distance ?? 0,
       pace: null,
     }));
 

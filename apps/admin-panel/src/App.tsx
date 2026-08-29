@@ -17,6 +17,7 @@ import SponsorsPage from './pages/SponsorsPage';
 import AnnouncementsPage from './pages/AnnouncementsPage';
 import SettingsPage from './pages/SettingsPage';
 import BulkRegistrationPage from './pages/BulkRegistrationPage';
+import PaymentsPage from './pages/PaymentsPage';
 
 function HrPortalRedirect() {
   const h = window.location.hostname;
@@ -70,6 +71,7 @@ function AppRoutes() {
         <Route path="companies" element={<CompaniesPage />} />
         <Route path="sponsors" element={<SponsorsPage />} />
         <Route path="bulk-registration" element={<BulkRegistrationPage />} />
+        <Route path="payments" element={<PaymentsPage />} />
         <Route path="checkin" element={<CheckinPage />} />
         <Route path="tracking" element={<RaceControlPage />} />
         <Route path="route-builder" element={<RouteBuilderPage />} />

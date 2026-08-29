@@ -2,13 +2,22 @@ import { Routes, Route } from 'react-router-dom';
 import RegisterPage from './pages/RegisterPage';
 import HRPortalPage from './pages/HRPortalPage';
 import { HRForgotPasswordPage, HRResetPasswordPage } from './pages/HRForgotPasswordPage';
+import AboutPage from './pages/AboutPage';
+import ContactPage from './pages/ContactPage';
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import TermsPage from './pages/TermsPage';
+import TreeCounterPage from './pages/TreeCounterPage';
+import PaymentDetailsPage from './pages/PaymentDetailsPage';
+import Footer from './components/Footer';
 import logoDark from './components/logo-dark.png';
+import heroRunner from './components/hero-runner.webp';
 import { useEffect, useState } from "react";
 
 
 const Logo = ({ size = 'h-16' }: { size?: string }) => (
-  <img src={logoDark} alt="ISA Marathon" className={`${size} w-auto max-w-full object-contain drop-shadow-lg`} />
+  <img src={logoDark} alt="ISA Marathon" className={`${size} w-auto max-w-full object-contain`} />
 );
+
 function CountdownTimer() {
   const targetDate = new Date("2026-09-27T00:00:00+05:30").getTime();
 
@@ -43,27 +52,27 @@ function CountdownTimer() {
   }, []);
 
   return (
-    <div className="mt-3 sm:mt-4">
-      <p className="text-slate-700 text-xs sm:text-sm font-semibold mb-2">
-        COUNTDOWN TO MARATHON DAY
+    <div>
+      <p className="hero-kicker text-[#1B2A5B]/50 text-[10px] sm:text-xs font-bold mb-3 tracking-[0.25em] uppercase">
+        Countdown to Marathon Day
       </p>
 
       <div className="flex justify-center gap-2 sm:gap-3">
         {[
           { value: timeLeft.days, label: "Days" },
-          { value: timeLeft.hours, label: "Hours" },
-          { value: timeLeft.minutes, label: "Minutes" },
-          { value: timeLeft.seconds, label: "Seconds" },
+          { value: timeLeft.hours, label: "Hrs" },
+          { value: timeLeft.minutes, label: "Min" },
+          { value: timeLeft.seconds, label: "Sec" },
         ].map((item) => (
           <div
             key={item.label}
-            className="bg-white/60 backdrop-blur-sm rounded-xl px-3 py-2 sm:px-4 sm:py-2.5 min-w-[60px] sm:min-w-[75px] shadow-lg"
+            className="relative rounded-xl px-3 py-2.5 sm:px-5 sm:py-3.5 min-w-[62px] sm:min-w-[84px]"
+            style={{ background: '#1B2A5B' }}
           >
-            <div className="text-lg sm:text-2xl font-black text-slate-800">
+            <div className="hero-tabular text-xl sm:text-3xl font-extrabold text-white leading-none">
               {String(item.value).padStart(2, "0")}
             </div>
-
-            <div className="text-[9px] sm:text-[10px] font-semibold text-slate-600 uppercase tracking-wide">
+            <div className="hero-kicker text-[8px] sm:text-[10px] font-bold text-[#F5821F] uppercase tracking-[0.2em] mt-1.5">
               {item.label}
             </div>
           </div>
@@ -74,58 +83,61 @@ function CountdownTimer() {
 }
 function HomePage() {
   return (
-    <div className="bg-marathon h-screen overflow-hidden flex flex-col">
-      {/* Hero Section */}
-      <div className="flex-1 flex items-center justify-center px-3 sm:px-4 py-3 min-h-0">
-        <div className="relative z-10 w-full max-w-4xl mx-auto">
-          <div className="glass-strong rounded-3xl p-4 sm:p-6 md:p-8 text-center">
-            {/* Logo with text in hero */}
-            <div className="flex justify-center mb-3 sm:mb-4">
-              <Logo size="h-14 sm:h-18" />
-            </div>
-            
-            
-             <div className="inline-block px-4 py-1 sm:px-5 py-1.5 rounded-full mb-2 sm:mb-3 border-2 text-slate-800 border-white/60 backdrop-blur-sm">
-              <span className="text-[10px] sm:text-xs text-slate-800 font-bold tracking-wider uppercase">INDORE SOFTWARE ASSOCIATION</span>
-            </div>
-            
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-black mb-2 sm:mb-3 tracking-tight text-slate-800 drop-shadow-lg leading-tight">
-              THE ISA
-              <br />
-              <span className="gradient-text">MARATHON</span>
-            </h1>
-            
-            <p className="text-sm sm:text-base md:text-lg text-slate-700 mb-3 sm:mb-4 font-light">
-              Run for a <span className="font-semibold text-[oklch(0.53_0.16_147.15)]">Greener</span> Tomorrow
-            </p>
-            
-            <div className="flex justify-center">
-              <span className="white-btn px-6 sm:px-8 py-2.5 sm:py-3 rounded-xl text-base sm:text-lg shadow-xl">
-                Coming Soon
-              </span>
-            </div>
-            <CountdownTimer />
-            <div className="mt-3 sm:mt-4 inline-block px-4 py-1 sm:px-5 py-1.5 rounded-full border-2 text-slate-800 border-white/60 backdrop-blur-sm">
-              <span className="text-[10px] sm:text-xs text-slate-800 font-medium">Open For Sponsors</span>
-            </div>
-          </div>
+    <div className="hero-root min-h-screen overflow-hidden flex flex-col">
+      {/* Decorative background layers */}
+      <div className="hero-grain" />
+
+      {/* Top bar: logo lockups, matching the poster's two-corner layout */}
+      <div className="hero-anim flex items-center justify-between px-4 sm:px-8 pt-4 sm:pt-6 relative z-10 shrink-0" style={{ animationDelay: '0ms' }}>
+        <Logo size="h-14 sm:h-20 xl:h-24" />
+        <div className="hero-kicker text-right leading-tight">
+          <div className="text-[10px] sm:text-xs font-extrabold tracking-[0.15em] uppercase" style={{ color: '#1B2A5B' }}>Indore Software</div>
+          <div className="text-[10px] sm:text-xs font-extrabold tracking-[0.15em] uppercase" style={{ color: '#1B2A5B' }}>Association</div>
         </div>
       </div>
 
-      {/* Footer */}
-      <footer className="bg-black/20 backdrop-blur-sm border-t border-white/10 py-2.5 px-3 sm:px-4 shrink-0">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-4 text-center sm:text-left">
-          <div className="flex items-center gap-2 justify-center sm:justify-start text-white/60 text-xs sm:text-sm">
-            <Logo size="h-5 sm:h-11" />
-            <span>&copy; 2026 ISA Marathon. All rights reserved.</span>
+      {/* Hero Section */}
+      <div className="flex-1 flex items-center xl:justify-between gap-6 px-4 sm:px-8 min-h-0 relative z-10 max-w-[1400px] mx-auto w-full">
+        <div className="relative z-10 w-full max-w-2xl mx-auto xl:mx-0 xl:shrink-0">
+          <h1 className="hero-anim hero-title hero-h1 text-5xl sm:text-6xl md:text-7xl font-extrabold mb-3 sm:mb-4 xl:mb-6 leading-[0.9]" style={{ animationDelay: '80ms', color: '#1B2A5B' }}>
+            CODE.<br />
+            CONNECT.<br />
+            CONSERVE.<br />
+            <span style={{ color: '#F5821F' }}>RUN FOR<br />INDORE.</span>
+          </h1>
+
+          <p className="hero-anim hero-body text-sm sm:text-base xl:text-lg mb-1.5" style={{ animationDelay: '200ms', color: '#1B2A5B', opacity: 0.75, maxWidth: '32rem' }}>
+            Where central India's biggest IT community unites for technology, fitness and responsibility.
+          </p>
+          <p className="hero-anim hero-body text-sm sm:text-base xl:text-lg mb-5 sm:mb-6" style={{ animationDelay: '250ms', color: '#1B2A5B', opacity: 0.75 }}>
+            Run for a <span className="font-bold" style={{ color: '#10b981' }}>Greener</span> Tomorrow &mdash; every 3km plants a tree.
+          </p>
+
+          <div className="hero-anim flex flex-wrap items-center gap-3 mb-6 sm:mb-7" style={{ animationDelay: '320ms' }}>
+            <span className="hero-body inline-flex items-center gap-2 px-5 py-2 sm:px-6 sm:py-2.5 rounded-full text-sm sm:text-base font-bold text-white" style={{ background: '#F5821F' }}>
+              <span className="hero-live-dot w-1.5 h-1.5 rounded-full bg-white" />
+              Coming Soon
+            </span>
+            <span className="hero-kicker text-xs sm:text-sm font-bold" style={{ color: '#1B2A5B' }}>
+              280+ IT Companies. One Run.
+            </span>
           </div>
-          <nav className="flex flex-wrap justify-center gap-3 sm:gap-6 text-white/60 text-xs sm:text-sm">
-            <a href="#about" className="hover:text-white/90 transition">About</a>
-            <a href="#contact" className="hover:text-white/90 transition">Contact</a>
-            <a href="#privacy" className="hover:text-white/90 transition">Privacy</a>
-          </nav>
+
+          <div className="hero-anim" style={{ animationDelay: '400ms' }}>
+            <CountdownTimer />
+          </div>
+
+          <div className="hero-anim mt-6 sm:mt-7" style={{ animationDelay: '480ms' }}>
+            <span className="hero-body inline-block px-4 py-1.5 rounded-full border text-[11px] sm:text-xs font-semibold" style={{ borderColor: 'rgba(27,42,91,0.2)', color: '#1B2A5B', opacity: 0.7 }}>
+              Open For Sponsors
+            </span>
+          </div>
         </div>
-      </footer>
+
+        <img src={heroRunner} alt="" aria-hidden="true" className="hero-runner" />
+      </div>
+
+      <Footer />
     </div>
   );
 }
@@ -138,6 +150,12 @@ export default function App() {
       <Route path="/hr-portal" element={<HRPortalPage />} />
       <Route path="/hr-forgot-password" element={<HRForgotPasswordPage />} />
       <Route path="/hr-reset-password" element={<HRResetPasswordPage />} />
+      <Route path="/about" element={<AboutPage />} />
+      <Route path="/contact" element={<ContactPage />} />
+      <Route path="/privacy" element={<PrivacyPolicyPage />} />
+      <Route path="/terms" element={<TermsPage />} />
+      <Route path="/green" element={<TreeCounterPage />} />
+      <Route path="/details" element={<PaymentDetailsPage />} />
     </Routes>
   );
 }

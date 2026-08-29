@@ -104,6 +104,12 @@ class ApiClient {
     return this.request<void>(`/api/v1/participants/${id}`, { method: 'DELETE' });
   }
 
+  async resetParticipantPin(id: string) {
+    return this.request<{ pin: string; email: string }>(`/api/v1/participants/${id}/reset-pin`, {
+      method: 'POST',
+    });
+  }
+
   async getParticipantStats(eventId?: string) {
     const query = eventId ? `?eventId=${eventId}` : '';
     return this.request<any>(`/api/v1/participants/stats/summary${query}`);
@@ -298,6 +304,21 @@ class ApiClient {
 
   async deleteSponsor(id: string) {
     return this.request<void>(`/api/v1/sponsors/${id}`, { method: 'DELETE' });
+  }
+
+  async getShowtimeBroPending() {
+    return this.request<any[]>('/api/v1/payments/showtimebro/pending');
+  }
+
+  async verifyShowtimeBroPayment(id: string) {
+    return this.request<any>(`/api/v1/payments/${id}/verify`, { method: 'POST' });
+  }
+
+  async rejectShowtimeBroPayment(id: string, reason: string) {
+    return this.request<any>(`/api/v1/payments/${id}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    });
   }
 
   async getAnnouncements() {

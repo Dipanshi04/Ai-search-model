@@ -3,7 +3,7 @@ import { prisma } from '../config/database.js';
 import { logger } from '../config/logger.js';
 import bcrypt from 'bcryptjs';
 import { generateQRCode } from '../utils/qrcode.js';
-import { sendPinEmail, sendWelcomeEmail } from '../services/email.js';
+import { sendPinEmail } from '../services/email.js';
 
 export const registerRouter: Router = Router();
 
@@ -44,7 +44,10 @@ registerRouter.post('/', async (req: Request, res: Response) => {
     if (reqEventId) {
       event = await prisma.event.findUnique({ where: { id: reqEventId } });
     } else {
-      event = await prisma.event.findFirst({ where: { status: { in: ['UPCOMING', 'ACTIVE'] } }, orderBy: { date: 'asc' } });
+      event = await prisma.event.findFirst({ where: { status: { in: ['ACTIVE', 'PAUSED'] } }, orderBy: { updatedAt: 'desc' } });
+      if (!event) {
+        event = await prisma.event.findFirst({ where: { status: 'UPCOMING' }, orderBy: { date: 'asc' } });
+      }
     }
     if (!event) {
       res.status(400).json({ success: false, message: 'No active event for registration' });
@@ -106,9 +109,13 @@ registerRouter.post('/', async (req: Request, res: Response) => {
 
     logger.info(`New registration: ${bibNumber} - ${name}`);
 
-    // Send welcome email and PIN email (async, don't block response)
+    // Send the PIN immediately — it's their login credential and doesn't
+    // depend on payment. The "Registration Confirmed" welcome email is
+    // intentionally NOT sent here: with the ShowtimeBro redirect flow,
+    // payment is confirmed asynchronously (admin reconciliation), so saying
+    // "confirmed" before that would be false. It goes out from the
+    // payment-verify step instead (see routes/payment.ts).
     if (isNewUser && pin) {
-      sendWelcomeEmail(user.email, user.name, bibNumber, category).catch((e) => logger.error('Welcome email failed:', e));
       sendPinEmail(user.email, user.name, pin).catch((e) => logger.error('PIN email failed:', e));
     }
 

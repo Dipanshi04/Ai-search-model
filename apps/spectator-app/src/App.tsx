@@ -10,6 +10,13 @@ const Logo = ({ size = 'h-14', theme = 'dark' }: { size?: string; theme?: 'light
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
+function getImageUrl(url: string | undefined): string {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('/')) return `${API_URL}${url}`;
+  return `${API_URL}/${url}`;
+}
+
 interface RunnerPosition {
   participantId: string;
   name: string;
@@ -71,15 +78,9 @@ export default function SpectatorTracking() {
   useEffect(() => {
     async function loadInitial() {
       try {
-        const [statusRes, sponsorRes, lbRes, treeRes] = await Promise.allSettled([
-          fetch(`${API_URL}/api/v1/race/status`).then((r) => r.json()),
-          fetch(`${API_URL}/api/v1/sponsors`).then((r) => r.json()),
-          fetch(`${API_URL}/api/v1/participants/leaderboard?limit=500`).then((r) => r.json()),
-          fetch(`${API_URL}/api/v1/trees/counter`).then((r) => r.json()),
-        ]);
-
-        if (statusRes.status === 'fulfilled' && statusRes.value.success) {
-          const ev = statusRes.value.data?.event;
+        const statusRes = await fetch(`${API_URL}/api/v1/race/status`).then((r) => r.json());
+        if (statusRes.success) {
+          const ev = statusRes.data?.event;
           if (ev?.id) resolvedEventIdRef.current = ev.id;
           const elapsedMs = ev?.elapsedMs || 0;
           if (elapsedMs > 0) {
@@ -91,24 +92,31 @@ export default function SpectatorTracking() {
           }
         }
 
+        const eventId = resolvedEventIdRef.current;
+        const [sponsorRes, lbRes, treeRes] = await Promise.allSettled([
+          fetch(`${API_URL}/api/v1/sponsors`).then((r) => r.json()),
+          fetch(`${API_URL}/api/v1/participants/leaderboard?limit=500${eventId ? `&eventId=${eventId}` : ''}`).then((r) => r.json()),
+          fetch(`${API_URL}/api/v1/trees/counter`).then((r) => r.json()),
+        ]);
+
         if (sponsorRes.status === 'fulfilled' && sponsorRes.value.success) {
           setSponsors(sponsorRes.value.data || []);
         }
 
         if (lbRes.status === 'fulfilled' && lbRes.value.success) {
           setTotalRunners(lbRes.value.data.length);
-          setRunners(lbRes.value.data.filter((p: any) => p.status === 'RUNNING' || p.status === 'FINISHED').map((p: any) => ({
+          setRunners(lbRes.value.data.filter((p: any) => p.status === 'RUNNING' || p.status === 'FINISHED').map((p: any, i: number) => ({
             participantId: p.id,
-            name: p.name,
+            name: p.user?.name || 'Unknown',
             bibNumber: p.bibNumber,
-            companyName: p.companyName,
+            companyName: p.company?.name,
             gender: p.gender,
             category: p.category,
             lat: 0,
             lng: 0,
-            distance: p.distance || 0,
+            distance: p.totalDistance || 0,
             pace: p.pace || null,
-            rank: p.rank || 0,
+            rank: i + 1,
             status: p.status,
           })));
         }
@@ -578,7 +586,7 @@ export default function SpectatorTracking() {
                   title={sponsor.name}
                 >
                   {sponsor.logoUrl ? (
-                    <img src={sponsor.logoUrl} alt={sponsor.name} className="max-h-6 max-w-[80px] object-contain" />
+                    <img src={getImageUrl(sponsor.logoUrl)} alt={sponsor.name} className="max-h-6 max-w-[80px] object-contain" />
                   ) : (
                     <>
                       <div

@@ -29,6 +29,10 @@ export default defineConfig({
         changeOrigin: true,
         ws: true,
       },
+      '/certificates': {
+        target: 'http://localhost:4000',
+        changeOrigin: true,
+      },
     },
   },
 });

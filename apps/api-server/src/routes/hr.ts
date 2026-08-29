@@ -218,11 +218,18 @@ hrRouter.get('/me', hrAuth, async (req: Request, res: Response) => {
 
 hrRouter.get('/event/current', hrAuth, async (req: Request, res: Response) => {
   try {
-    const event = await prisma.event.findFirst({
-      where: { status: { in: ['UPCOMING', 'ACTIVE'] } },
-      orderBy: { date: 'asc' },
+    let event = await prisma.event.findFirst({
+      where: { status: { in: ['ACTIVE', 'PAUSED'] } },
+      orderBy: { updatedAt: 'desc' },
       select: { id: true, name: true, status: true, date: true, registrationOpen: true },
     });
+    if (!event) {
+      event = await prisma.event.findFirst({
+        where: { status: 'UPCOMING' },
+        orderBy: { date: 'asc' },
+        select: { id: true, name: true, status: true, date: true, registrationOpen: true },
+      });
+    }
     if (!event) {
       res.status(404).json({ success: false, message: 'No active event found' });
       return;
@@ -296,7 +303,10 @@ hrRouter.post('/participants', hrAuth, async (req: Request, res: Response) => {
     if (reqEventId) {
       event = await prisma.event.findUnique({ where: { id: reqEventId } });
     } else {
-      event = await prisma.event.findFirst({ where: { status: { in: ['UPCOMING', 'ACTIVE'] } }, orderBy: { date: 'asc' } });
+      event = await prisma.event.findFirst({ where: { status: { in: ['ACTIVE', 'PAUSED'] } }, orderBy: { updatedAt: 'desc' } });
+      if (!event) {
+        event = await prisma.event.findFirst({ where: { status: 'UPCOMING' }, orderBy: { date: 'asc' } });
+      }
     }
     if (!event) {
       res.status(400).json({ success: false, message: 'No active event for registration' });
@@ -449,7 +459,10 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
     if (reqEventId) {
       event = await prisma.event.findUnique({ where: { id: reqEventId } });
     } else {
-      event = await prisma.event.findFirst({ where: { status: { in: ['UPCOMING', 'ACTIVE'] } }, orderBy: { date: 'asc' } });
+      event = await prisma.event.findFirst({ where: { status: { in: ['ACTIVE', 'PAUSED'] } }, orderBy: { updatedAt: 'desc' } });
+      if (!event) {
+        event = await prisma.event.findFirst({ where: { status: 'UPCOMING' }, orderBy: { date: 'asc' } });
+      }
     }
     if (!event) {
       res.status(400).json({ success: false, message: 'No active event for registration' });

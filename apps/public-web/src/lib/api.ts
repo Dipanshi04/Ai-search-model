@@ -81,6 +81,26 @@ class ApiClient {
     });
   }
 
+  async startShowtimeBroPayment(participantId: string) {
+    return this.request<{ reference: string; amount: number; redirectUrl: string }>(
+      '/api/v1/payments/showtimebro/start',
+      { method: 'POST', body: JSON.stringify({ participantId }) }
+    );
+  }
+
+  async claimShowtimeBroPayment(reference: string, returnParams: Record<string, string>) {
+    return this.request<{ status: string }>('/api/v1/payments/showtimebro/claim', {
+      method: 'POST',
+      body: JSON.stringify({ reference, returnParams }),
+    });
+  }
+
+  async getShowtimeBroPaymentStatus(reference: string) {
+    return this.request<{ status: string; bibNumber: string }>(
+      `/api/v1/payments/showtimebro/status?reference=${encodeURIComponent(reference)}`
+    );
+  }
+
   async getLeaderboard(category?: string, limit?: number) {
     const params = new URLSearchParams();
     if (category) params.set('category', category);
@@ -91,6 +111,10 @@ class ApiClient {
 
   async getTreeCounter() {
     return this.request<any>('/api/v1/trees/counter');
+  }
+
+  async getRaceStatus() {
+    return this.request<any>('/api/v1/race/status');
   }
 
   async getAnnouncements() {

@@ -20,10 +20,7 @@ function formatFinishTime(seconds: number): string {
   return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
 }
 
-export const certificateWorker = new Worker(
-  'certificates',
-  async (job: Job) => {
-    const { participantId } = job.data;
+export async function generateCertificate(participantId: string): Promise<string> {
     logger.info(`[Certificate] Generating for ${participantId}`);
 
     const participant = await prisma.participant.findUnique({
@@ -117,7 +114,7 @@ export const certificateWorker = new Worker(
     </div>
     <div class="footer">
       ${participant.company?.name ? `Representing ${participant.company.name} - ` : ''}
-      1 KM = 1 Tree - Run for a Greener Tomorrow
+      3 KM = 1 Tree - Run for a Greener Tomorrow
     </div>
   </div>
 </body>
@@ -152,11 +149,16 @@ export const certificateWorker = new Worker(
       });
 
       logger.info(`[Certificate] PDF generated: ${filename}`);
+      return certificateUrl;
     } catch (error) {
       if (browser) await browser.close();
       throw error;
     }
-  },
+}
+
+export const certificateWorker = new Worker(
+  'certificates',
+  async (job: Job) => generateCertificate(job.data.participantId),
   { connection, concurrency: 2 }
 );
 

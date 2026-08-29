@@ -2,7 +2,7 @@ import { Server as SocketIOServer, Socket } from 'socket.io';
 import { logger } from './logger.js';
 import { processGpsUpdate, flushGpsLogs, getRunnerDistance } from '../services/tracking.js';
 import { prisma } from './database.js';
-import { markRunnerFinished, recalcTreeCounter } from '../services/greenMission.js';
+import { markRunnerFinished, recalcTreeCounter, updateParticipantTrees } from '../services/greenMission.js';
 
 let ioInstance: SocketIOServer | null = null;
 
@@ -70,6 +70,7 @@ export function setupSocketIO(io: SocketIOServer): void {
           where: { id: data.participantId },
           data: { totalDistance: distance },
         });
+        await updateParticipantTrees(data.participantId);
 
         // Broadcast runner position to tracking room
         const io = getSocketIO();

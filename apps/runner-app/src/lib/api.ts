@@ -62,6 +62,13 @@ class ApiClient {
     });
   }
 
+  async changePin(currentPin: string, newPin: string) {
+    return this.request<any>('/api/v1/auth/change-pin', {
+      method: 'POST',
+      body: JSON.stringify({ currentPin, newPin }),
+    });
+  }
+
   async getMe() {
     return this.request<any>('/api/v1/auth/me');
   }
@@ -73,6 +80,13 @@ class ApiClient {
 
   async getMyQrCode(participantId: string) {
     return this.request<any>(`/api/v1/participants/${participantId}/qr`);
+  }
+
+  async generateCertificate(participantId: string) {
+    return this.request<{ pdfUrl: string }>('/api/v1/certificates/generate', {
+      method: 'POST',
+      body: JSON.stringify({ participantId }),
+    });
   }
 
   async getRaceStatus() {

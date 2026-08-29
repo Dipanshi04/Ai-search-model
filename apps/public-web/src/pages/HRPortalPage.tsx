@@ -1,6 +1,7 @@
-﻿import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { api } from '../lib/api';
 import logoDark from '../components/logo-dark.png';
+import Footer from '../components/Footer';
 
 interface HrProfile {
   id: string;
@@ -158,25 +159,26 @@ export default function HRPortalPage() {
 
   if (!token) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4" style={{ background: 'linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%)' }}>
-        <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-xl border border-slate-200">
+      <div className="min-h-screen bg-brand-cream flex flex-col">
+      <div className="flex-1 flex items-center justify-center px-4">
+        <div className="bg-white rounded-3xl p-8 w-full max-w-md shadow-sm border border-brand-navy/10">
           <div className="flex justify-center mb-6">
             <img src={logoDark} alt="ISA Marathon" className="h-40" />
           </div>
-          <h1 className="text-2xl font-black text-slate-800 text-center mb-1">HR Portal</h1>
-          <p className="text-center text-slate-500 text-sm mb-6">Bulk Registration Login</p>
-          {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm mb-4">{error}</div>}
+          <h1 className="hero-title text-2xl font-bold text-brand-navy text-center mb-1">HR Portal</h1>
+          <p className="hero-body text-center text-brand-navy/60 text-sm mb-6">Bulk Registration Login</p>
+          {error && <div className="hero-body bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm mb-4">{error}</div>}
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">Email</label>
+              <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1">Email</label>
               <input type="email" required value={loginEmail} onChange={e => setLoginEmail(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                className="w-full px-4 py-2.5 bg-brand-cream border border-brand-navy/15 rounded-xl text-brand-navy text-sm focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none transition"
                 placeholder="hr@company.com" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">Password</label>
+              <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1">Password</label>
               <input type="password" required value={loginPassword} onChange={e => setLoginPassword(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-800 text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                className="w-full px-4 py-2.5 bg-brand-cream border border-brand-navy/15 rounded-xl text-brand-navy text-sm focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none transition"
                 placeholder="Password" />
             </div>
             <button
@@ -184,9 +186,9 @@ export default function HRPortalPage() {
               disabled={loginState !== 'idle'}
               className={`w-full h-12 rounded-xl text-base font-bold text-white transition-all duration-300 ease-in-out overflow-hidden ${
                 loginState === 'idle'
-                  ? 'bg-slate-800 hover:bg-slate-700 hover:scale-[1.02] active:scale-[0.98]'
+                  ? 'bg-brand-orange hover:opacity-90 hover:scale-[1.02] active:scale-[0.98]'
                   : loginState === 'loading'
-                  ? 'bg-slate-600 w-12 rounded-full cursor-wait'
+                  ? 'bg-brand-navy/70 w-12 rounded-full cursor-wait'
                   : 'bg-emerald-500 w-12 rounded-full'
               }`}
             >
@@ -204,18 +206,20 @@ export default function HRPortalPage() {
               )}
             </button>
           </form>
-          <p className="text-center text-sm text-slate-500 mt-4">
-            <a href="/hr-forgot-password" className="text-slate-600 hover:text-slate-800 underline">Forgot Password?</a>
+          <p className="hero-body text-center text-sm text-brand-navy/60 mt-4">
+            <a href="/hr-forgot-password" className="text-brand-navy hover:text-brand-orange underline transition">Forgot Password?</a>
           </p>
         </div>
+      </div>
+      <Footer />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-100 flex">
-      <aside className="w-72 bg-white flex flex-col border-r border-slate-200 shrink-0">
-        <div className="px-5 py-5 border-b border-slate-200">
+    <div className="min-h-screen bg-brand-cream flex">
+      <aside className="w-72 bg-white flex flex-col border-r border-brand-navy/10 shrink-0">
+        <div className="px-5 py-5 border-b border-brand-navy/10">
           <a href="/" className="flex justify-center">
             <img src={logoDark} alt="ISA Marathon" className="h-20 w-auto max-w-[200px] object-contain" />
           </a>
@@ -223,21 +227,21 @@ export default function HRPortalPage() {
         <nav className="flex-1 p-4 space-y-2">
           {([['dashboard', 'Participants'], ['add', 'Add Single'], ['csv', 'CSV Upload']] as const).map(([key, label]) => (
             <button key={key} onClick={() => { setTab(key as Tab); setError(''); setSuccess(''); setCsvResult(null); }}
-              className={`w-full flex items-center gap-3 rounded-3xl px-4 py-3 text-sm font-medium transition ${tab === key ? 'bg-violet-50 text-violet-700 shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'}`}>
+              className={`hero-body w-full flex items-center gap-3 rounded-3xl px-4 py-3 text-sm font-medium transition ${tab === key ? 'bg-brand-orange/10 text-brand-orange' : 'text-brand-navy/60 hover:text-brand-navy hover:bg-brand-navy/5'}`}>
               {label}
             </button>
           ))}
         </nav>
-        <div className="p-4 border-t border-slate-200 bg-slate-50">
-          <div className="flex items-center gap-3 rounded-3xl bg-white px-4 py-3 shadow-sm border border-slate-200">
-            <div className="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center text-violet-700 text-sm font-bold shrink-0">
+        <div className="p-4 border-t border-brand-navy/10 bg-brand-cream">
+          <div className="flex items-center gap-3 rounded-3xl bg-white px-4 py-3 shadow-sm border border-brand-navy/10">
+            <div className="w-10 h-10 rounded-full bg-brand-navy/10 flex items-center justify-center text-brand-navy text-sm font-bold shrink-0">
               {profile?.hrName?.charAt(0) || 'H'}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm text-slate-900 truncate">{profile?.hrName}</p>
-              <p className="text-xs text-slate-500 truncate">{profile?.companyName}</p>
+              <p className="hero-body text-sm text-brand-navy truncate">{profile?.hrName}</p>
+              <p className="hero-body text-xs text-brand-navy/50 truncate">{profile?.companyName}</p>
             </div>
-            <button onClick={handleLogout} className="text-sm font-semibold text-slate-500 hover:text-red-500 transition shrink-0">Logout</button>
+            <button onClick={handleLogout} className="hero-body text-sm font-semibold text-brand-navy/50 hover:text-red-500 transition shrink-0">Logout</button>
           </div>
         </div>
       </aside>
@@ -245,12 +249,12 @@ export default function HRPortalPage() {
       <main className="flex-1 overflow-auto">
         <div className="p-8">
           <div className="mb-8">
-            <h1 className="text-2xl font-bold text-slate-950">
+            <h1 className="hero-title text-2xl font-bold text-brand-navy">
               {tab === 'dashboard' && 'Participants'}
               {tab === 'add' && 'Register Participant'}
               {tab === 'csv' && 'Bulk Upload'}
             </h1>
-            <p className="text-slate-500 text-sm mt-1">
+            <p className="hero-body text-brand-navy/60 text-sm mt-1">
               {tab === 'dashboard' && `${total} registered`}
               {tab === 'add' && 'Add a single participant'}
               {tab === 'csv' && 'Upload a CSV file to register multiple participants'}
@@ -259,171 +263,171 @@ export default function HRPortalPage() {
 
           {profile && tab === 'dashboard' && (
             <div className="grid grid-cols-3 gap-4 mb-8">
-              <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
-                <p className="text-3xl font-black text-slate-800">{profile.numberOfRegistrations}</p>
-                <p className="text-xs text-slate-500 mt-1">Total Slots</p>
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-brand-navy/10">
+                <p className="hero-title text-3xl font-bold text-brand-navy">{profile.numberOfRegistrations}</p>
+                <p className="hero-body text-xs text-brand-navy/50 mt-1">Total Slots</p>
               </div>
-              <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
-                <p className="text-3xl font-black text-slate-800">{profile.usedRegistrations}</p>
-                <p className="text-xs text-slate-500 mt-1">Used</p>
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-brand-navy/10">
+                <p className="hero-title text-3xl font-bold text-brand-navy">{profile.usedRegistrations}</p>
+                <p className="hero-body text-xs text-brand-navy/50 mt-1">Used</p>
               </div>
-              <div className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
-                <p className="text-3xl font-black text-slate-800">{profile.remainingRegistrations}</p>
-                <p className="text-xs text-slate-500 mt-1">Remaining</p>
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-brand-navy/10">
+                <p className="hero-title text-3xl font-bold text-brand-orange">{profile.remainingRegistrations}</p>
+                <p className="hero-body text-xs text-brand-navy/50 mt-1">Remaining</p>
               </div>
             </div>
           )}
 
           {currentEvent && (
-            <div className="mb-6 px-4 py-3 bg-violet-50 border border-violet-200 rounded-xl text-sm text-violet-700 font-medium">
+            <div className="hero-body mb-6 px-4 py-3 bg-brand-orange/10 border border-brand-orange/30 rounded-xl text-sm text-brand-orange font-medium">
               Registering for: {currentEvent.name}
             </div>
           )}
 
-          {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm mb-4">{error}</div>}
-          {success && <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl text-sm mb-4">{success}</div>}
+          {error && <div className="hero-body bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm mb-4">{error}</div>}
+          {success && <div className="hero-body bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-xl text-sm mb-4">{success}</div>}
 
           {tab === 'dashboard' && (
-            <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-slate-200">
-              <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-                <p className="text-sm text-slate-500">{total} participants</p>
-                <p className="text-sm text-slate-500">Page {page} of {totalPages}</p>
+            <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-brand-navy/10">
+              <div className="hero-body px-4 py-3 border-b border-brand-navy/10 flex items-center justify-between">
+                <p className="text-sm text-brand-navy/50">{total} participants</p>
+                <p className="text-sm text-brand-navy/50">Page {page} of {totalPages}</p>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-50">
+                <table className="hero-body w-full text-sm">
+                  <thead className="bg-brand-cream">
                     <tr>
-                      <th className="text-left px-4 py-3 text-slate-500 font-semibold">BIB</th>
-                      <th className="text-left px-4 py-3 text-slate-500 font-semibold">Name</th>
-                      <th className="text-left px-4 py-3 text-slate-500 font-semibold">Email</th>
-                      <th className="text-left px-4 py-3 text-slate-500 font-semibold">Phone</th>
-                      <th className="text-center px-4 py-3 text-slate-500 font-semibold">Category</th>
-                      <th className="text-center px-4 py-3 text-slate-500 font-semibold">Status</th>
+                      <th className="text-left px-4 py-3 text-brand-navy/50 font-semibold">BIB</th>
+                      <th className="text-left px-4 py-3 text-brand-navy/50 font-semibold">Name</th>
+                      <th className="text-left px-4 py-3 text-brand-navy/50 font-semibold">Email</th>
+                      <th className="text-left px-4 py-3 text-brand-navy/50 font-semibold">Phone</th>
+                      <th className="text-center px-4 py-3 text-brand-navy/50 font-semibold">Category</th>
+                      <th className="text-center px-4 py-3 text-brand-navy/50 font-semibold">Status</th>
                     </tr>
                   </thead>
                   <tbody>
                     {participants.map(p => (
-                      <tr key={p.id} className="border-t border-slate-200/50 hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3 font-mono font-bold text-violet-700">{p.bibNumber}</td>
-                        <td className="px-4 py-3 text-slate-800">{p.user.name}</td>
-                        <td className="px-4 py-3 text-slate-600">{p.user.email}</td>
-                        <td className="px-4 py-3 text-slate-600">{p.user.phone}</td>
+                      <tr key={p.id} className="border-t border-brand-navy/5 hover:bg-brand-cream transition-colors">
+                        <td className="hero-tabular px-4 py-3 font-bold text-brand-orange">{p.bibNumber}</td>
+                        <td className="px-4 py-3 text-brand-navy">{p.user.name}</td>
+                        <td className="px-4 py-3 text-brand-navy/70">{p.user.email}</td>
+                        <td className="px-4 py-3 text-brand-navy/70">{p.user.phone}</td>
                         <td className="px-4 py-3 text-center">
-                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-violet-50 text-violet-700">
+                          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-brand-navy/10 text-brand-navy">
                             {p.category === 'RUN_5K' ? '5K' : '3K'}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-center">
                           <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                            p.status === 'REGISTERED' ? 'bg-slate-100 text-slate-600' :
+                            p.status === 'REGISTERED' ? 'bg-brand-navy/10 text-brand-navy' :
                             p.status === 'CHECKED_IN' ? 'bg-emerald-100 text-emerald-700' :
                             p.status === 'RUNNING' ? 'bg-amber-100 text-amber-700' :
-                            p.status === 'FINISHED' ? 'bg-purple-100 text-purple-700' :
-                            'bg-slate-100 text-slate-600'
+                            p.status === 'FINISHED' ? 'bg-brand-orange/10 text-brand-orange' :
+                            'bg-brand-navy/10 text-brand-navy'
                           }`}>{p.status}</span>
                         </td>
                       </tr>
                     ))}
                     {participants.length === 0 && (
-                      <tr><td colSpan={6} className="px-4 py-8 text-center text-slate-500">No participants registered yet</td></tr>
+                      <tr><td colSpan={6} className="px-4 py-8 text-center text-brand-navy/50">No participants registered yet</td></tr>
                     )}
                   </tbody>
                 </table>
               </div>
               {totalPages > 1 && (
-                <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                <div className="hero-body px-4 py-3 border-t border-brand-navy/10 flex items-center justify-end gap-2">
                   <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}
-                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl text-sm text-slate-700 disabled:opacity-50 transition">Previous</button>
+                    className="px-4 py-2 bg-brand-cream hover:bg-brand-navy/10 border border-brand-navy/15 rounded-xl text-sm text-brand-navy disabled:opacity-50 transition">Previous</button>
                   <button onClick={() => setPage(Math.min(totalPages, page + 1))} disabled={page === totalPages}
-                    className="px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-200 rounded-xl text-sm text-slate-700 disabled:opacity-50 transition">Next</button>
+                    className="px-4 py-2 bg-brand-cream hover:bg-brand-navy/10 border border-brand-navy/15 rounded-xl text-sm text-brand-navy disabled:opacity-50 transition">Next</button>
                 </div>
               )}
             </div>
           )}
 
           {tab === 'add' && (
-            <div className="w-full bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+            <div className="w-full bg-white rounded-2xl shadow-sm border border-brand-navy/10 overflow-hidden">
               <form onSubmit={handleAddParticipant}>
-                <div className="px-10 py-6 border-b border-slate-100">
-                  <h2 className="text-2xl font-bold text-violet-700">Personal Info</h2>
+                <div className="px-10 py-6 border-b border-brand-navy/10">
+                  <h2 className="hero-title text-2xl font-bold text-brand-orange">Personal Info</h2>
                 </div>
-                <div className="px-10 py-8 grid grid-cols-1 lg:grid-cols-2 gap-x-10 gap-y-7">
-                  <div className="flex items-stretch border border-slate-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-violet-300 focus-within:border-violet-400 bg-white">
-                    <span className="px-6 py-4 bg-slate-50 text-slate-500 text-base border-r border-slate-200 shrink-0 flex items-center">Name</span>
+                <div className="hero-body px-10 py-8 grid grid-cols-1 lg:grid-cols-2 gap-x-10 gap-y-7">
+                  <div className="flex items-stretch border border-brand-navy/15 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-brand-orange/40 focus-within:border-brand-orange bg-white">
+                    <span className="px-6 py-4 bg-brand-cream text-brand-navy/60 text-base border-r border-brand-navy/10 shrink-0 flex items-center">Name</span>
                     <input required value={form.name} onChange={e => setForm({...form, name: e.target.value})}
-                      className="flex-1 px-5 py-4 text-slate-800 text-base outline-none min-w-0" placeholder="Jonathan Webster" />
+                      className="flex-1 px-5 py-4 text-brand-navy text-base outline-none min-w-0" placeholder="Jonathan Webster" />
                   </div>
-                  <div className="flex items-stretch border border-slate-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-violet-300 focus-within:border-violet-400 bg-white">
-                    <span className="px-6 py-4 bg-slate-50 text-slate-500 text-base border-r border-slate-200 shrink-0 flex items-center">Email</span>
+                  <div className="flex items-stretch border border-brand-navy/15 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-brand-orange/40 focus-within:border-brand-orange bg-white">
+                    <span className="px-6 py-4 bg-brand-cream text-brand-navy/60 text-base border-r border-brand-navy/10 shrink-0 flex items-center">Email</span>
                     <input type="email" required value={form.email} onChange={e => setForm({...form, email: e.target.value})}
-                      className="flex-1 px-5 py-4 text-slate-800 text-base outline-none min-w-0" placeholder="john@company.com" />
+                      className="flex-1 px-5 py-4 text-brand-navy text-base outline-none min-w-0" placeholder="john@company.com" />
                   </div>
-                  <div className="flex items-stretch border border-slate-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-violet-300 focus-within:border-violet-400 bg-white">
-                    <span className="px-6 py-4 bg-slate-50 text-slate-500 text-base border-r border-slate-200 shrink-0 flex items-center">Phone</span>
+                  <div className="flex items-stretch border border-brand-navy/15 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-brand-orange/40 focus-within:border-brand-orange bg-white">
+                    <span className="px-6 py-4 bg-brand-cream text-brand-navy/60 text-base border-r border-brand-navy/10 shrink-0 flex items-center">Phone</span>
                     <input type="tel" required value={form.phone} onChange={e => setForm({...form, phone: e.target.value})}
-                      className="flex-1 px-5 py-4 text-slate-800 text-base outline-none min-w-0" placeholder="+91 98765 43210" />
+                      className="flex-1 px-5 py-4 text-brand-navy text-base outline-none min-w-0" placeholder="+91 98765 43210" />
                   </div>
-                  <div className="flex items-stretch border border-slate-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-violet-300 focus-within:border-violet-400 bg-white">
-                    <span className="px-6 py-4 bg-slate-50 text-slate-500 text-base border-r border-slate-200 shrink-0 flex items-center">Gender</span>
+                  <div className="flex items-stretch border border-brand-navy/15 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-brand-orange/40 focus-within:border-brand-orange bg-white">
+                    <span className="px-6 py-4 bg-brand-cream text-brand-navy/60 text-base border-r border-brand-navy/10 shrink-0 flex items-center">Gender</span>
                     <select value={form.gender} onChange={e => setForm({...form, gender: e.target.value})}
-                      className="flex-1 px-5 py-4 text-slate-800 text-base outline-none min-w-0 bg-white">
+                      className="flex-1 px-5 py-4 text-brand-navy text-base outline-none min-w-0 bg-white">
                       <option value="MALE">Male</option>
                       <option value="FEMALE">Female</option>
                       <option value="NON_BINARY">Non-Binary</option>
                     </select>
                   </div>
-                  <div className="flex items-stretch border border-slate-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-violet-300 focus-within:border-violet-400 bg-white">
-                    <span className="px-6 py-4 bg-slate-50 text-slate-500 text-base border-r border-slate-200 shrink-0 flex items-center">Distance</span>
+                  <div className="flex items-stretch border border-brand-navy/15 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-brand-orange/40 focus-within:border-brand-orange bg-white">
+                    <span className="px-6 py-4 bg-brand-cream text-brand-navy/60 text-base border-r border-brand-navy/10 shrink-0 flex items-center">Distance</span>
                     <div className="flex flex-1">
                       {(['RUN_3K', 'RUN_5K'] as const).map(cat => (
                         <button key={cat} type="button" onClick={() => setForm({...form, category: cat})}
-                          className={`flex-1 px-6 text-base font-semibold transition ${form.category === cat ? 'bg-violet-50 text-violet-700' : 'text-slate-500 hover:bg-slate-50'}`}>
+                          className={`flex-1 px-6 text-base font-semibold transition ${form.category === cat ? 'bg-brand-orange/10 text-brand-orange' : 'text-brand-navy/50 hover:bg-brand-cream'}`}>
                           {cat === 'RUN_3K' ? '3K Fun Run' : '5K Challenge'}
                         </button>
                       ))}
                     </div>
                   </div>
-                  <div className="flex items-stretch border border-slate-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-violet-300 focus-within:border-violet-400 bg-white">
-                    <span className="px-6 py-4 bg-slate-50 text-slate-500 text-base border-r border-slate-200 shrink-0 flex items-center">T-Shirt</span>
+                  <div className="flex items-stretch border border-brand-navy/15 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-brand-orange/40 focus-within:border-brand-orange bg-white">
+                    <span className="px-6 py-4 bg-brand-cream text-brand-navy/60 text-base border-r border-brand-navy/10 shrink-0 flex items-center">T-Shirt</span>
                     <select value={form.tshirtSize} onChange={e => setForm({...form, tshirtSize: e.target.value})}
-                      className="flex-1 px-5 py-4 text-slate-800 text-base outline-none min-w-0 bg-white">
+                      className="flex-1 px-5 py-4 text-brand-navy text-base outline-none min-w-0 bg-white">
                       {['XS','S','M','L','XL','XXL'].map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
                 </div>
 
-                <div className="px-10 py-6 border-y border-slate-100">
-                  <h2 className="text-2xl font-bold text-violet-700">Additional Info</h2>
-                  <p className="text-sm text-slate-400 mt-1">Optional — used for race day safety</p>
+                <div className="px-10 py-6 border-y border-brand-navy/10">
+                  <h2 className="hero-title text-2xl font-bold text-brand-orange">Additional Info</h2>
+                  <p className="hero-body text-sm text-brand-navy/40 mt-1">Optional — used for race day safety</p>
                 </div>
-                <div className="px-10 py-8 grid grid-cols-1 lg:grid-cols-2 gap-x-10 gap-y-7">
-                  <div className="flex items-stretch border border-slate-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-violet-300 focus-within:border-violet-400 bg-white">
-                    <span className="px-6 py-4 bg-slate-50 text-slate-500 text-base border-r border-slate-200 shrink-0 flex items-center">Blood</span>
+                <div className="hero-body px-10 py-8 grid grid-cols-1 lg:grid-cols-2 gap-x-10 gap-y-7">
+                  <div className="flex items-stretch border border-brand-navy/15 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-brand-orange/40 focus-within:border-brand-orange bg-white">
+                    <span className="px-6 py-4 bg-brand-cream text-brand-navy/60 text-base border-r border-brand-navy/10 shrink-0 flex items-center">Blood</span>
                     <select value={form.bloodGroup} onChange={e => setForm({...form, bloodGroup: e.target.value})}
-                      className="flex-1 px-5 py-4 text-slate-800 text-base outline-none min-w-0 bg-white">
+                      className="flex-1 px-5 py-4 text-brand-navy text-base outline-none min-w-0 bg-white">
                       <option value="">Select blood group</option>
                       {['A+','A-','B+','B-','O+','O-','AB+','AB-'].map(b => <option key={b} value={b}>{b}</option>)}
                     </select>
                   </div>
-                  <div className="flex items-stretch border border-slate-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-violet-300 focus-within:border-violet-400 bg-white">
-                    <span className="px-6 py-4 bg-slate-50 text-slate-500 text-base border-r border-slate-200 shrink-0 flex items-center">Contact</span>
+                  <div className="flex items-stretch border border-brand-navy/15 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-brand-orange/40 focus-within:border-brand-orange bg-white">
+                    <span className="px-6 py-4 bg-brand-cream text-brand-navy/60 text-base border-r border-brand-navy/10 shrink-0 flex items-center">Contact</span>
                     <input value={form.emergencyContact} onChange={e => setForm({...form, emergencyContact: e.target.value})}
-                      className="flex-1 px-5 py-4 text-slate-800 text-base outline-none min-w-0" placeholder="Emergency contact name" />
+                      className="flex-1 px-5 py-4 text-brand-navy text-base outline-none min-w-0" placeholder="Emergency contact name" />
                   </div>
-                  <div className="flex items-stretch border border-slate-200 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-violet-300 focus-within:border-violet-400 bg-white lg:col-span-2">
-                    <span className="px-6 py-4 bg-slate-50 text-slate-500 text-base border-r border-slate-200 shrink-0 flex items-center">Phone</span>
+                  <div className="flex items-stretch border border-brand-navy/15 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-brand-orange/40 focus-within:border-brand-orange bg-white lg:col-span-2">
+                    <span className="px-6 py-4 bg-brand-cream text-brand-navy/60 text-base border-r border-brand-navy/10 shrink-0 flex items-center">Phone</span>
                     <input value={form.emergencyPhone} onChange={e => setForm({...form, emergencyPhone: e.target.value})}
-                      className="flex-1 px-5 py-4 text-slate-800 text-base outline-none min-w-0" placeholder="Emergency contact phone" />
+                      className="flex-1 px-5 py-4 text-brand-navy text-base outline-none min-w-0" placeholder="Emergency contact phone" />
                   </div>
                 </div>
 
-                <div className="px-10 py-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                <div className="px-10 py-6 bg-brand-cream border-t border-brand-navy/10 flex justify-end gap-3">
                   <button type="button" onClick={() => setForm(emptyForm)}
-                    className="px-8 py-3.5 rounded-xl text-base font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-100 transition">
+                    className="hero-body px-8 py-3.5 rounded-xl text-base font-semibold text-brand-navy bg-white border border-brand-navy/20 hover:bg-brand-navy/5 transition">
                     Reset
                   </button>
                   <button type="submit" disabled={loading || (profile?.remainingRegistrations ?? 0) <= 0}
-                    className="px-10 py-3.5 rounded-xl text-base font-bold text-white bg-slate-800 hover:bg-slate-700 disabled:opacity-50 transition-all hover:scale-[1.02] active:scale-[0.98]">
+                    className="px-10 py-3.5 rounded-xl text-base font-bold text-white bg-brand-orange hover:opacity-90 disabled:opacity-50 transition-all hover:scale-[1.02] active:scale-[0.98]">
                     {loading ? 'Registering...' : 'Register Participant'}
                   </button>
                 </div>
@@ -432,31 +436,31 @@ export default function HRPortalPage() {
           )}
 
           {tab === 'csv' && (
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 w-full overflow-hidden">
-              <div className="px-8 py-5 border-b border-slate-100">
-                <h2 className="text-lg font-bold text-slate-800">Bulk Upload via CSV</h2>
+            <div className="bg-white rounded-2xl shadow-sm border border-brand-navy/10 w-full overflow-hidden">
+              <div className="px-8 py-5 border-b border-brand-navy/10">
+                <h2 className="hero-title text-lg font-bold text-brand-navy">Bulk Upload via CSV</h2>
               </div>
-              <div className="px-8 py-7">
-                <p className="text-sm text-slate-600 mb-2">CSV must have columns: <strong>name, email, phone, category, gender, tshirtSize. Accepted categories: RUN_3K, RUN_5K</strong>.</p>
-                
+              <div className="hero-body px-8 py-7">
+                <p className="text-sm text-brand-navy/70 mb-2">CSV must have columns: <strong>name, email, phone, category, gender, tshirtSize. Accepted categories: RUN_3K, RUN_5K</strong>.</p>
+
                 <form onSubmit={handleCSVUpload} className="space-y-5">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Upload File</label>
+                    <label className="block text-sm font-medium text-brand-navy/70 mb-2">Upload File</label>
                     <input ref={fileInputRef} type="file" accept=".csv" onChange={e => setCsvFile(e.target.files?.[0] || null)}
-                      className="block w-full text-sm text-slate-600 bg-slate-100/70 border border-slate-200 rounded-lg file:mr-4 file:py-2.5 file:px-4 file:border-0 file:text-sm file:font-semibold file:bg-violet-600 file:text-white hover:file:bg-violet-700 file:cursor-pointer cursor-pointer file:rounded-md file:m-1.5" />
+                      className="block w-full text-sm text-brand-navy/70 bg-brand-cream border border-brand-navy/15 rounded-lg file:mr-4 file:py-2.5 file:px-4 file:border-0 file:text-sm file:font-semibold file:bg-brand-orange file:text-white file:cursor-pointer cursor-pointer file:rounded-md file:m-1.5" />
                   </div>
                   <button type="button" onClick={() => api.hrDownloadSampleCSV()}
-                    className="text-sm font-semibold text-violet-600 hover:text-violet-800 transition">
+                    className="text-sm font-semibold text-brand-orange hover:opacity-80 transition">
                     Download Sample CSV →
                   </button>
-                  {csvFile && <p className="text-sm text-slate-600">Selected: <strong className="text-slate-800">{csvFile.name}</strong></p>}
+                  {csvFile && <p className="text-sm text-brand-navy/70">Selected: <strong className="text-brand-navy">{csvFile.name}</strong></p>}
                   <div className="flex justify-end gap-3 pt-2">
                     <button type="button" onClick={() => { setCsvFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
-                      className="px-6 py-3 rounded-lg text-sm font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition">
+                      className="px-6 py-3 rounded-lg text-sm font-semibold text-brand-navy bg-white border border-brand-navy/20 hover:bg-brand-navy/5 transition">
                       Clear
                     </button>
                     <button type="submit" disabled={loading || !csvFile}
-                      className="px-8 py-3 rounded-lg text-sm font-bold text-white bg-violet-600 hover:bg-violet-700 disabled:opacity-50 transition-all hover:scale-[1.02] active:scale-[0.98]">
+                      className="px-8 py-3 rounded-lg text-sm font-bold text-white bg-brand-orange hover:opacity-90 disabled:opacity-50 transition-all hover:scale-[1.02] active:scale-[0.98]">
                       {loading ? 'Uploading...' : 'Upload & Register'}
                     </button>
                   </div>
@@ -467,10 +471,10 @@ export default function HRPortalPage() {
                     <div className="flex gap-3 text-sm">
                       <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 font-medium">Created: {csvResult.created}</span>
                       {csvResult.failed > 0 && <span className="px-3 py-1 rounded-full bg-red-100 text-red-700 font-medium">Failed: {csvResult.failed}</span>}
-                      <span className="px-3 py-1 rounded-full bg-slate-100 text-slate-700 font-medium">Total: {csvResult.total}</span>
+                      <span className="px-3 py-1 rounded-full bg-brand-navy/10 text-brand-navy font-medium">Total: {csvResult.total}</span>
                     </div>
                     {csvResult.results && (
-                      <div className="bg-slate-50 rounded-xl overflow-hidden max-h-64 overflow-y-auto border border-slate-200">
+                      <div className="bg-brand-cream rounded-xl overflow-hidden max-h-64 overflow-y-auto border border-brand-navy/10">
                         <table className="w-full text-xs">
                           <thead className="bg-white/80 sticky top-0">
                             <tr>
@@ -482,10 +486,10 @@ export default function HRPortalPage() {
                           </thead>
                           <tbody>
                             {csvResult.results.map((r: any, i: number) => (
-                              <tr key={i} className="border-t border-slate-200/50">
-                                <td className="px-3 py-2 text-slate-800">{r.name}</td>
-                                <td className="px-3 py-2 text-slate-600">{r.email}</td>
-                                <td className="px-3 py-2 font-mono font-bold text-slate-800">{r.bibNumber || '-'}</td>
+                              <tr key={i} className="border-t border-brand-navy/5">
+                                <td className="px-3 py-2 text-brand-navy">{r.name}</td>
+                                <td className="px-3 py-2 text-brand-navy/70">{r.email}</td>
+                                <td className="px-3 py-2 font-mono font-bold text-brand-navy">{r.bibNumber || '-'}</td>
                                 <td className="px-3 py-2">
                                   {r.success ? <span className="text-emerald-700 font-medium">Success</span> : <span className="text-red-600">{r.error}</span>}
                                 </td>
@@ -501,6 +505,7 @@ export default function HRPortalPage() {
             </div>
           )}
         </div>
+        <Footer />
       </main>
     </div>
   );

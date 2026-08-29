@@ -179,6 +179,50 @@ authRouter.post(
   }
 );
 
+authRouter.post(
+  '/change-pin',
+  authenticate,
+  async (req: Request, res: Response) => {
+    try {
+      const { currentPin, newPin } = req.body;
+      if (!currentPin || !newPin) {
+        res.status(400).json({ success: false, message: 'Current and new PIN required' });
+        return;
+      }
+      if (!/^\d{4}$/.test(newPin)) {
+        res.status(400).json({ success: false, message: 'New PIN must be 4 digits' });
+        return;
+      }
+
+      const user = await prisma.user.findUnique({
+        where: { id: req.user!.userId },
+        select: { id: true, pinHash: true },
+      });
+
+      if (!user?.pinHash) {
+        res.status(401).json({ success: false, message: 'No PIN set. Use "Reset PIN" first.' });
+        return;
+      }
+
+      const isValid = await comparePassword(currentPin, user.pinHash);
+      if (!isValid) {
+        res.status(401).json({ success: false, message: 'Current PIN is incorrect' });
+        return;
+      }
+
+      const pinHash = await bcrypt.hash(newPin, 12);
+      await prisma.user.update({ where: { id: user.id }, data: { pinHash } });
+
+      logger.info(`PIN changed for user: ${req.user!.email}`);
+
+      res.json({ success: true, message: 'PIN updated successfully' });
+    } catch (error) {
+      logger.error('Change PIN error:', error);
+      res.status(500).json({ success: false, message: 'Failed to change PIN' });
+    }
+  }
+);
+
 authRouter.get(
   '/me',
   authenticate,
@@ -189,7 +233,7 @@ authRouter.get(
         select: {
           id: true, name: true, email: true, phone: true, role: true,
           participants: {
-            select: { id: true, bibNumber: true, category: true, eventId: true, status: true },
+            select: { id: true, bibNumber: true, category: true, eventId: true, status: true, kitDistributed: true, certificateUrl: true },
           },
         },
       });

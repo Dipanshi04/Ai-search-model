@@ -1,6 +1,10 @@
 import { useState } from 'react';
 import { api } from '../lib/api';
 import logoDark from '../components/logo-dark.png';
+import Footer from '../components/Footer';
+
+const FONT_DISPLAY = "'Big Shoulders Display', sans-serif";
+const FONT_BODY = "'Manrope', sans-serif";
 
 export function HRForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -26,19 +30,19 @@ export function HRForgotPasswordPage() {
   };
 
   const s = {
-    page: { minHeight: '100dvh', display: 'flex' as const, flexDirection: 'column' as const, background: '#f8fafc' },
+    page: { minHeight: '100dvh', display: 'flex' as const, flexDirection: 'column' as const, background: '#F5F1EA' },
     center: { flex: 1, display: 'flex' as const, flexDirection: 'column' as const, alignItems: 'center' as const, justifyContent: 'center' as const, padding: '24px 20px', width: '100%' },
-    card: { width: '100%', maxWidth: '400px', background: '#fff', borderRadius: '24px', padding: '32px', boxShadow: '0 4px 24px rgba(0,0,0,0.08)', border: '1px solid #e2e8f0' },
+    card: { width: '100%', maxWidth: '400px', background: '#fff', borderRadius: '24px', padding: '32px', boxShadow: '0 4px 24px rgba(27,42,91,0.08)', border: '1px solid rgba(27,42,91,0.1)' },
     logo: { marginBottom: '24px', display: 'flex' as const, justifyContent: 'center' as const },
-    title: { textAlign: 'center' as const, fontSize: '24px', fontWeight: 800, color: '#1e293b', marginBottom: '8px' },
-    subtitle: { textAlign: 'center' as const, fontSize: '14px', color: '#64748b', marginBottom: '32px' },
-    error: { marginBottom: '20px', padding: '12px 16px', borderRadius: '12px', background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', fontSize: '14px', fontWeight: 500 },
-    successMsg: { marginBottom: '20px', padding: '12px 16px', borderRadius: '12px', background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#16a34a', fontSize: '14px', fontWeight: 500, textAlign: 'center' as const },
+    title: { textAlign: 'center' as const, fontFamily: FONT_DISPLAY, fontSize: '26px', fontWeight: 700, color: '#1B2A5B', marginBottom: '8px' },
+    subtitle: { textAlign: 'center' as const, fontFamily: FONT_BODY, fontSize: '14px', color: 'rgba(27,42,91,0.6)', marginBottom: '32px' },
+    error: { marginBottom: '20px', padding: '12px 16px', borderRadius: '12px', background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', fontFamily: FONT_BODY, fontSize: '14px', fontWeight: 500 },
+    successMsg: { marginBottom: '20px', padding: '12px 16px', borderRadius: '12px', background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#16a34a', fontFamily: FONT_BODY, fontSize: '14px', fontWeight: 500, textAlign: 'center' as const },
     field: { marginBottom: '20px' },
-    label: { display: 'block' as const, fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '8px' },
-    input: { width: '100%', padding: '14px 16px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '12px', color: '#1f2937', fontSize: '16px', outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s' },
-    btn: { width: '100%', padding: '16px', marginTop: '8px', color: '#fff', fontSize: '16px', fontWeight: 700, borderRadius: '12px', border: 'none', cursor: 'pointer', transition: 'all 0.2s' },
-    backLink: { marginTop: '24px', textAlign: 'center' as const, fontSize: '14px', color: '#64748b' },
+    label: { display: 'block' as const, fontFamily: FONT_BODY, fontSize: '13px', fontWeight: 600, color: 'rgba(27,42,91,0.7)', marginBottom: '8px' },
+    input: { width: '100%', padding: '14px 16px', background: '#F5F1EA', border: '1px solid rgba(27,42,91,0.15)', borderRadius: '12px', color: '#1B2A5B', fontFamily: FONT_BODY, fontSize: '16px', outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s' },
+    btn: { width: '100%', padding: '16px', marginTop: '8px', color: '#fff', fontFamily: FONT_BODY, fontSize: '16px', fontWeight: 700, borderRadius: '12px', border: 'none', cursor: 'pointer', transition: 'all 0.2s' },
+    backLink: { marginTop: '24px', textAlign: 'center' as const, fontFamily: FONT_BODY, fontSize: '14px', color: 'rgba(27,42,91,0.6)' },
   };
 
   return (
@@ -72,7 +76,7 @@ export function HRForgotPasswordPage() {
               disabled={loading || !email}
               style={{
                 ...s.btn,
-                background: loading || !email ? '#94a3b8' : '#1e293b',
+                background: loading || !email ? 'rgba(27,42,91,0.3)' : '#F5821F',
                 cursor: loading || !email ? 'not-allowed' : 'pointer',
               }}
             >
@@ -81,10 +85,11 @@ export function HRForgotPasswordPage() {
           </form>
 
           <p style={s.backLink}>
-            <a href="/hr-portal" style={{ color: '#64748b', textDecoration: 'underline' }}>Back to Login</a>
+            <a href="/hr-portal" style={{ color: '#1B2A5B', textDecoration: 'underline' }}>Back to Login</a>
           </p>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }
@@ -118,6 +123,7 @@ export function HRResetPasswordPage() {
       const res = await api.hrResetPassword(token, password);
       if (res.success) {
         setSuccess(true);
+        setTimeout(() => { window.location.href = '/hr-portal'; }, 2000);
       } else {
         setError(res.message || 'Failed to reset password');
       }
@@ -128,19 +134,19 @@ export function HRResetPasswordPage() {
   };
 
   const s = {
-    page: { minHeight: '100dvh', display: 'flex' as const, flexDirection: 'column' as const, background: '#f8fafc' },
+    page: { minHeight: '100dvh', display: 'flex' as const, flexDirection: 'column' as const, background: '#F5F1EA' },
     center: { flex: 1, display: 'flex' as const, flexDirection: 'column' as const, alignItems: 'center' as const, justifyContent: 'center' as const, padding: '24px 20px', width: '100%' },
-    card: { width: '100%', maxWidth: '400px', background: '#fff', borderRadius: '24px', padding: '32px', boxShadow: '0 4px 24px rgba(0,0,0,0.08)', border: '1px solid #e2e8f0' },
+    card: { width: '100%', maxWidth: '400px', background: '#fff', borderRadius: '24px', padding: '32px', boxShadow: '0 4px 24px rgba(27,42,91,0.08)', border: '1px solid rgba(27,42,91,0.1)' },
     logo: { marginBottom: '24px', display: 'flex' as const, justifyContent: 'center' as const },
-    title: { textAlign: 'center' as const, fontSize: '24px', fontWeight: 800, color: '#1e293b', marginBottom: '8px' },
-    subtitle: { textAlign: 'center' as const, fontSize: '14px', color: '#64748b', marginBottom: '32px' },
-    error: { marginBottom: '20px', padding: '12px 16px', borderRadius: '12px', background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', fontSize: '14px', fontWeight: 500 },
-    successMsg: { marginBottom: '20px', padding: '12px 16px', borderRadius: '12px', background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#16a34a', fontSize: '14px', fontWeight: 500, textAlign: 'center' as const },
+    title: { textAlign: 'center' as const, fontFamily: FONT_DISPLAY, fontSize: '26px', fontWeight: 700, color: '#1B2A5B', marginBottom: '8px' },
+    subtitle: { textAlign: 'center' as const, fontFamily: FONT_BODY, fontSize: '14px', color: 'rgba(27,42,91,0.6)', marginBottom: '32px' },
+    error: { marginBottom: '20px', padding: '12px 16px', borderRadius: '12px', background: '#fef2f2', border: '1px solid #fecaca', color: '#dc2626', fontFamily: FONT_BODY, fontSize: '14px', fontWeight: 500 },
+    successMsg: { marginBottom: '20px', padding: '12px 16px', borderRadius: '12px', background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#16a34a', fontFamily: FONT_BODY, fontSize: '14px', fontWeight: 500, textAlign: 'center' as const },
     field: { marginBottom: '20px' },
-    label: { display: 'block' as const, fontSize: '13px', fontWeight: 600, color: '#374151', marginBottom: '8px' },
-    input: { width: '100%', padding: '14px 16px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: '12px', color: '#1f2937', fontSize: '16px', outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s' },
-    btn: { width: '100%', padding: '16px', marginTop: '8px', color: '#fff', fontSize: '16px', fontWeight: 700, borderRadius: '12px', border: 'none', cursor: 'pointer', transition: 'all 0.2s' },
-    backLink: { marginTop: '24px', textAlign: 'center' as const, fontSize: '14px', color: '#64748b' },
+    label: { display: 'block' as const, fontFamily: FONT_BODY, fontSize: '13px', fontWeight: 600, color: 'rgba(27,42,91,0.7)', marginBottom: '8px' },
+    input: { width: '100%', padding: '14px 16px', background: '#F5F1EA', border: '1px solid rgba(27,42,91,0.15)', borderRadius: '12px', color: '#1B2A5B', fontFamily: FONT_BODY, fontSize: '16px', outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s' },
+    btn: { width: '100%', padding: '16px', marginTop: '8px', color: '#fff', fontFamily: FONT_BODY, fontSize: '16px', fontWeight: 700, borderRadius: '12px', border: 'none', cursor: 'pointer', transition: 'all 0.2s' },
+    backLink: { marginTop: '24px', textAlign: 'center' as const, fontFamily: FONT_BODY, fontSize: '14px', color: 'rgba(27,42,91,0.6)' },
   };
 
   if (!token) {
@@ -155,10 +161,11 @@ export function HRResetPasswordPage() {
             <p style={s.subtitle}>This password reset link is invalid or has expired.</p>
             <div style={s.error}>Please request a new password reset link.</div>
             <p style={s.backLink}>
-              <a href="/hr-forgot-password" style={{ color: '#64748b', textDecoration: 'underline' }}>Request New Link</a>
+              <a href="/hr-forgot-password" style={{ color: '#1B2A5B', textDecoration: 'underline' }}>Request New Link</a>
             </p>
           </div>
         </div>
+        <Footer />
       </div>
     );
   }
@@ -208,7 +215,7 @@ export function HRResetPasswordPage() {
               disabled={loading || !password || !confirmPassword}
               style={{
                 ...s.btn,
-                background: loading || !password || !confirmPassword ? '#94a3b8' : '#1e293b',
+                background: loading || !password || !confirmPassword ? 'rgba(27,42,91,0.3)' : '#F5821F',
                 cursor: loading || !password || !confirmPassword ? 'not-allowed' : 'pointer',
               }}
             >
@@ -217,10 +224,11 @@ export function HRResetPasswordPage() {
           </form>
 
           {!success && <p style={s.backLink}>
-            <a href="/hr-portal" style={{ color: '#64748b', textDecoration: 'underline' }}>Back to Login</a>
+            <a href="/hr-portal" style={{ color: '#1B2A5B', textDecoration: 'underline' }}>Back to Login</a>
           </p>}
         </div>
       </div>
+      <Footer />
     </div>
   );
 }

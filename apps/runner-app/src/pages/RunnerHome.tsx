@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import logoDark from '../components/logo-dark.png';
+import ProfilePage from './ProfilePage';
 
 interface RunnerDetails {
   name: string;
@@ -9,6 +10,9 @@ interface RunnerDetails {
   bibNumber: string;
   category: string;
   status: string;
+  participantId: string;
+  kitDistributed: boolean;
+  certificateUrl: string | null;
 }
 
 interface Props {
@@ -25,17 +29,24 @@ const CATEGORY_LABELS: Record<string, string> = {
 export default function RunnerHome({ bibNumber, category, onStart }: Props) {
   const [details, setDetails] = useState<RunnerDetails | null>(null);
   const [raceStatus, setRaceStatus] = useState<string>('UPCOMING');
+  const [showProfile, setShowProfile] = useState(false);
+  const [certGenerating, setCertGenerating] = useState(false);
+  const [certError, setCertError] = useState('');
 
   useEffect(() => {
     api.getMe().then((res) => {
       if (res.success && res.data) {
+        const p = res.data.participants?.[0];
         setDetails({
           name: res.data.name,
           email: res.data.email,
           phone: res.data.phone,
-          bibNumber: res.data.participants?.[0]?.bibNumber || bibNumber,
-          category: res.data.participants?.[0]?.category || category,
-          status: res.data.participants?.[0]?.status || 'REGISTERED',
+          bibNumber: p?.bibNumber || bibNumber,
+          category: p?.category || category,
+          status: p?.status || 'REGISTERED',
+          participantId: p?.id || '',
+          kitDistributed: p?.kitDistributed || false,
+          certificateUrl: p?.certificateUrl || null,
         });
       }
     });
@@ -47,6 +58,28 @@ export default function RunnerHome({ bibNumber, category, onStart }: Props) {
 
   const canStart = raceStatus === 'ACTIVE';
 
+  const handleDownloadCertificate = async () => {
+    if (!details?.participantId) return;
+    setCertError('');
+    if (details.certificateUrl) {
+      window.open(`${import.meta.env.VITE_API_URL || ''}${details.certificateUrl}`, '_blank');
+      return;
+    }
+    setCertGenerating(true);
+    try {
+      const res = await api.generateCertificate(details.participantId);
+      if (res.success && res.data?.pdfUrl) {
+        setDetails((d) => (d ? { ...d, certificateUrl: res.data!.pdfUrl } : d));
+        window.open(`${import.meta.env.VITE_API_URL || ''}${res.data.pdfUrl}`, '_blank');
+      } else {
+        setCertError(res.message || 'Failed to generate certificate');
+      }
+    } catch {
+      setCertError('Network error. Please try again.');
+    }
+    setCertGenerating(false);
+  };
+
   return (
     <div style={{
       minHeight: '100dvh',
@@ -54,6 +87,37 @@ export default function RunnerHome({ bibNumber, category, onStart }: Props) {
       display: 'flex',
       flexDirection: 'column',
     }}>
+      <button
+        onClick={() => setShowProfile(true)}
+        aria-label="Profile"
+        style={{
+          position: 'fixed',
+          top: 'calc(16px + env(safe-area-inset-top))',
+          right: '16px',
+          zIndex: 20,
+          width: '40px',
+          height: '40px',
+          borderRadius: '50%',
+          background: '#fff',
+          border: '1.5px solid #e2e8f0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+          transition: 'transform 0.1s',
+          touchAction: 'manipulation',
+        }}
+        onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.92)'; }}
+        onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="8" r="4" />
+          <path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8" />
+        </svg>
+      </button>
+
       <div style={{
         flex: 1,
         display: 'flex',
@@ -62,6 +126,51 @@ export default function RunnerHome({ bibNumber, category, onStart }: Props) {
         justifyContent: 'center',
         padding: '24px 20px',
       }}>
+        {details && (details.kitDistributed || details.status === 'FINISHED') && (
+          <div style={{ width: '100%', maxWidth: '380px', display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '16px' }}>
+            {details.kitDistributed && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '12px',
+                background: '#fffbeb', border: '1.5px solid #fde68a', borderRadius: '16px',
+                padding: '14px 16px',
+              }}>
+                <span style={{ fontSize: '22px', lineHeight: 1 }}>🎁</span>
+                <div>
+                  <p style={{ fontSize: '13.5px', fontWeight: 700, color: '#92400e', margin: 0 }}>Your kit is ready</p>
+                  <p style={{ fontSize: '12px', color: '#b45309', margin: '1px 0 0' }}>Collect it from the kit distribution desk.</p>
+                </div>
+              </div>
+            )}
+
+            {details.status === 'FINISHED' && (
+              <button
+                onClick={handleDownloadCertificate}
+                disabled={certGenerating}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '12px', textAlign: 'left',
+                  background: '#ecfdf5', border: '1.5px solid #a7f3d0', borderRadius: '16px',
+                  padding: '14px 16px', cursor: certGenerating ? 'not-allowed' : 'pointer',
+                  width: '100%', touchAction: 'manipulation',
+                }}
+              >
+                <span style={{ fontSize: '22px', lineHeight: 1 }}>🏅</span>
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: '13.5px', fontWeight: 700, color: '#065f46', margin: 0 }}>
+                    {certGenerating ? 'Preparing your certificate…' : 'Your certificate is ready'}
+                  </p>
+                  <p style={{ fontSize: '12px', color: '#059669', margin: '1px 0 0' }}>
+                    {certGenerating ? 'This takes a few seconds' : 'Tap to download'}
+                  </p>
+                </div>
+              </button>
+            )}
+
+            {certError && (
+              <p style={{ fontSize: '12px', color: '#dc2626', textAlign: 'center', margin: 0 }}>{certError}</p>
+            )}
+          </div>
+        )}
+
         <div style={{
           width: '100%',
           maxWidth: '380px',
@@ -228,15 +337,34 @@ export default function RunnerHome({ bibNumber, category, onStart }: Props) {
             START RACE
           </button>
 
-          <p style={{ textAlign: 'center', fontSize: '11px', color: '#94a3b8', margin: 0, marginTop: '16px' }}>
-            Make sure GPS is enabled before starting
-          </p>
+          <button
+            type="button"
+            onClick={() => setShowProfile(true)}
+            style={{
+              display: 'block',
+              width: '100%',
+              textAlign: 'center',
+              fontSize: '11px',
+              color: '#94a3b8',
+              background: 'none',
+              border: 'none',
+              margin: 0,
+              marginTop: '16px',
+              cursor: 'pointer',
+              textDecoration: 'underline',
+              textUnderlineOffset: '2px',
+            }}
+          >
+            Make sure GPS is enabled before starting — check now
+          </button>
         </div>
       </div>
 
       <div style={{ paddingBottom: '20px', textAlign: 'center' }}>
         <p style={{ fontSize: '11px', color: '#94a3b8' }}>ISA Tech Marathon 2026</p>
       </div>
+
+      {showProfile && <ProfilePage onBack={() => setShowProfile(false)} />}
     </div>
   );
 }

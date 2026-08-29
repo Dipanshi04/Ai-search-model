@@ -113,6 +113,8 @@ model Participant {
   bloodGroup      String?          @map("blood_group")
   bloodDonation   Boolean          @default(false) @map("blood_donation")
   tshirtSize      String?          @map("tshirt_size")
+  kitDistributed  Boolean          @default(false) @map("kit_distributed")
+  foodDistributed Boolean          @default(false) @map("food_distributed")
   bulkRegistrationId String?       @map("bulk_registration_id")
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
@@ -241,25 +243,41 @@ model Setting {
 }
 
 model Payment {
-  id              String        @id @default(cuid())
-  participantId   String        @map("participant_id")
-  razorpayOrderId String?       @unique @map("razorpay_order_id")
-  razorpayPaymentId String?     @map("razorpay_payment_id")
-  razorpaySignature String?     @map("razorpay_signature")
+  id              String          @id @default(cuid())
+  participantId   String          @map("participant_id")
+  provider        PaymentProvider @default(RAZORPAY)
+  razorpayOrderId String?         @unique @map("razorpay_order_id")
+  razorpayPaymentId String?       @map("razorpay_payment_id")
+  razorpaySignature String?       @map("razorpay_signature")
+  // Our own correlation id, minted before the runner ever leaves the site and
+  // never trusted from a query param — the one thing a redirect-only gateway
+  // integration can't spoof, because we never accept it back from the client.
+  reference       String?         @unique
+  // Whatever the return redirect carried (their order id, a success flag, etc).
+  // Captured for a human to reconcile against the provider's own sales report —
+  // never used to auto-decide payment status for a provider with no signed webhook.
+  externalRef     String?         @map("external_ref")
+  returnParams    Json?           @map("return_params")
   amount          Int
-  currency        String        @default("INR")
-  status          PaymentStatus @default(PENDING)
+  currency        String          @default("INR")
+  status          PaymentStatus   @default(PENDING)
   description     String?
-  failureReason   String?       @map("failure_reason")
-  paidAt          DateTime?     @map("paid_at")
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  failureReason   String?         @map("failure_reason")
+  paidAt          DateTime?       @map("paid_at")
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
 
-  participant     Participant   @relation(fields: [participantId], references: [id])
+  participant     Participant     @relation(fields: [participantId], references: [id])
 
   @@index([participantId])
   @@index([razorpayOrderId])
+  @@index([provider, status])
   @@map("payments")
+}
+
+enum PaymentProvider {
+  RAZORPAY
+  SHOWTIMEBRO
 }
 
 model BulkRegistration {
@@ -321,6 +339,9 @@ enum ParticipantStatus {
 enum PaymentStatus {
   PENDING
   PROCESSING
+  // The return redirect said success, but for a provider with no signed
+  // webhook that claim is unverified until an admin reconciles it.
+  CLAIMED
   COMPLETED
   FAILED
   REFUNDED

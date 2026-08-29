@@ -1,18 +1,13 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { api } from '../lib/api';
+import Footer from '../components/Footer';
 
 const CATEGORY_FEES = {
-  RUN_3K: { label: '3K Fun Run', amount: 500 },
-  RUN_5K: { label: '5K Challenge', amount: 800 },
+  RUN_3K: { label: '3K Fun Run', amount: 299 },
+  RUN_5K: { label: '5K Challenge', amount: 499 },
 } as const;
 
 type CategoryKey = keyof typeof CATEGORY_FEES;
-
-declare global {
-  interface Window {
-    Razorpay: any;
-  }
-}
 
 export default function RegisterPage() {
   const [step, setStep] = useState<'form' | 'payment' | 'success'>('form');
@@ -33,7 +28,6 @@ export default function RegisterPage() {
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState('');
   const [paymentLoading, setPaymentLoading] = useState(false);
-  const [razorpayKeyId, setRazorpayKeyId] = useState('');
   const [showTACModal, setShowTACModal] = useState(false);
   const [tacAccepted, setTacAccepted] = useState(false);
   const [tacScrolledToBottom, setTacScrolledToBottom] = useState(false);
@@ -54,23 +48,6 @@ export default function RegisterPage() {
     setTacAccepted(true);
     setShowTACModal(false);
   };
-
-  useEffect(() => {
-    api.getPaymentConfig().then((res) => {
-      if (res.success && res.data?.keyId) {
-        setRazorpayKeyId(res.data.keyId);
-      }
-    });
-  }, []);
-
-  useEffect(() => {
-    if (!document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]')) {
-      const script = document.createElement('script');
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      script.async = true;
-      document.body.appendChild(script);
-    }
-  }, []);
 
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,12 +72,16 @@ export default function RegisterPage() {
     setLoading(false);
   };
 
-  const handlePayment = async () => {
-    if (!razorpayKeyId) {
-      setError('Payment gateway not configured. Contact organizer.');
-      return;
-    }
-
+  // Active payment path: redirect out to ShowtimeBro's hosted checkout.
+  // (The Razorpay flow this replaced is still implemented server-side in
+  // routes/payment.ts, dormant, for when ISA's NGO KYC clears — swapping
+  // back is a button change there, not a rewrite.)
+  // There's no signed webhook on their side, so this only gets the runner
+  // there — /payments/showtimebro/claim (called from /details on return)
+  // records that the redirect came back, and an admin still has to
+  // reconcile it against ShowtimeBro's sales report before anyone is
+  // actually marked paid. See routes/payment.ts for the full reasoning.
+  const handlePayShowtimeBro = async () => {
     setPaymentLoading(true);
     setError('');
 
@@ -111,101 +92,58 @@ export default function RegisterPage() {
       return;
     }
 
-    const category: CategoryKey = result?.participant?.category === 'RUN_5K' ? 'RUN_5K' : 'RUN_3K';
-    const categoryFee = CATEGORY_FEES[category];
-
-    const orderRes = await api.createPaymentOrder(participantId, categoryFee.amount);
-    if (!orderRes.success) {
-      setError(orderRes.message || 'Failed to create payment order');
+    const res = await api.startShowtimeBroPayment(participantId);
+    if (!res.success || !res.data?.redirectUrl) {
+      setError(res.message || 'Failed to start payment. Please try again.');
       setPaymentLoading(false);
       return;
     }
 
-    const { orderId, amount, currency } = orderRes.data;
-    const { name, email, phone } = result?.participant?.user || {};
-    const bibNumber = result?.participant?.bibNumber || result?.bibNumber;
-
-    const options = {
-      key: razorpayKeyId,
-      amount: amount.toString(),
-      currency,
-      name: 'ISA MARATHON 2026',
-      description: `${categoryFee.label} - BIB #${bibNumber}`,
-      order_id: orderId,
-      handler: async function (response: any) {
-        const verifyRes = await api.verifyPayment({
-          razorpayOrderId: response.razorpay_order_id,
-          razorpayPaymentId: response.razorpay_payment_id,
-          razorpaySignature: response.razorpay_signature,
-          registrationId: participantId,
-        });
-
-        if (verifyRes.success) {
-          setResult({ ...result, participant: verifyRes.data.participant });
-          setStep('success');
-        } else {
-          setError('Payment verification failed. Please contact support.');
-        }
-        setPaymentLoading(false);
-      },
-      prefill: {
-        name,
-        email,
-        contact: phone,
-      },
-      theme: {
-        color: '#1e293b',
-      },
-      modal: {
-        ondismiss: function () {
-          setPaymentLoading(false);
-        },
-      },
-    };
-
-    const rzp = new window.Razorpay(options);
-    rzp.on('payment.failed', async function (response: any) {
-      await api.reportPaymentFailure({
-        razorpayOrderId: response.error.metadata.order_id,
-        failureReason: response.error.description || 'Payment failed',
-      });
-      setError(`Payment failed: ${response.error.description || 'Please try again'}`);
-      setPaymentLoading(false);
-    });
-
-    rzp.open();
+    // The browser is about to leave the site entirely. Stash the reference
+    // so /details can find it again on return — this is the reliable
+    // correlator, independent of whatever ShowtimeBro's redirect carries.
+    sessionStorage.setItem('isa_payment_reference', res.data.reference);
+    window.location.href = res.data.redirectUrl;
   };
 
   if (step === 'success') {
     return (
-      <div className="bg-marathon min-h-screen flex items-center justify-center px-4 py-8">
-        <div className="glass-strong p-8 sm:p-10 rounded-3xl max-w-md w-full text-center relative z-10">
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-800 mb-4">
+      <div className="min-h-screen bg-brand-cream flex flex-col">
+      <div className="flex-1 flex items-center justify-center px-4 py-8">
+        <div className="bg-white border border-brand-navy/10 shadow-sm p-8 sm:p-10 rounded-3xl max-w-md w-full text-center relative z-10">
+          <h2 className="hero-title text-2xl sm:text-3xl font-bold text-brand-navy mb-4">
             Registration Complete!
           </h2>
-          <p className="text-slate-600 mb-6 sm:mb-8 text-base sm:text-lg">Welcome, {result.participant?.user?.name}</p>
-          <div className="glass-dark rounded-2xl p-5 sm:p-6 mb-4">
-            <p className="text-sm text-slate-500 mb-2">Your BIB Number</p>
-            <p className="text-3xl sm:text-4xl font-black text-slate-800 font-mono tracking-wider">{result.participant?.bibNumber || result.bibNumber}</p>
+          <p className="hero-body text-brand-navy/70 mb-6 sm:mb-8 text-base sm:text-lg">Welcome, {result.participant?.user?.name}</p>
+
+          <div className="rounded-2xl p-5 sm:p-6 mb-4" style={{ background: '#1B2A5B' }}>
+            <p className="hero-body text-xs uppercase tracking-wide font-bold mb-2" style={{ color: '#F5821F' }}>Your BIB Number</p>
+            <p className="hero-tabular text-3xl sm:text-4xl font-black text-white tracking-wider">{result.participant?.bibNumber || result.bibNumber}</p>
           </div>
-          <div className="glass-dark rounded-2xl p-5 sm:p-6 mb-4">
-            <p className="text-sm text-slate-500 mb-2">Your 4-Digit Login PIN</p>
-            <p className="text-2xl sm:text-3xl font-black text-emerald-600 font-mono tracking-widest">Sent to Email</p>
+
+          <div className="bg-brand-cream border border-brand-navy/10 rounded-2xl p-5 sm:p-6 mb-4">
+            <p className="hero-body text-sm text-brand-navy/60 mb-2">Your 4-Digit Login PIN</p>
+            <p className="hero-title text-2xl sm:text-3xl font-bold text-emerald-600 tracking-widest">Sent to Email</p>
           </div>
-          <div className="glass-dark rounded-2xl p-4 mb-6 border border-green-500/30">
-            <p className="text-green-700 text-sm">Payment confirmed! You're all set for race day.</p>
+
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-6">
+            <p className="hero-body text-emerald-700 text-sm">Payment confirmed! You're all set for race day.</p>
           </div>
+
           <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-6 text-left">
-            <p className="text-emerald-800 text-sm font-semibold mb-1">Check your email for your PIN</p>
-            <p className="text-emerald-700 text-xs">Use your email and the 4-digit PIN sent to you to log into the Runner App at <strong>localhost:3001</strong>.</p>
+            <p className="hero-body text-emerald-800 text-sm font-semibold mb-1">Check your email for your PIN</p>
+            <p className="hero-body text-emerald-700 text-xs">Use your email and the 4-digit PIN sent to you to log into the Runner App at <strong>localhost:3001</strong>.</p>
           </div>
-          <p className="text-xs text-slate-500 mb-6">
+
+          <p className="hero-body text-xs text-brand-navy/50 mb-6">
             Save this BIB number. You will need it for check-in on race day.
           </p>
-          <a href="/" className="inline-block white-btn px-6 sm:px-8 py-3 rounded-xl text-base">
+          <a href="/" className="inline-block bg-brand-orange text-white hover:opacity-90 transition px-6 sm:px-8 py-3 rounded-xl text-base font-bold">
             Back to Home
           </a>
         </div>
+      </div>
+      <Footer />
       </div>
     );
   }
@@ -214,119 +152,123 @@ export default function RegisterPage() {
     const payCategory: CategoryKey = result?.participant?.category === 'RUN_5K' ? 'RUN_5K' : 'RUN_3K';
     const categoryFee = CATEGORY_FEES[payCategory];
     return (
-      <div className="bg-marathon min-h-screen flex items-center justify-center px-4 py-8">
-        <div className="glass-strong p-8 sm:p-10 rounded-3xl max-w-md w-full relative z-10">
+      <div className="min-h-screen bg-brand-cream flex flex-col">
+      <div className="flex-1 flex items-center justify-center px-4 py-8">
+        <div className="bg-white border border-brand-navy/10 shadow-sm p-8 sm:p-10 rounded-3xl max-w-md w-full relative z-10">
           <div className="text-center mb-6 sm:mb-8">
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-800">Complete Payment</h2>
+            <h2 className="hero-title text-2xl sm:text-3xl font-bold text-brand-navy">Complete Payment</h2>
           </div>
 
           {error && (
-            <div className="bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded-xl text-sm mb-6">
+            <div className="hero-body bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm mb-6">
               {error}
             </div>
           )}
 
-          <div className="glass-dark rounded-2xl p-5 sm:p-6 mb-6 sm:mb-8 space-y-3">
+          <div className="hero-body bg-brand-cream border border-brand-navy/10 rounded-2xl p-5 sm:p-6 mb-6 sm:mb-8 space-y-3">
             <div className="flex justify-between">
-              <span className="text-slate-500">Name</span>
-              <span className="text-slate-800 font-medium">{result.participant?.user?.name}</span>
+              <span className="text-brand-navy/60">Name</span>
+              <span className="text-brand-navy font-medium">{result.participant?.user?.name}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">BIB Number</span>
-              <span className="text-slate-800 font-mono font-bold">{result.participant?.bibNumber || result.bibNumber}</span>
+              <span className="text-brand-navy/60">BIB Number</span>
+              <span className="hero-tabular text-brand-navy font-bold">{result.participant?.bibNumber || result.bibNumber}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-500">Category</span>
-              <span className="text-slate-800">{categoryFee?.label || result.participant?.category}</span>
+              <span className="text-brand-navy/60">Category</span>
+              <span className="text-brand-navy">{categoryFee?.label || result.participant?.category}</span>
             </div>
-            <div className="flex justify-between border-t border-slate-200 pt-3 mt-3">
-              <span className="text-slate-600 font-medium">Amount</span>
-              <span className="text-2xl sm:text-3xl font-black text-slate-800">Rs. {categoryFee?.amount || 500}</span>
+            <div className="flex justify-between border-t border-brand-navy/10 pt-3 mt-3">
+              <span className="text-brand-navy font-medium">Amount</span>
+              <span className="hero-title text-2xl sm:text-3xl font-bold text-brand-orange">Rs. {categoryFee?.amount || 299}</span>
             </div>
           </div>
 
           <div className="space-y-3 sm:space-y-4">
             <button
-              onClick={handlePayment}
-              disabled={paymentLoading || !razorpayKeyId}
-              className="w-full py-3 sm:py-4 white-btn rounded-xl transition-all flex items-center justify-center gap-2 text-base sm:text-lg"
+              onClick={handlePayShowtimeBro}
+              disabled={paymentLoading}
+              className="w-full py-3 sm:py-4 bg-brand-orange text-white hover:opacity-90 disabled:opacity-50 font-bold rounded-xl transition-all flex items-center justify-center gap-2 text-base sm:text-lg"
             >
-              {paymentLoading ? 'Processing...' : !razorpayKeyId ? 'Payment gateway loading...' : 'Pay Now'}
+              {paymentLoading ? 'Redirecting...' : 'Pay Now'}
             </button>
             <button
               onClick={() => { setStep('form'); setError(''); }}
               disabled={paymentLoading}
-              className="w-full py-3 sm:py-4 glass-dark hover:bg-white/60 disabled:opacity-50 text-slate-700 font-medium rounded-xl transition-all"
+              className="w-full py-3 sm:py-4 border border-brand-navy/20 hover:bg-brand-navy/5 disabled:opacity-50 text-brand-navy font-medium rounded-xl transition-all"
             >
               Back to Form
             </button>
           </div>
 
-          <p className="text-xs text-slate-500 text-center mt-5 sm:mt-6">
-            Secure payment powered by Razorpay
+          <p className="hero-body text-xs text-brand-navy/50 text-center mt-5 sm:mt-6">
+            You'll be taken to our secure checkout partner, ShowtimeBro, to complete payment.
           </p>
         </div>
+      </div>
+      <Footer />
       </div>
     );
   }
 
   return (
-    <div className="bg-marathon min-h-screen flex items-center justify-center px-4 py-8">
+    <div className="min-h-screen bg-brand-cream flex flex-col">
+    <div className="flex-1 flex items-center justify-center px-4 py-8">
       <div className="relative z-10 w-full max-w-3xl">
-        <form onSubmit={handleSubmitForm} className="glass-strong rounded-3xl p-5 sm:p-6 sm:p-8">
+        <form onSubmit={handleSubmitForm} className="bg-white border border-brand-navy/10 shadow-sm rounded-3xl p-5 sm:p-6 sm:p-8">
           <div className="text-center mb-4">
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-800 mb-1">
+            <h1 className="hero-title text-2xl sm:text-3xl font-bold text-brand-navy mb-1">
               Register for ISA Marathon
             </h1>
-            <p className="text-slate-600 text-sm">Fill in your details to join the race</p>
+            <p className="hero-body text-brand-navy/60 text-sm">Fill in your details to join the race</p>
           </div>
 
           {error && (
-            <div className="bg-red-100 border border-red-300 text-red-700 px-4 py-3 rounded-xl text-sm mb-4">
+            <div className="hero-body bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm mb-4">
               {error}
             </div>
           )}
 
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div>
-              <label className="block text-xs font-medium oklch(0 0 0) mb-1">Full Name *</label>
+              <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1">Full Name *</label>
               <input
                 type="text"
                 required
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="w-full px-3 py-2 glass-dark rounded-lg text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-slate-800 outline-none text-sm"
+                className="w-full px-3 py-2 bg-brand-cream border border-brand-navy/15 rounded-lg text-brand-navy placeholder-brand-navy/30 focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition"
                 placeholder="Name"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium oklch(0 0 0) mb-1">Email *</label>
+              <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1">Email *</label>
               <input
                 type="email"
                 required
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="w-full px-3 py-2 glass-dark rounded-lg text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-slate-800 outline-none text-sm"
+                className="w-full px-3 py-2 bg-brand-cream border border-brand-navy/15 rounded-lg text-brand-navy placeholder-brand-navy/30 focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition"
                 placeholder="Email"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium oklch(0 0 0) mb-1">Phone *</label>
+              <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1">Phone *</label>
               <input
                 type="tel"
                 required
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                className="w-full px-3 py-2 glass-dark rounded-lg text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-slate-800 outline-none text-sm"
+                className="w-full px-3 py-2 bg-brand-cream border border-brand-navy/15 rounded-lg text-brand-navy placeholder-brand-navy/30 focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition"
                 placeholder="Phone"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium oklch(0 0 0) mb-1">Gender *</label>
+              <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1">Gender *</label>
               <select
                 value={form.gender}
                 onChange={(e) => setForm({ ...form, gender: e.target.value })}
-                className="w-full px-3 py-2 glass-dark rounded-lg text-slate-800 focus:ring-2 focus:ring-slate-800 outline-none text-sm"
+                className="w-full px-3 py-2 bg-brand-cream border border-brand-navy/15 rounded-lg text-brand-navy focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition"
               >
                 <option value="MALE">Male</option>
                 <option value="FEMALE">Female</option>
@@ -334,41 +276,41 @@ export default function RegisterPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium oklch(0 0 0) mb-1">Company</label>
+              <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1">Company</label>
               <input
                 type="text"
                 value={form.companyName}
                 onChange={(e) => setForm({ ...form, companyName: e.target.value })}
-                className="w-full px-3 py-2 glass-dark rounded-lg text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-slate-800 outline-none text-sm"
+                className="w-full px-3 py-2 bg-brand-cream border border-brand-navy/15 rounded-lg text-brand-navy placeholder-brand-navy/30 focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition"
                 placeholder="company"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium oklch(0 0 0) mb-1">Emergency Contact</label>
+              <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1">Emergency Contact</label>
               <input
                 type="text"
                 value={form.emergencyContact}
                 onChange={(e) => setForm({ ...form, emergencyContact: e.target.value })}
-                className="w-full px-3 py-2 glass-dark rounded-lg text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-slate-800 outline-none text-sm"
+                className="w-full px-3 py-2 bg-brand-cream border border-brand-navy/15 rounded-lg text-brand-navy placeholder-brand-navy/30 focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition"
                 placeholder="Optional"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium oklch(0 0 0) mb-1">Emergency Phone</label>
+              <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1">Emergency Phone</label>
               <input
                 type="tel"
                 value={form.emergencyPhone}
                 onChange={(e) => setForm({ ...form, emergencyPhone: e.target.value })}
-                className="w-full px-3 py-2 glass-dark rounded-lg text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-slate-800 outline-none text-sm"
+                className="w-full px-3 py-2 bg-brand-cream border border-brand-navy/15 rounded-lg text-brand-navy placeholder-brand-navy/30 focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition"
                 placeholder="Optional"
               />
             </div>
             <div>
-              <label className="block text-xs font-medium oklch(0 0 0) mb-1">Blood Group</label>
+              <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1">Blood Group</label>
               <select
                 value={form.bloodGroup}
                 onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })}
-                className="w-full px-3 py-2 glass-dark rounded-lg text-slate-800 focus:ring-2 focus:ring-slate-800 outline-none text-sm"
+                className="w-full px-3 py-2 bg-brand-cream border border-brand-navy/15 rounded-lg text-brand-navy focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition"
               >
                 <option value="">Select</option>
                 <option value="A+">A+</option>
@@ -384,26 +326,26 @@ export default function RegisterPage() {
           </div>
 
           <div className="mb-4">
-            <label className="flex items-center gap-3 glass-dark rounded-lg px-3 py-2.5 cursor-pointer">
+            <label className="hero-body flex items-center gap-3 bg-brand-cream border border-brand-navy/10 rounded-lg px-3 py-2.5 cursor-pointer">
               <input
                 type="checkbox"
                 checked={form.bloodDonation}
                 onChange={(e) => setForm({ ...form, bloodDonation: e.target.checked })}
-                className="w-4 h-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                className="w-4 h-4 rounded border-brand-navy/30 text-brand-orange focus:ring-brand-orange"
               />
-              <span className="text-sm text-slate-700">I am interested in blood donation</span>
+              <span className="text-sm text-brand-navy/80">I am interested in blood donation</span>
             </label>
           </div>
 
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div>
-              <label className="block text-xs font-medium oklch(0 0 0) mb-1">Distance *</label>
+              <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1">Distance *</label>
               <div className="flex gap-2">
                 <label
                   className={`flex-1 flex items-center justify-center p-2 rounded-lg border-2 cursor-pointer transition-all text-center ${
                     form.category === 'RUN_3K'
-                      ? 'border-slate-800 bg-slate-800/10'
-                      : 'border-slate-300 bg-white/50 hover:border-slate-400'
+                      ? 'border-brand-orange bg-brand-orange/10'
+                      : 'border-brand-navy/15 bg-white hover:border-brand-navy/30'
                   }`}
                 >
                   <input
@@ -414,13 +356,13 @@ export default function RegisterPage() {
                     onChange={(e) => setForm({ ...form, category: e.target.value })}
                     className="sr-only"
                   />
-                  <span className="text-slate-800 font-medium text-sm">3K</span>
+                  <span className="hero-body text-brand-navy font-medium text-sm">3K</span>
                 </label>
                 <label
                   className={`flex-1 flex items-center justify-center p-2 rounded-lg border-2 cursor-pointer transition-all text-center ${
                     form.category === 'RUN_5K'
-                      ? 'border-slate-800 bg-slate-800/10'
-                      : 'border-slate-300 bg-white/50 hover:border-slate-400'
+                      ? 'border-brand-orange bg-brand-orange/10'
+                      : 'border-brand-navy/15 bg-white hover:border-brand-navy/30'
                   }`}
                 >
                   <input
@@ -431,16 +373,16 @@ export default function RegisterPage() {
                     onChange={(e) => setForm({ ...form, category: e.target.value })}
                     className="sr-only"
                   />
-                  <span className="text-slate-800 font-medium text-sm">5K</span>
+                  <span className="hero-body text-brand-navy font-medium text-sm">5K</span>
                 </label>
               </div>
             </div>
             <div>
-              <label className="block text-xs font-medium oklch(0 0 0) mb-1">T-Shirt Size</label>
+              <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1">T-Shirt Size</label>
               <select
                 value={form.tshirtSize}
                 onChange={(e) => setForm({ ...form, tshirtSize: e.target.value })}
-                className="w-full px-3 py-2 glass-dark rounded-lg text-slate-800 focus:ring-2 focus:ring-slate-800 outline-none text-sm"
+                className="w-full px-3 py-2 bg-brand-cream border border-brand-navy/15 rounded-lg text-brand-navy focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition"
               >
                 <option value="XS">XS</option>
                 <option value="S">S</option>
@@ -452,25 +394,25 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <label className="flex items-center gap-2 mb-3 cursor-pointer"
+          <label className="hero-body flex items-center gap-2 mb-3 cursor-pointer"
             onClick={() => setShowTACModal(true)}
           >
             <input
               type="checkbox"
               checked={tacAccepted}
               readOnly
-              className="w-4 h-4 rounded border-slate-300 text-slate-800 focus:ring-slate-800"
+              className="w-4 h-4 rounded border-brand-navy/30 text-brand-orange focus:ring-brand-orange"
             />
-            <span className="text-xs text-slate-700">
+            <span className="text-xs text-brand-navy/70">
               I have read and agree to the{' '}
-              <span className="text-slate-900 font-semibold underline">Terms & Conditions</span>
+              <span className="text-brand-orange font-semibold underline">Terms & Conditions</span>
             </span>
           </label>
 
           <button
             type="submit"
             disabled={loading || !tacAccepted}
-            className="w-full py-3 white-btn rounded-xl transition-all text-base disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-3 bg-brand-orange text-white hover:opacity-90 font-bold rounded-xl transition-all text-base disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Processing...' : 'Register & Pay'}
           </button>
@@ -480,61 +422,60 @@ export default function RegisterPage() {
       {/* Terms & Conditions Modal */}
       {showTACModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="glass-strong rounded-3xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl relative">
-            <div className="p-6 border-b border-slate-200/50">
-              <h2 className="text-2xl font-black text-slate-800">Terms & Conditions</h2>
-              <p className="text-sm oklch(0 0 0) mt-1">Please read carefully before proceeding</p>
+          <div className="bg-white border border-brand-navy/10 rounded-3xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl relative">
+            <div className="p-6 border-b border-brand-navy/10">
+              <h2 className="hero-title text-2xl font-bold text-brand-navy">Terms & Conditions</h2>
+              <p className="hero-body text-sm text-brand-navy/60 mt-1">Please read carefully before proceeding</p>
             </div>
 
             <div
               ref={tacContentRef}
               onScroll={handleTacScroll}
-              className="flex-1 overflow-y-auto p-6 space-y-5 text-sm text-slate-800"
+              className="hero-body flex-1 overflow-y-auto p-6 space-y-5 text-sm text-brand-navy/80"
             >
               <div>
-                <h3 className="font-bold text-slate-900 mb-2">Payment Details</h3>
-                <div className="glass-dark rounded-xl p-4 space-y-2">
+                <h3 className="font-bold text-brand-orange mb-2">Payment Details</h3>
+                <div className="bg-brand-cream border border-brand-navy/10 rounded-xl p-4 space-y-2">
                   <div className="flex justify-between">
-                    <span className="oklch(0 0 0)">3K Fun Run - Registration Fee</span>
-                    <span className="font-bold text-slate-900">Rs. 500</span>
+                    <span className="text-brand-navy/60">3K Fun Run - Registration Fee</span>
+                    <span className="font-bold text-brand-navy">Rs. 299</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="oklch(0 0 0)">5K Challenge - Registration Fee</span>
-                    <span className="font-bold text-slate-900">Rs. 800</span>
+                    <span className="text-brand-navy/60">5K Challenge - Registration Fee</span>
+                    <span className="font-bold text-brand-navy">Rs. 499</span>
                   </div>
-                  <div className="border-t border-slate-300 pt-2 mt-2">
+                  <div className="border-t border-brand-navy/10 pt-2 mt-2">
                     <div className="flex justify-between">
-                      <span className="oklch(0 0 0)">Payment Method</span>
-                      <span className="oklch(0 0 0)">Razorpay (UPI / Cards / Net Banking)</span>
+                      <span className="text-brand-navy/60">Payment Method</span>
+                      <span className="text-brand-navy/60">ShowtimeBro (secure external checkout)</span>
                     </div>
                   </div>
                 </div>
               </div>
 
               <div>
-                <h3 className="font-bold oklch(0 0 0) mb-2">Payment Rules</h3>
-                <ul className="space-y-2 list-disc list-inside oklch(0 0 0)">
-                  <li>Registration fee is non-refundable once payment is confirmed.</li>
+                <h3 className="font-bold text-brand-orange mb-2">Payment Rules</h3>
+                <ul className="space-y-2 list-disc list-inside text-brand-navy/80">
+                  <li>Registration fee is non-refundable and non-transferable once payment is confirmed.</li>
                   <li>Payment must be completed within 15 minutes of starting the registration process.</li>
-                  <li>Failed transactions will be auto-reversed within 5-7 business days.</li>
+                  <li>Failed or duplicate transactions will be auto-reversed within 5-7 business days.</li>
                   <li>Each participant can register only once per category.</li>
                   <li>Multiple registrations for the same person will be cancelled.</li>
                 </ul>
               </div>
 
               <div>
-                <h3 className="font-bold oklch(0 0 0) mb-2">Cancellation & Refund Policy</h3>
-                <ul className="space-y-2 list-disc list-inside oklch(0 0 0)">
-                  <li>Cancellations made 15+ days before the event: 50% refund.</li>
-                  <li>Cancellations made less than 15 days before the event: No refund.</li>
-                  <li>No-shows on race day: No refund.</li>
-                  <li>Refunds will be processed within 10 business days to the original payment method.</li>
+                <h3 className="font-bold text-brand-orange mb-2">Cancellation Policy</h3>
+                <ul className="space-y-2 list-disc list-inside text-brand-navy/80">
+                  <li>Registration fees are strictly non-refundable and non-transferable, including for cancellations, no-shows, or inability to attend.</li>
+                  <li>This applies regardless of when a cancellation request is made.</li>
+                  <li>If the organizers postpone or cancel the event, registered participants will be notified of the applicable arrangements.</li>
                 </ul>
               </div>
 
               <div>
-                <h3 className="font-bold oklch(0 0 0) mb-2">Race Day Rules</h3>
-                <ul className="space-y-2 list-disc list-inside oklch(0 0 0)">
+                <h3 className="font-bold text-brand-orange mb-2">Race Day Rules</h3>
+                <ul className="space-y-2 list-disc list-inside text-brand-navy/80">
                   <li>Valid photo ID is required for check-in on race day.</li>
                   <li>BIB number must be visible at all times during the race.</li>
                   <li>Organizers reserve the right to disqualify participants for unsportsmanlike conduct.</li>
@@ -543,21 +484,21 @@ export default function RegisterPage() {
               </div>
 
               <div>
-                <h3 className="font-bold oklch(0 0 0) mb-2">Liability Waiver</h3>
-                <p className="oklch(0 0 0)">
-                  By registering, I confirm that I am physically fit to participate in the marathon event. 
-                  I understand that running involves inherent risks including but not limited to falls, 
-                  contact with other participants, effects of weather, traffic, and road conditions. 
-                  I hereby release ISA Marathon organizers, sponsors, and volunteers from any and all 
+                <h3 className="font-bold text-brand-orange mb-2">Liability Waiver</h3>
+                <p className="text-brand-navy/80">
+                  By registering, I confirm that I am physically fit to participate in the marathon event.
+                  I understand that running involves inherent risks including but not limited to falls,
+                  contact with other participants, effects of weather, traffic, and road conditions.
+                  I hereby release ISA Marathon organizers, sponsors, and volunteers from any and all
                   claims, damages, or liabilities arising from my participation in this event.
                 </p>
               </div>
 
               <div>
-                <h3 className="font-bold oklch(0 0 0) mb-2">Privacy Policy</h3>
-                <p className="oklch(0 0 0)">
-                  Your personal information will be used solely for event management purposes. 
-                  Your data may be shared with race timing services and medical teams for safety. 
+                <h3 className="font-bold text-brand-orange mb-2">Privacy Policy</h3>
+                <p className="text-brand-navy/80">
+                  Your personal information will be used solely for event management purposes.
+                  Your data may be shared with race timing services and medical teams for safety.
                   Photos and videos taken during the event may be used for promotional purposes.
                 </p>
               </div>
@@ -569,18 +510,18 @@ export default function RegisterPage() {
               )}
             </div>
 
-            <div className="p-6 border-t border-slate-200/50">
+            <div className="p-6 border-t border-brand-navy/10">
               <div className="flex gap-4">
                 <button
                   onClick={() => setShowTACModal(false)}
-                  className="flex-1 py-3 glass-dark hover:bg-white/60 text-slate-700 rounded-xl font-medium transition-all"
+                  className="flex-1 py-3 border border-brand-navy/20 hover:bg-brand-navy/5 text-brand-navy rounded-xl font-medium transition-all"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleAcceptTAC}
                   disabled={!tacScrolledToBottom}
-                  className="flex-1 py-3 white-btn disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-all"
+                  className="flex-1 py-3 bg-brand-orange text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-bold transition-all"
                 >
                   {tacScrolledToBottom ? 'Accept & Proceed' : 'Scroll to read first'}
                 </button>
@@ -589,6 +530,8 @@ export default function RegisterPage() {
           </div>
         </div>
       )}
+    </div>
+      <Footer />
     </div>
   );
 }

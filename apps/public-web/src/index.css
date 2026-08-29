@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+/* Brand tokens (from the official event poster) — usable as Tailwind utilities:
+   bg-brand-navy, text-brand-navy, border-brand-orange/30, etc. */
+@theme {
+  --color-brand-navy: #1B2A5B;
+  --color-brand-orange: #F5821F;
+  --color-brand-cream: #F5F1EA;
+}
+
 :root {
   --color-primary: #1E3A6E;
   --color-primary-light: #2B4B8C;
@@ -9,6 +17,126 @@
   --color-blue: #2196F3;
   --color-orange: #FF9800;
   --gradient-primary: linear-gradient(135deg, #E91E8C 0%, #9C27B0 50%, #2196F3 100%);
+}
+
+/* ===== Homepage Hero ===== */
+.hero-root {
+  background: #f5f1ea;
+  position: relative;
+  isolation: isolate;
+}
+
+/* Subject-tight asset: 644x1151, runner fills ~9%-97% of the frame width.
+   Sits behind the copy (z-0) while the text column rides above it (z-10). */
+.hero-runner {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+  top: 0;
+  right: -3%;
+  height: min(38vh, 320px);
+  width: auto;
+  filter: drop-shadow(0 18px 34px rgba(27, 42, 91, 0.22));
+  animation:
+    hero-runner-in 1.15s cubic-bezier(0.22, 1, 0.36, 1) 0.3s forwards,
+    hero-runner-float 7s ease-in-out 1.5s infinite;
+}
+
+@media (min-width: 640px) {
+  .hero-runner { right: -1%; height: min(54vh, 470px); }
+}
+
+@media (min-width: 1024px) {
+  .hero-runner { right: 1%; height: min(74vh, 640px); }
+}
+
+@media (min-width: 1280px) {
+  .hero-runner {
+    position: static;
+    top: auto;
+    right: auto;
+    height: 100%;
+    max-height: 780px;
+    width: auto;
+    align-self: flex-end;
+    flex-shrink: 0;
+  }
+}
+
+@keyframes hero-runner-in {
+  from { opacity: 0; transform: translate(44px, 18px) scale(0.94); }
+  to { opacity: 1; transform: translate(0, 0) scale(1); }
+}
+
+@keyframes hero-runner-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-13px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-runner {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+.hero-grain {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.05;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+.hero-title {
+  font-family: 'Big Shoulders Display', sans-serif;
+  letter-spacing: -0.01em;
+}
+
+/* On large screens the headline scales with BOTH width and height, so a short
+   viewport can never push the hero copy down into the footer. */
+@media (min-width: 1280px) {
+  .hero-h1 {
+    font-size: clamp(3rem, min(4.8vw, 7.8vh), 6.25rem);
+  }
+}
+
+.hero-kicker,
+.hero-body {
+  font-family: 'Manrope', sans-serif;
+}
+
+.hero-tabular {
+  font-family: 'Manrope', sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hero-anim {
+  opacity: 0;
+  animation: hero-rise 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes hero-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.hero-live-dot {
+  animation: hero-pulse 1.8s ease-in-out infinite;
 }
 
 * {

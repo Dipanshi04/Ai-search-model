@@ -2,7 +2,7 @@ import { prisma } from '../config/database.js';
 import { logger } from '../config/logger.js';
 import { getSocketIO } from '../config/socket.js';
 
-const KM_PER_TREE = 1;
+const KM_PER_TREE = 3;
 const CO2_PER_TREE_KG = 22;
 
 export function calculateTreesFromDistance(distanceKm: number): number {
@@ -37,8 +37,10 @@ export async function updateParticipantTrees(participantId: string): Promise<voi
 
 export async function recalcTreeCounter(eventId: string): Promise<void> {
   try {
+    // Includes runners still mid-race (not just FINISHED) so the counter
+    // reflects trees earned in real time as distance accrues, not only at the finish line.
     const stats = await prisma.participant.aggregate({
-      where: { eventId, status: 'FINISHED' },
+      where: { eventId },
       _sum: { totalDistance: true, treesCount: true },
       _count: { id: true },
     });

@@ -1,7 +1,10 @@
 import { Router } from 'express';
+import bcrypt from 'bcryptjs';
 import { prisma } from '../config/database.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireRole } from '../middleware/auth.js';
+import { logger } from '../config/logger.js';
+import { sendPinEmail } from '../services/email.js';
 
 export const participantsRouter: Router = Router();
 
@@ -104,6 +107,7 @@ participantsRouter.get('/', async (req, res) => {
         { bibNumber: { contains: search, mode: 'insensitive' } },
         { user: { name: { contains: search, mode: 'insensitive' } } },
         { user: { email: { contains: search, mode: 'insensitive' } } },
+        { user: { phone: { contains: search, mode: 'insensitive' } } },
         { company: { name: { contains: search, mode: 'insensitive' } } },
       ];
     }
@@ -131,16 +135,32 @@ participantsRouter.get('/', async (req, res) => {
 
 participantsRouter.get('/leaderboard', async (req, res) => {
   try {
-    const { eventId, category, limit = '100' } = req.query;
+    const { category, limit = '100' } = req.query;
+    let eventId = typeof req.query.eventId === 'string' ? req.query.eventId : undefined;
+
+    if (!eventId) {
+      let event = await prisma.event.findFirst({
+        where: { status: { in: ['ACTIVE', 'PAUSED'] } },
+        orderBy: { updatedAt: 'desc' },
+      });
+      if (!event) {
+        event = await prisma.event.findFirst({
+          where: { status: 'UPCOMING' },
+          orderBy: { date: 'asc' },
+        });
+      }
+      eventId = event?.id;
+    }
+
     if (!eventId) {
       res.json({ success: true, data: [] });
       return;
     }
-    const where: any = { eventId: eventId as string };
+    const where: any = { eventId };
     if (category) where.category = category;
     const participants = await prisma.participant.findMany({
       where,
-      include: { user: true },
+      include: { user: true, company: true },
       orderBy: { totalDistance: 'desc' },
       take: parseInt(limit as string),
     });
@@ -245,7 +265,7 @@ participantsRouter.get('/:id', async (req, res) => {
 
 participantsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'), async (req, res) => {
   try {
-    const { status, category, gender, companyId, bibNumber, emergencyContact, emergencyPhone, bloodGroup, tshirtSize } = req.body;
+    const { status, category, gender, companyId, bibNumber, emergencyContact, emergencyPhone, bloodGroup, tshirtSize, kitDistributed, foodDistributed } = req.body;
     const participant = await prisma.participant.findUnique({ where: { id: req.params.id as string } });
     if (!participant) {
       res.status(404).json({ success: false, message: 'Participant not found' });
@@ -264,6 +284,8 @@ participantsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MA
         ...(emergencyPhone !== undefined && { emergencyPhone }),
         ...(bloodGroup !== undefined && { bloodGroup }),
         ...(tshirtSize !== undefined && { tshirtSize }),
+        ...(kitDistributed !== undefined && { kitDistributed: Boolean(kitDistributed) }),
+        ...(foodDistributed !== undefined && { foodDistributed: Boolean(foodDistributed) }),
       },
       include: { user: true, company: true },
     });
@@ -271,6 +293,41 @@ participantsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MA
     res.json({ success: true, data: updated });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to update participant' });
+  }
+});
+
+// Admin-only fallback for race day: regenerates the participant's PIN and
+// returns it in plaintext so staff can read it out even if the notification
+// email never arrives (SMTP outage, spam filtering, etc).
+participantsRouter.post('/:id/reset-pin', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER', 'CHECKIN_STAFF'), async (req, res) => {
+  try {
+    const participant = await prisma.participant.findUnique({
+      where: { id: req.params.id as string },
+      include: { user: true },
+    });
+    if (!participant) {
+      res.status(404).json({ success: false, message: 'Participant not found' });
+      return;
+    }
+
+    const pin = String(Math.floor(1000 + Math.random() * 9000));
+    const pinHash = await bcrypt.hash(pin, 12);
+
+    await prisma.user.update({
+      where: { id: participant.userId },
+      data: { pinHash },
+    });
+
+    sendPinEmail(participant.user.email, participant.user.name, pin).catch((err) =>
+      logger.error('Failed to email reset PIN:', err)
+    );
+
+    logger.info(`Admin reset PIN for participant ${participant.id} (${participant.user.email})`);
+
+    res.json({ success: true, data: { pin, email: participant.user.email } });
+  } catch (error) {
+    logger.error('Admin reset PIN error:', error);
+    res.status(500).json({ success: false, message: 'Failed to reset PIN' });
   }
 });
 

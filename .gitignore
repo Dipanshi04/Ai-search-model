@@ -9,6 +9,11 @@ build/
 .next/
 .turbo/
 
+# Compiled vite config output (tsc -b compiles vite.config.ts alongside the source;
+# these shadow the real config when present, so they must never be committed)
+apps/*/vite.config.js
+apps/*/vite.config.d.ts
+
 # Environment files (NEVER commit secrets)
 **/.env
 **/.env.*

@@ -9,10 +9,16 @@ greenRouter.get('/stats', async (req: Request, res: Response) => {
 
     let eventIdToUse = eventId;
     if (!eventIdToUse) {
-      const event = await prisma.event.findFirst({
+      let event = await prisma.event.findFirst({
         where: { status: { in: ['ACTIVE', 'PAUSED', 'COMPLETED'] } },
         orderBy: { updatedAt: 'desc' },
       });
+      if (!event) {
+        event = await prisma.event.findFirst({
+          where: { status: 'UPCOMING' },
+          orderBy: { date: 'asc' },
+        });
+      }
       eventIdToUse = event?.id;
     }
 

@@ -115,12 +115,13 @@ async function main() {
 
     const user = await prisma.user.upsert({
       where: { email: runner.email },
-      update: {},
+      update: { pinHash: await bcrypt.hash('1234', 10) },
       create: {
         name: runner.name,
         email: runner.email,
         phone: runner.phone,
         passwordHash: await bcrypt.hash('runner123', 10),
+        pinHash: await bcrypt.hash('1234', 10),
         role: 'PARTICIPANT',
       },
     });
@@ -157,6 +158,7 @@ async function main() {
     { name: 'Mindtree', tier: 'BRONZE', displayOrder: 6 },
   ];
 
+  await prisma.sponsor.deleteMany({ where: { eventId: event.id } });
   for (const sponsor of sponsors) {
     await prisma.sponsor.create({
       data: {
@@ -169,6 +171,7 @@ async function main() {
   }
   console.log(`✅ ${sponsors.length} sponsors`);
 
+  await prisma.announcement.deleteMany({ where: { eventId: event.id } });
   await prisma.announcement.createMany({
     data: [
       { eventId: event.id, title: 'Welcome!', message: 'ISA Tech Marathon 2026 is coming soon. Stay tuned for updates!', type: 'info' },
@@ -181,7 +184,7 @@ async function main() {
   console.log('\n📋 Test Credentials:');
   console.log('   Admin:    admin@isamarathon.com / admin123');
   console.log('   Manager:  racemanager@isamarathon.com / manager123');
-  console.log('   Runner:   vikas@test.com / runner123');
+  console.log('   Runner:   vikas@test.com / PIN 1234');
 }
 
 main()

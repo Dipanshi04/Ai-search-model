@@ -1,6 +1,7 @@
-import { useState, useRef, FormEvent } from 'react';
+import { useState, FormEvent } from 'react';
 import { api } from '../lib/api';
 import logoDark from '../components/logo-dark.png';
+import PinInput from '../components/PinInput';
 
 interface LoginPageProps {
   onLogin: () => void;
@@ -9,7 +10,6 @@ interface LoginPageProps {
 export default function LoginPage({ onLogin }: LoginPageProps) {
   const [email, setEmail] = useState('');
   const [pin, setPin] = useState(['', '', '', '']);
-  const pinRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)];
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
@@ -163,59 +163,10 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               }}>
                 4-Digit PIN
               </label>
-              <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
-                {pinRefs.map((ref, i) => (
-                  <input
-                    key={i}
-                    ref={ref}
-                    type="text"
-                    inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={1}
-                    value={pin[i]}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, '');
-                      const newPin = [...pin];
-                      newPin[i] = val;
-                      setPin(newPin);
-                      setError('');
-                      setResetSent(false);
-                      if (val && i < 3) pinRefs[i + 1]?.current?.focus();
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Backspace' && !pin[i] && i > 0) {
-                        pinRefs[i - 1]?.current?.focus();
-                      }
-                    }}
-                    onPaste={(e) => {
-                      e.preventDefault();
-                      const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 4);
-                      if (pasted) {
-                        const newPin = pasted.split('').concat(Array(4).fill('')).slice(0, 4);
-                        setPin(newPin);
-                        const focusIdx = Math.min(pasted.length, 3);
-                        pinRefs[focusIdx]?.current?.focus();
-                      }
-                    }}
-                    style={{
-                      width: '56px',
-                      height: '60px',
-                      background: '#f8fafc',
-                      border: '1.5px solid #e2e8f0',
-                      borderRadius: '14px',
-                      color: '#1e293b',
-                      fontSize: '24px',
-                      fontWeight: 700,
-                      textAlign: 'center',
-                      outline: 'none',
-                      caretColor: '#10b981',
-                      transition: 'border-color 0.2s',
-                    }}
-                    onFocus={(e) => { e.target.style.borderColor = '#10b981'; }}
-                    onBlur={(e) => { e.target.style.borderColor = '#e2e8f0'; }}
-                  />
-                ))}
-              </div>
+              <PinInput
+                value={pin}
+                onChange={(next) => { setPin(next); setError(''); setResetSent(false); }}
+              />
             </div>
 
             <button

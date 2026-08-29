@@ -18,6 +18,7 @@ interface Event {
   description?: string;
   date: string;
   status: string;
+  isFeatured?: boolean;
   registrationOpen: boolean;
   maxParticipants?: number;
   distances?: EventDistance[];
@@ -130,6 +131,30 @@ export default function EventsPage() {
     }
   }
 
+  const [featureError, setFeatureError] = useState('');
+
+  async function handleSetFeatured(id: string) {
+    setFeatureError('');
+    try {
+      const res = await api.setFeaturedEvent(id);
+      if (res.success) fetchEvents();
+      else setFeatureError(res.message || 'Failed to set featured event');
+    } catch (e: any) {
+      setFeatureError(e.message || 'Failed to set featured event');
+    }
+  }
+
+  async function handleClearFeatured() {
+    setFeatureError('');
+    try {
+      const res = await api.clearFeaturedEvent();
+      if (res.success) fetchEvents();
+      else setFeatureError(res.message || 'Failed to clear featured event');
+    } catch (e: any) {
+      setFeatureError(e.message || 'Failed to clear featured event');
+    }
+  }
+
   const statusColors: Record<string, string> = {
     UPCOMING: 'bg-blue-500/20 text-blue-400',
     ACTIVE: 'bg-emerald-500/20 text-emerald-400',
@@ -156,6 +181,22 @@ export default function EventsPage() {
         </button>
       </div>
 
+      <div className="glass rounded-[2rem] p-5 border border-white/20 shadow-sm">
+        {events.some((e) => e.isFeatured) ? (
+          <p className="text-sm text-slate-600">
+            <span className="font-semibold text-violet-700">Featured</span> — the LED board, spectator app, and other
+            public displays are showing{' '}
+            <span className="font-semibold text-slate-950">{events.find((e) => e.isFeatured)?.name}</span>.
+          </p>
+        ) : (
+          <p className="text-sm text-amber-700">
+            No event is featured. Public displays are guessing — whichever event is ACTIVE or PAUSED, otherwise the
+            soonest UPCOMING one. Pin one below if that's not what you want shown.
+          </p>
+        )}
+        {featureError && <p className="text-sm text-red-600 mt-2">{featureError}</p>}
+      </div>
+
       <div className="glass rounded-[2rem] overflow-hidden border border-white/20 shadow-sm">
         <table className="w-full text-sm">
           <thead className="bg-white/80 backdrop-blur-md">
@@ -179,9 +220,16 @@ export default function EventsPage() {
                   {new Date(ev.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
                 </td>
                 <td className="px-5 py-4">
-                  <span className={`px-2 py-1 rounded-full text-xs font-semibold ${statusColors[ev.status] || 'bg-slate-100 text-slate-600'}`}>
-                    {ev.status}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${statusColors[ev.status] || 'bg-slate-100 text-slate-600'}`}>
+                      {ev.status}
+                    </span>
+                    {ev.isFeatured && (
+                      <span className="px-2 py-1 rounded-full text-xs font-semibold bg-violet-100 text-violet-700">
+                        Featured
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="px-5 py-4 text-violet-700 font-semibold">{ev._count?.participants || 0}</td>
                 <td className="px-5 py-4 space-y-2">
@@ -201,6 +249,15 @@ export default function EventsPage() {
                   )}
                 </td>
                 <td className="px-5 py-4 text-right space-x-3">
+                  {ev.isFeatured ? (
+                    <button onClick={handleClearFeatured} className="text-slate-500 hover:text-slate-700 text-xs">
+                      Unfeature
+                    </button>
+                  ) : (
+                    <button onClick={() => handleSetFeatured(ev.id)} className="text-violet-700 hover:text-violet-900 text-xs font-semibold">
+                      Set as Featured
+                    </button>
+                  )}
                   <button
                     onClick={() => navigate(`/route-builder?eventId=${ev.id}`)}
                     className="text-violet-700 hover:text-violet-900 text-xs"

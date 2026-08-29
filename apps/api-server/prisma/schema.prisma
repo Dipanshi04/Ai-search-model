@@ -15,6 +15,11 @@ model Event {
   description     String?
   date            DateTime
   status          EventStatus      @default(UPCOMING)
+  // Explicit admin pin for "which event public displays (LED board,
+  // spectator app) should show." Without this, every display independently
+  // guessed via the ACTIVE/PAUSED-then-next-UPCOMING heuristic below, which
+  // silently breaks the moment there's more than one event in the system.
+  isFeatured      Boolean          @default(false) @map("is_featured")
   totalDistance    Float            @default(0)
   routeGeojson    String?
   branding        Json?

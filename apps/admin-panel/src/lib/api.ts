@@ -220,6 +220,14 @@ class ApiClient {
     return this.request<void>(`/api/v1/events/${id}`, { method: 'DELETE' });
   }
 
+  async setFeaturedEvent(id: string) {
+    return this.request<any>(`/api/v1/events/${id}/feature`, { method: 'POST' });
+  }
+
+  async clearFeaturedEvent() {
+    return this.request<any>('/api/v1/events/unfeature', { method: 'POST' });
+  }
+
   async getRaceDistances(eventId: string) {
     return this.request<any[]>(`/api/v1/routes/event/${eventId}`);
   }

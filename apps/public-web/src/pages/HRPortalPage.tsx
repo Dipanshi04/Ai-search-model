@@ -217,22 +217,25 @@ export default function HRPortalPage() {
   }
 
   return (
-    <div className="min-h-screen bg-brand-cream flex">
-      <aside className="w-72 bg-white flex flex-col border-r border-brand-navy/10 shrink-0">
-        <div className="px-5 py-5 border-b border-brand-navy/10">
+    <div className="h-screen bg-brand-cream flex flex-col lg:flex-row overflow-hidden">
+      <aside className="w-full lg:w-72 bg-white flex flex-col border-b lg:border-b-0 lg:border-r border-brand-navy/10 shrink-0 lg:h-full lg:overflow-y-auto">
+        <div className="px-4 lg:px-5 py-3 lg:py-5 border-b border-brand-navy/10 flex items-center justify-between">
           <a href="/" className="flex justify-center">
-            <img src={logoDark} alt="ISA Marathon" className="h-20 w-auto max-w-[200px] object-contain" />
+            <img src={logoDark} alt="ISA Marathon" className="h-10 lg:h-20 w-auto max-w-[140px] lg:max-w-[200px] object-contain" />
           </a>
+          <button onClick={handleLogout} className="lg:hidden hero-body text-sm font-semibold text-brand-navy/50 hover:text-red-500 transition shrink-0">
+            Logout
+          </button>
         </div>
-        <nav className="flex-1 p-4 space-y-2">
+        <nav className="flex lg:flex-col lg:flex-1 gap-2 p-3 lg:p-4 overflow-x-auto lg:overflow-visible">
           {([['dashboard', 'Participants'], ['add', 'Add Single'], ['csv', 'CSV Upload']] as const).map(([key, label]) => (
             <button key={key} onClick={() => { setTab(key as Tab); setError(''); setSuccess(''); setCsvResult(null); }}
-              className={`hero-body w-full flex items-center gap-3 rounded-3xl px-4 py-3 text-sm font-medium transition ${tab === key ? 'bg-brand-orange/10 text-brand-orange' : 'text-brand-navy/60 hover:text-brand-navy hover:bg-brand-navy/5'}`}>
+              className={`hero-body w-full lg:w-full flex items-center justify-center lg:justify-start gap-3 rounded-3xl px-4 py-2.5 lg:py-3 text-sm font-medium transition whitespace-nowrap shrink-0 ${tab === key ? 'bg-brand-orange/10 text-brand-orange' : 'text-brand-navy/60 hover:text-brand-navy hover:bg-brand-navy/5'}`}>
               {label}
             </button>
           ))}
         </nav>
-        <div className="p-4 border-t border-brand-navy/10 bg-brand-cream">
+        <div className="hidden lg:block p-4 border-t border-brand-navy/10 bg-brand-cream">
           <div className="flex items-center gap-3 rounded-3xl bg-white px-4 py-3 shadow-sm border border-brand-navy/10">
             <div className="w-10 h-10 rounded-full bg-brand-navy/10 flex items-center justify-center text-brand-navy text-sm font-bold shrink-0">
               {profile?.hrName?.charAt(0) || 'H'}
@@ -246,8 +249,8 @@ export default function HRPortalPage() {
         </div>
       </aside>
 
-      <main className="flex-1 overflow-auto">
-        <div className="p-8">
+      <main className="flex-1 overflow-y-auto">
+        <div className="p-4 lg:p-8">
           <div className="mb-8">
             <h1 className="hero-title text-2xl font-bold text-brand-navy">
               {tab === 'dashboard' && 'Participants'}

@@ -4,6 +4,7 @@ import { logger } from '../config/logger.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 import { getSocketIO } from '../config/socket.js';
 import { recalcTreeCounter } from '../services/greenMission.js';
+import { resolveCurrentEventId } from '../services/events.js';
 
 export const raceRouter: Router = Router();
 
@@ -27,28 +28,15 @@ raceRouter.get('/events', async (_req: Request, res: Response) => {
 
 raceRouter.get('/status', async (req: Request, res: Response) => {
   try {
-    const eventId = typeof req.query.eventId === 'string' ? req.query.eventId : undefined;
+    const requestedEventId = typeof req.query.eventId === 'string' ? req.query.eventId : undefined;
+    const resolvedEventId = await resolveCurrentEventId(requestedEventId);
 
-    let event;
-    if (eventId) {
-      event = await prisma.event.findUnique({
-        where: { id: eventId },
-        include: { raceDistances: { orderBy: { distanceKm: 'asc' } } },
-      });
-    } else {
-      event = await prisma.event.findFirst({
-        where: { status: { in: ['ACTIVE', 'PAUSED'] } },
-        include: { raceDistances: { orderBy: { distanceKm: 'asc' } } },
-        orderBy: { updatedAt: 'desc' },
-      });
-      if (!event) {
-        event = await prisma.event.findFirst({
-          where: { status: 'UPCOMING' },
+    const event = resolvedEventId
+      ? await prisma.event.findUnique({
+          where: { id: resolvedEventId },
           include: { raceDistances: { orderBy: { distanceKm: 'asc' } } },
-          orderBy: { date: 'asc' },
-        });
-      }
-    }
+        })
+      : null;
 
     if (!event) {
       res.json({ success: true, data: { event: null, stats: null } });

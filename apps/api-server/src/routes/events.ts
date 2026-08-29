@@ -2,8 +2,34 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../config/database.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireRole } from '../middleware/auth.js';
+import { setFeaturedEvent, clearFeaturedEvent } from '../services/events.js';
 
 export const eventsRouter: Router = Router();
+
+// Which event public displays (LED board, spectator app) show. See
+// services/events.ts for why this exists.
+eventsRouter.post('/:id/feature', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'), async (req: Request, res: Response) => {
+  try {
+    const event = await prisma.event.findUnique({ where: { id: req.params.id as string } });
+    if (!event) {
+      res.status(404).json({ success: false, message: 'Event not found' });
+      return;
+    }
+    await setFeaturedEvent(event.id);
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to set featured event' });
+  }
+});
+
+eventsRouter.post('/unfeature', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'), async (_req: Request, res: Response) => {
+  try {
+    await clearFeaturedEvent();
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to clear featured event' });
+  }
+});
 
 eventsRouter.get('/', async (_req: Request, res: Response) => {
   try {

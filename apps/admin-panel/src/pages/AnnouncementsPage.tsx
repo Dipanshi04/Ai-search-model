@@ -6,13 +6,19 @@ interface Announcement {
   title: string;
   message: string;
   eventId?: string;
+  location?: string | null;
+  url?: string | null;
+  phone?: string | null;
+  eventDate?: string | null;
   createdAt: string;
 }
+
+const emptyForm = { title: '', message: '', eventId: '', location: '', url: '', phone: '', eventDate: '' };
 
 export default function AnnouncementsPage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ title: '', message: '', eventId: '' });
+  const [form, setForm] = useState(emptyForm);
   const [loading, setLoading] = useState(false);
   const [events, setEvents] = useState<any[]>([]);
 
@@ -51,10 +57,14 @@ export default function AnnouncementsPage() {
         eventId: form.eventId,
         title: form.title,
         message: form.message,
+        location: form.location || undefined,
+        url: form.url || undefined,
+        phone: form.phone || undefined,
+        eventDate: form.eventDate || undefined,
       });
       if (res.success) {
         await loadAnnouncements();
-        setForm({ title: '', message: '', eventId: '' });
+        setForm(emptyForm);
         setShowForm(false);
       }
     } catch (error) {
@@ -127,6 +137,49 @@ export default function AnnouncementsPage() {
                 className="w-full px-3 py-2.5 bg-white/80 border border-white/70 rounded-3xl text-slate-950 text-sm resize-none focus:ring-2 focus:ring-violet-200 outline-none"
               />
             </div>
+            <p className="text-xs text-slate-400 -mt-2">
+              Optional details — shown in the runner app's message center when set. Leave any of these blank to skip them.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-slate-600 mb-1">Location</label>
+                <input
+                  value={form.location}
+                  onChange={(e) => setForm({ ...form, location: e.target.value })}
+                  placeholder="e.g. ISA Office, Vijay Nagar"
+                  className="w-full px-3 py-2.5 bg-white/80 border border-white/70 rounded-3xl text-slate-950 text-sm focus:ring-2 focus:ring-violet-200 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-600 mb-1">Date</label>
+                <input
+                  type="date"
+                  value={form.eventDate}
+                  onChange={(e) => setForm({ ...form, eventDate: e.target.value })}
+                  className="w-full px-3 py-2.5 bg-white/80 border border-white/70 rounded-3xl text-slate-950 text-sm focus:ring-2 focus:ring-violet-200 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-600 mb-1">Phone</label>
+                <input
+                  type="tel"
+                  value={form.phone}
+                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  placeholder="+91 98765 43210"
+                  className="w-full px-3 py-2.5 bg-white/80 border border-white/70 rounded-3xl text-slate-950 text-sm focus:ring-2 focus:ring-violet-200 outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-slate-600 mb-1">Link</label>
+                <input
+                  type="url"
+                  value={form.url}
+                  onChange={(e) => setForm({ ...form, url: e.target.value })}
+                  placeholder="https://maps.google.com/..."
+                  className="w-full px-3 py-2.5 bg-white/80 border border-white/70 rounded-3xl text-slate-950 text-sm focus:ring-2 focus:ring-violet-200 outline-none"
+                />
+              </div>
+            </div>
             <div className="flex gap-3 pt-2">
               <button type="submit" disabled={loading} className="px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-3xl text-sm font-medium disabled:opacity-50">
                 {loading ? 'Sending...' : 'Send Now'}
@@ -151,8 +204,18 @@ export default function AnnouncementsPage() {
                   </span>
                 </div>
                 <p className="text-sm text-slate-600 mt-1">{a.message}</p>
+                {(a.location || a.eventDate || a.phone || a.url) && (
+                  <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+                    {a.eventDate && (
+                      <span className="text-xs text-slate-500">📅 {new Date(a.eventDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                    )}
+                    {a.location && <span className="text-xs text-slate-500">📍 {a.location}</span>}
+                    {a.phone && <span className="text-xs text-slate-500">📞 {a.phone}</span>}
+                    {a.url && <span className="text-xs text-slate-500">🔗 {a.url}</span>}
+                  </div>
+                )}
                 <p className="text-xs text-slate-400 mt-2">
-                  {new Date(a.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  Sent {new Date(a.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                 </p>
               </div>
               <div className="flex items-center gap-2 shrink-0">

@@ -109,6 +109,10 @@ class ApiClient {
   async getRoute(raceDistanceId: string) {
     return this.request<any>(`/api/v1/routes/${raceDistanceId}`);
   }
+
+  async getAnnouncements(eventId: string) {
+    return this.request<any[]>(`/api/v1/announcements?eventId=${eventId}`);
+  }
 }
 
 export const api = new ApiClient();

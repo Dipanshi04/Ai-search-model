@@ -322,10 +322,18 @@ class ApiClient {
   }
 
   async getAnnouncements() {
-    return this.request<any[]>('/api/v1/announcements');
+    return this.request<any[]>('/api/v1/announcements?all=true');
   }
 
-  async sendAnnouncement(data: { eventId: string; title: string; message: string }) {
+  async sendAnnouncement(data: {
+    eventId: string;
+    title: string;
+    message: string;
+    location?: string;
+    url?: string;
+    phone?: string;
+    eventDate?: string;
+  }) {
     return this.request<any>('/api/v1/announcements', {
       method: 'POST',
       body: JSON.stringify(data),

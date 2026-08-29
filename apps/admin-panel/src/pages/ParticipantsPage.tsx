@@ -16,6 +16,7 @@ export default function ParticipantsPage() {
   const [pin, setPin] = useState<string | null>(null);
   const [pinLoading, setPinLoading] = useState(false);
   const [pinError, setPinError] = useState('');
+  const [distError, setDistError] = useState('');
 
   useEffect(() => {
     api.getEvents().then((res) => {
@@ -68,25 +69,30 @@ export default function ParticipantsPage() {
     setViewParticipant(p);
     setPin(null);
     setPinError('');
+    setDistError('');
   };
 
   const closeView = () => {
     setViewParticipant(null);
     setPin(null);
     setPinError('');
+    setDistError('');
   };
 
   const handleToggleDistribution = async (field: 'kitDistributed' | 'foodDistributed') => {
     if (!viewParticipant) return;
     const next = !viewParticipant[field];
+    setDistError('');
     try {
       const res = await api.updateParticipant(viewParticipant.id, { [field]: next });
       if (res.success && res.data) {
         setViewParticipant(res.data);
         loadParticipants();
+      } else {
+        setDistError(res.message || 'Failed to update. Please try again.');
       }
-    } catch (e) {
-      console.error(`Failed to update ${field}:`, e);
+    } catch (e: any) {
+      setDistError(e.message || 'Failed to update. Please try again.');
     }
   };
 
@@ -300,6 +306,9 @@ export default function ParticipantsPage() {
 
             <div className="border-t border-slate-200 pt-4 pb-4">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Distribution Status</p>
+              {distError && (
+                <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-2xl px-3 py-2 mb-3">{distError}</p>
+              )}
               <div className="space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-slate-700">Kit Distributed</span>

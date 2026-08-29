@@ -481,6 +481,7 @@ export default function HRPortalPage() {
                               <th className="text-left px-3 py-2">Name</th>
                               <th className="text-left px-3 py-2">Email</th>
                               <th className="text-left px-3 py-2">BIB</th>
+                              <th className="text-left px-3 py-2">PIN</th>
                               <th className="text-left px-3 py-2">Status</th>
                             </tr>
                           </thead>
@@ -490,6 +491,9 @@ export default function HRPortalPage() {
                                 <td className="px-3 py-2 text-brand-navy">{r.name}</td>
                                 <td className="px-3 py-2 text-brand-navy/70">{r.email}</td>
                                 <td className="px-3 py-2 font-mono font-bold text-brand-navy">{r.bibNumber || '-'}</td>
+                                <td className="px-3 py-2 font-mono font-bold text-brand-orange">
+                                  {r.success ? (r.pin || 'Already set') : '-'}
+                                </td>
                                 <td className="px-3 py-2">
                                   {r.success ? <span className="text-emerald-700 font-medium">Success</span> : <span className="text-red-600">{r.error}</span>}
                                 </td>

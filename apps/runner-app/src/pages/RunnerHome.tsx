@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import logoDark from '../components/logo-dark.png';
 import ProfilePage from './ProfilePage';
+import MessagesPage from './MessagesPage';
 
 interface RunnerDetails {
   name: string;
@@ -11,6 +12,7 @@ interface RunnerDetails {
   category: string;
   status: string;
   participantId: string;
+  eventId: string;
   kitDistributed: boolean;
   certificateUrl: string | null;
 }
@@ -30,6 +32,8 @@ export default function RunnerHome({ bibNumber, category, onStart }: Props) {
   const [details, setDetails] = useState<RunnerDetails | null>(null);
   const [raceStatus, setRaceStatus] = useState<string>('UPCOMING');
   const [showProfile, setShowProfile] = useState(false);
+  const [showMessages, setShowMessages] = useState(false);
+  const [hasMessages, setHasMessages] = useState(false);
   const [certGenerating, setCertGenerating] = useState(false);
   const [certError, setCertError] = useState('');
 
@@ -45,9 +49,15 @@ export default function RunnerHome({ bibNumber, category, onStart }: Props) {
           category: p?.category || category,
           status: p?.status || 'REGISTERED',
           participantId: p?.id || '',
+          eventId: p?.eventId || '',
           kitDistributed: p?.kitDistributed || false,
           certificateUrl: p?.certificateUrl || null,
         });
+        if (p?.eventId) {
+          api.getAnnouncements(p.eventId).then((mRes) => {
+            if (mRes.success && mRes.data) setHasMessages(mRes.data.length > 0);
+          }).catch(() => {});
+        }
       }
     });
 
@@ -87,6 +97,44 @@ export default function RunnerHome({ bibNumber, category, onStart }: Props) {
       display: 'flex',
       flexDirection: 'column',
     }}>
+      <button
+        onClick={() => setShowMessages(true)}
+        aria-label="Messages"
+        style={{
+          position: 'fixed',
+          top: 'calc(16px + env(safe-area-inset-top))',
+          right: '64px',
+          zIndex: 20,
+          width: '40px',
+          height: '40px',
+          borderRadius: '50%',
+          background: '#fff',
+          border: '1.5px solid #e2e8f0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          boxShadow: '0 2px 10px rgba(0,0,0,0.06)',
+          transition: 'transform 0.1s',
+          touchAction: 'manipulation',
+        }}
+        onMouseDown={(e) => { e.currentTarget.style.transform = 'scale(0.92)'; }}
+        onMouseUp={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+        onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)'; }}
+      >
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#475569" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+          <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+        </svg>
+        {hasMessages && (
+          <span style={{
+            position: 'absolute', top: '6px', right: '6px',
+            width: '9px', height: '9px', borderRadius: '50%',
+            background: '#ef4444', border: '1.5px solid #fff',
+          }} />
+        )}
+      </button>
+
       <button
         onClick={() => setShowProfile(true)}
         aria-label="Profile"
@@ -365,6 +413,12 @@ export default function RunnerHome({ bibNumber, category, onStart }: Props) {
       </div>
 
       {showProfile && <ProfilePage onBack={() => setShowProfile(false)} />}
+      {showMessages && (
+        <MessagesPage
+          eventId={details?.eventId || ''}
+          onBack={() => { setShowMessages(false); setHasMessages(false); }}
+        />
+      )}
     </div>
   );
 }

@@ -1,37 +1,52 @@
 import { Router, Request, Response } from 'express';
+import { prisma } from '../config/database.js';
 import { getSocketIO } from '../config/socket.js';
 import { authenticate, requireRole } from '../middleware/auth.js';
 
 export const announcementsRouter: Router = Router();
 
-// In-memory store for announcements (resets on server restart)
-const announcementsStore: { id: string; title: string; message: string; eventId: string; createdAt: string }[] = [];
-
-announcementsRouter.get('/', async (_req, res) => {
-  res.json({ success: true, data: announcementsStore });
+// Public read, no auth — these are race-day notices meant to reach every
+// runner and spectator, same as before this route was moved onto the DB.
+announcementsRouter.get('/', async (req: Request, res: Response) => {
+  try {
+    const { eventId, all } = req.query;
+    const announcements = await prisma.announcement.findMany({
+      where: {
+        ...(all === 'true' ? {} : { active: true }),
+        ...(eventId ? { eventId: String(eventId) } : {}),
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json({ success: true, data: announcements });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to load announcements' });
+  }
 });
 
 announcementsRouter.post('/', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'), async (req: Request, res: Response) => {
   try {
-    const { eventId, title, message } = req.body;
+    const { eventId, title, message, location, url, phone, eventDate } = req.body;
     if (!eventId || !title || !message) {
       res.status(400).json({ success: false, message: 'eventId, title, and message required' });
       return;
     }
 
-    const announcement = {
-      id: Date.now().toString(),
-      title,
-      message,
-      eventId,
-      createdAt: new Date().toISOString(),
-    };
-    announcementsStore.unshift(announcement);
+    const announcement = await prisma.announcement.create({
+      data: {
+        eventId,
+        title,
+        message,
+        location: location || null,
+        url: url || null,
+        phone: phone || null,
+        eventDate: eventDate ? new Date(eventDate) : null,
+      },
+    });
 
     const io = getSocketIO();
-    io.to(`event:${eventId}`).emit('announcement', { title, message, eventId });
-    io.to(`tracking:${eventId}`).emit('announcement', { title, message, eventId });
-    io.to(`leaderboard:${eventId}`).emit('announcement', { title, message, eventId });
+    io.to(`event:${eventId}`).emit('announcement', announcement);
+    io.to(`tracking:${eventId}`).emit('announcement', announcement);
+    io.to(`leaderboard:${eventId}`).emit('announcement', announcement);
 
     res.json({ success: true, data: announcement });
   } catch (error) {
@@ -40,18 +55,32 @@ announcementsRouter.post('/', authenticate, requireRole('SUPER_ADMIN', 'RACE_MAN
   }
 });
 
+announcementsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'), async (req: Request, res: Response) => {
+  try {
+    const { title, message, location, url, phone, eventDate, active } = req.body;
+    const announcement = await prisma.announcement.update({
+      where: { id: req.params.id as string },
+      data: {
+        ...(title !== undefined && { title }),
+        ...(message !== undefined && { message }),
+        ...(location !== undefined && { location: location || null }),
+        ...(url !== undefined && { url: url || null }),
+        ...(phone !== undefined && { phone: phone || null }),
+        ...(eventDate !== undefined && { eventDate: eventDate ? new Date(eventDate) : null }),
+        ...(active !== undefined && { active: Boolean(active) }),
+      },
+    });
+    res.json({ success: true, data: announcement });
+  } catch (error) {
+    res.status(404).json({ success: false, message: 'Announcement not found' });
+  }
+});
+
 announcementsRouter.delete('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'), async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
-    const index = announcementsStore.findIndex((a) => a.id === id);
-    if (index === -1) {
-      res.status(404).json({ success: false, message: 'Announcement not found' });
-      return;
-    }
-    announcementsStore.splice(index, 1);
+    await prisma.announcement.delete({ where: { id: req.params.id as string } });
     res.json({ success: true, message: 'Announcement deleted' });
   } catch (error) {
-    console.error('Delete announcement error:', error);
-    res.status(500).json({ success: false, message: 'Failed to delete announcement' });
+    res.status(404).json({ success: false, message: 'Announcement not found' });
   }
 });

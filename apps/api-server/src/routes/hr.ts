@@ -475,7 +475,7 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
     });
     let lastNum = lastParticipant ? parseInt(lastParticipant.bibNumber.replace('ISA', '')) : 0;
 
-    const results: { success: boolean; name: string; email: string; bibNumber?: string; error?: string }[] = [];
+    const results: { success: boolean; name: string; email: string; bibNumber?: string; pin?: string; error?: string }[] = [];
     let created = 0;
 
     for (const record of records) {
@@ -583,7 +583,7 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
         const qrCodeDataUrl = await generateQRCode(bibNumber);
         await prisma.participant.update({ where: { id: participant.id }, data: { qrCodeUrl: qrCodeDataUrl } });
 
-        results.push({ success: true, name, email, bibNumber });
+        results.push({ success: true, name, email, bibNumber, pin: pin || undefined });
         created++;
 
         // Send welcome email and PIN email (async)

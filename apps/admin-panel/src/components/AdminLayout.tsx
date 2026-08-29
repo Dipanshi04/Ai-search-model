@@ -39,8 +39,8 @@ export default function AdminLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-transparent flex">
-      <aside className="w-72 glass flex flex-col border border-white/20">
+    <div className="h-screen bg-transparent flex overflow-hidden">
+      <aside className="w-72 glass flex flex-col border border-white/20 overflow-y-auto shrink-0">
         <div className="px-5 py-5 border-b border-white/10">
           <a href="/" className="flex justify-center">
             <Logo size="h-20" />

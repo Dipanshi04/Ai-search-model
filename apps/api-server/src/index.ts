@@ -35,6 +35,7 @@ import { analyticsRouter } from './routes/analytics.js';
 import { paymentRouter } from './routes/payment.js';
 import { bulkRegistrationRouter } from './routes/bulk-registration.js';
 import { hrRouter } from './routes/hr.js';
+import { settingsRouter } from './routes/settings.js';
 
 const PORT = parseInt(process.env.PORT || '4000', 10);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';
@@ -71,6 +72,7 @@ app.use('/api/v1/certificates', certificateRouter);
 app.use('/api/v1/analytics', analyticsRouter);
 app.use('/api/v1/bulk-registration', bulkRegistrationRouter);
 app.use('/api/v1/hr', hrRouter);
+app.use('/api/v1/settings', settingsRouter);
 
 app.use('/certificates', express.static(path.join(process.cwd(), 'certificates')));
 app.use('/uploads', (req, res, next) => {

@@ -78,6 +78,8 @@ model Company {
   logoUrl        String?       @map("logo_url")
   industry       String?
   employeeCount  Int?          @map("employee_count")
+  contactEmail   String?       @map("contact_email")
+  contactPhone   String?       @map("contact_phone")
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 

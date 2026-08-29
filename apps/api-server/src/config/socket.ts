@@ -1,6 +1,7 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { logger } from './logger.js';
-import { processGpsUpdate, flushGpsLogs, getRunnerDistance } from '../services/tracking.js';
+import { processGpsUpdate, flushGpsLogs, getRunnerDistance, evaluateGpsUpdate, distanceToFinishMeters, clearGpsTrackingState } from '../services/tracking.js';
+import { getTrackingSettings } from '../services/settings.js';
 import { prisma } from './database.js';
 import { markRunnerFinished, recalcTreeCounter, updateParticipantTrees } from '../services/greenMission.js';
 
@@ -62,6 +63,21 @@ export function setupSocketIO(io: SocketIOServer): void {
       timestamp: string;
     }) => {
       try {
+        // Resolved once and reused for the accuracy/outlier gate, the
+        // finish-threshold check, and the broadcast below — one query
+        // instead of the two this used to take.
+        const participant = await prisma.participant.findUnique({
+          where: { id: data.participantId },
+          select: { eventId: true, bibNumber: true, category: true, status: true, user: { select: { name: true } } },
+        });
+        if (!participant?.eventId) return;
+
+        const rejectReason = await evaluateGpsUpdate(participant.eventId, data);
+        if (rejectReason) {
+          logger.info(`[Tracking] Rejected GPS point for ${data.participantId}: ${rejectReason}`);
+          return;
+        }
+
         await processGpsUpdate(data);
 
         // Update total distance from GPS logs
@@ -72,12 +88,17 @@ export function setupSocketIO(io: SocketIOServer): void {
         });
         await updateParticipantTrees(data.participantId);
 
+        if (participant.status !== 'FINISHED') {
+          const settings = await getTrackingSettings(participant.eventId);
+          const finishDistance = await distanceToFinishMeters(participant.eventId, participant.category, data.lat, data.lng);
+          if (finishDistance !== null && finishDistance <= settings.finishThresholdMeters) {
+            await markRunnerFinished(data.participantId);
+            clearGpsTrackingState(data.participantId);
+          }
+        }
+
         // Broadcast runner position to tracking room
         const io = getSocketIO();
-        const participant = await prisma.participant.findUnique({
-          where: { id: data.participantId },
-          select: { eventId: true, bibNumber: true, category: true, user: { select: { name: true } } },
-        });
         if (participant?.eventId) {
           io.to(`tracking:${participant.eventId}`).emit('runner:update', {
             participantId: data.participantId,

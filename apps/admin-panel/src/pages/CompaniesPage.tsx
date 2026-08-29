@@ -17,6 +17,7 @@ export default function CompaniesPage() {
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ name: '', contactEmail: '', contactPhone: '' });
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     api.getEvents().then((res) => {
@@ -40,18 +41,21 @@ export default function CompaniesPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setError('');
     try {
-      if (editingId) {
-        await api.updateCompany(editingId, { name: form.name });
-      } else {
-        await api.createCompany(form);
+      const res = editingId
+        ? await api.updateCompany(editingId, form)
+        : await api.createCompany(form);
+      if (!res.success) {
+        setError(res.message || 'Failed to save company');
+        return;
       }
       setShowModal(false);
       setForm({ name: '', contactEmail: '', contactPhone: '' });
       setEditingId(null);
       fetchCompanies();
-    } catch (e) {
-      console.error('Failed to save company:', e);
+    } catch (e: any) {
+      setError(e.message || 'Failed to save company');
     }
   }
 
@@ -68,6 +72,7 @@ export default function CompaniesPage() {
   function openEdit(c: Company) {
     setForm({ name: c.name, contactEmail: c.contactEmail || '', contactPhone: c.contactPhone || '' });
     setEditingId(c.id);
+    setError('');
     setShowModal(true);
   }
 
@@ -90,7 +95,7 @@ export default function CompaniesPage() {
             ))}
           </select>
           <button
-            onClick={() => { setForm({ name: '', contactEmail: '', contactPhone: '' }); setEditingId(null); setShowModal(true); }}
+            onClick={() => { setForm({ name: '', contactEmail: '', contactPhone: '' }); setEditingId(null); setError(''); setShowModal(true); }}
             className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-3xl text-sm font-medium shadow-sm"
           >
             Add Company
@@ -133,6 +138,9 @@ export default function CompaniesPage() {
         <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="glass rounded-[2rem] p-6 w-96 border border-white/20 shadow-lg">
             <h3 className="text-slate-950 font-semibold mb-4">{editingId ? 'Edit Company' : 'Add Company'}</h3>
+            {error && (
+              <div className="mb-4 rounded-3xl bg-red-50 border border-red-200 px-4 py-2.5 text-xs text-red-700">{error}</div>
+            )}
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-slate-600 text-sm mb-1">Company Name</label>

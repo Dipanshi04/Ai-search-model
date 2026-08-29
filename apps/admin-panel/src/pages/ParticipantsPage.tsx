@@ -17,6 +17,8 @@ export default function ParticipantsPage() {
   const [pinLoading, setPinLoading] = useState(false);
   const [pinError, setPinError] = useState('');
   const [distError, setDistError] = useState('');
+  const [paymentError, setPaymentError] = useState('');
+  const [paymentSaving, setPaymentSaving] = useState(false);
 
   useEffect(() => {
     api.getEvents().then((res) => {
@@ -70,6 +72,7 @@ export default function ParticipantsPage() {
     setPin(null);
     setPinError('');
     setDistError('');
+    setPaymentError('');
   };
 
   const closeView = () => {
@@ -77,6 +80,25 @@ export default function ParticipantsPage() {
     setPin(null);
     setPinError('');
     setDistError('');
+    setPaymentError('');
+  };
+
+  const handleSetPaymentStatus = async (paymentStatus: 'COMPLETED' | 'PENDING' | 'FAILED' | 'REFUNDED') => {
+    if (!viewParticipant) return;
+    setPaymentError('');
+    setPaymentSaving(true);
+    try {
+      const res = await api.updateParticipant(viewParticipant.id, { paymentStatus });
+      if (res.success && res.data) {
+        setViewParticipant(res.data);
+        loadParticipants();
+      } else {
+        setPaymentError(res.message || 'Failed to update payment status');
+      }
+    } catch (e: any) {
+      setPaymentError(e.message || 'Failed to update payment status');
+    }
+    setPaymentSaving(false);
   };
 
   const handleToggleDistribution = async (field: 'kitDistributed' | 'foodDistributed') => {
@@ -301,6 +323,45 @@ export default function ParticipantsPage() {
               <div>
                 <p className="text-xs text-slate-400 uppercase tracking-wide">Emergency Phone</p>
                 <p className="text-slate-800">{viewParticipant.emergencyPhone || '—'}</p>
+              </div>
+            </div>
+
+            <div className="border-t border-slate-200 pt-4 pb-4">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Payment</p>
+              <p className="text-xs text-slate-400 mb-3">
+                Manual override — for cash-at-venue or fixing a mismatch. Online payments verify through the Payments tab instead.
+              </p>
+              {paymentError && (
+                <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-2xl px-3 py-2 mb-3">{paymentError}</p>
+              )}
+              <div className="flex items-center justify-between">
+                <span
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold ${
+                    viewParticipant.paymentStatus === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' :
+                    viewParticipant.paymentStatus === 'FAILED' ? 'bg-red-100 text-red-700' :
+                    viewParticipant.paymentStatus === 'REFUNDED' ? 'bg-slate-200 text-slate-600' :
+                    'bg-amber-100 text-amber-700'
+                  }`}
+                >
+                  {viewParticipant.paymentStatus || 'PENDING'}
+                </span>
+                {viewParticipant.paymentStatus !== 'COMPLETED' ? (
+                  <button
+                    onClick={() => handleSetPaymentStatus('COMPLETED')}
+                    disabled={paymentSaving}
+                    className="text-xs font-semibold text-emerald-700 hover:text-emerald-900 disabled:opacity-50"
+                  >
+                    Mark as Paid
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleSetPaymentStatus('PENDING')}
+                    disabled={paymentSaving}
+                    className="text-xs font-semibold text-slate-500 hover:text-slate-700 disabled:opacity-50"
+                  >
+                    Revert to Pending
+                  </button>
+                )}
               </div>
             </div>
 

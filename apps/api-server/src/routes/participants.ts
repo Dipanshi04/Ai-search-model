@@ -193,13 +193,13 @@ participantsRouter.get('/companies', async (req, res) => {
 
 participantsRouter.post('/companies', authenticate, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
-    const { name, industry, employeeCount } = req.body;
+    const { name, industry, employeeCount, contactEmail, contactPhone } = req.body;
     if (!name) {
       res.status(400).json({ success: false, message: 'name is required' });
       return;
     }
     const company = await prisma.company.create({
-      data: { name, industry, employeeCount },
+      data: { name, industry, employeeCount, contactEmail, contactPhone },
     });
     res.status(201).json({ success: true, data: company });
   } catch (error: any) {
@@ -213,7 +213,7 @@ participantsRouter.post('/companies', authenticate, requireRole('SUPER_ADMIN'), 
 
 participantsRouter.put('/companies/:id', authenticate, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
-    const { name, industry, employeeCount } = req.body;
+    const { name, industry, employeeCount, contactEmail, contactPhone } = req.body;
     const company = await prisma.company.findUnique({ where: { id: req.params.id as string } });
     if (!company) {
       res.status(404).json({ success: false, message: 'Company not found' });
@@ -225,6 +225,8 @@ participantsRouter.put('/companies/:id', authenticate, requireRole('SUPER_ADMIN'
         ...(name !== undefined && { name }),
         ...(industry !== undefined && { industry }),
         ...(employeeCount !== undefined && { employeeCount }),
+        ...(contactEmail !== undefined && { contactEmail }),
+        ...(contactPhone !== undefined && { contactPhone }),
       },
     });
     res.json({ success: true, data: updated });
@@ -265,7 +267,7 @@ participantsRouter.get('/:id', async (req, res) => {
 
 participantsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'), async (req, res) => {
   try {
-    const { status, category, gender, companyId, bibNumber, emergencyContact, emergencyPhone, bloodGroup, tshirtSize, kitDistributed, foodDistributed } = req.body;
+    const { status, category, gender, companyId, bibNumber, emergencyContact, emergencyPhone, bloodGroup, tshirtSize, kitDistributed, foodDistributed, paymentStatus } = req.body;
     const participant = await prisma.participant.findUnique({ where: { id: req.params.id as string } });
     if (!participant) {
       res.status(404).json({ success: false, message: 'Participant not found' });
@@ -286,6 +288,10 @@ participantsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MA
         ...(tshirtSize !== undefined && { tshirtSize }),
         ...(kitDistributed !== undefined && { kitDistributed: Boolean(kitDistributed) }),
         ...(foodDistributed !== undefined && { foodDistributed: Boolean(foodDistributed) }),
+        // Manual override for cash-at-venue payments and other edge cases the
+        // ShowtimeBro reconciliation queue doesn't cover — see payment.ts for
+        // the normal verify/reject flow this sits alongside.
+        ...(paymentStatus !== undefined && { paymentStatus }),
       },
       include: { user: true, company: true },
     });

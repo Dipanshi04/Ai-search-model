@@ -183,7 +183,7 @@ class ApiClient {
     });
   }
 
-  async updateCompany(id: string, data: { name: string }) {
+  async updateCompany(id: string, data: { name: string; contactEmail?: string; contactPhone?: string }) {
     return this.request<any>(`/api/v1/participants/companies/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -318,6 +318,17 @@ class ApiClient {
     return this.request<any>(`/api/v1/payments/${id}/reject`, {
       method: 'POST',
       body: JSON.stringify({ reason }),
+    });
+  }
+
+  async getSettings(eventId: string) {
+    return this.request<Record<string, any>>(`/api/v1/settings/${eventId}`);
+  }
+
+  async updateSettings(eventId: string, data: Record<string, any>) {
+    return this.request<any>(`/api/v1/settings/${eventId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
     });
   }
 

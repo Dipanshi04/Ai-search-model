@@ -1,7 +1,57 @@
 import { logger } from '../config/logger.js';
 import { prisma } from '../config/database.js';
+import { getTrackingSettings } from './settings.js';
 
 const gpsBuffer = new Map<string, any[]>();
+
+// Last accepted point per runner, kept in memory purely to test the next
+// point's jump distance against OUTLIER_DISTANCE_METERS without a DB read
+// on the hot per-ping path.
+const lastAcceptedPoint = new Map<string, { lat: number; lng: number; timestamp: number }>();
+
+export type GpsRejectReason = 'inaccurate' | 'outlier' | null;
+
+/**
+ * Accuracy and outlier gate, run before a point ever reaches the buffer.
+ * Keeps a single bad GPS fix (a building-bounce, an implausible jump) from
+ * corrupting distance, the leaderboard, and the tree counter.
+ */
+export async function evaluateGpsUpdate(
+  eventId: string,
+  data: { participantId: string; lat: number; lng: number; accuracy: number; timestamp: string }
+): Promise<GpsRejectReason> {
+  const settings = await getTrackingSettings(eventId);
+
+  if (data.accuracy > settings.maxAccuracyMeters) {
+    return 'inaccurate';
+  }
+
+  const last = lastAcceptedPoint.get(data.participantId);
+  if (last) {
+    const jumpMeters = calculateDistance(last.lat, last.lng, data.lat, data.lng) * 1000;
+    if (jumpMeters > settings.outlierDistanceMeters) {
+      const elapsedSec = Math.max(1, (new Date(data.timestamp).getTime() - last.timestamp) / 1000);
+      // A big jump is only an outlier if it also implies an impossible
+      // pace — a runner who's been stationary a while covering real ground
+      // on the next ping shouldn't be rejected just for a sparse buffer.
+      const impliedKmh = (jumpMeters / 1000) / (elapsedSec / 3600);
+      if (impliedKmh > 25) {
+        return 'outlier';
+      }
+    }
+  }
+
+  lastAcceptedPoint.set(data.participantId, {
+    lat: data.lat,
+    lng: data.lng,
+    timestamp: new Date(data.timestamp).getTime(),
+  });
+  return null;
+}
+
+export function clearGpsTrackingState(participantId: string): void {
+  lastAcceptedPoint.delete(participantId);
+}
 
 export async function processGpsUpdate(data: {
   participantId: string;
@@ -25,6 +75,33 @@ export async function processGpsUpdate(data: {
   } catch (error) {
     logger.error('[Tracking] Error processing GPS update:', error);
   }
+}
+
+/**
+ * Distance in meters from a point to the finish line — the last point of
+ * the runner's race route. Returns null when the route has no points, so
+ * callers can skip the finish-threshold check rather than false-positive.
+ */
+export async function distanceToFinishMeters(
+  eventId: string,
+  category: string,
+  lat: number,
+  lng: number
+): Promise<number | null> {
+  const targetKm = category === 'RUN_5K' ? 5 : 3;
+  const raceDistance = await prisma.raceDistance.findFirst({
+    where: { eventId, distanceKm: targetKm },
+    orderBy: { createdAt: 'asc' },
+  });
+  if (!raceDistance) return null;
+
+  const finishPoint = await prisma.routePoint.findFirst({
+    where: { raceDistanceId: raceDistance.id },
+    orderBy: { sequence: 'desc' },
+  });
+  if (!finishPoint) return null;
+
+  return calculateDistance(lat, lng, finishPoint.lat, finishPoint.lng) * 1000;
 }
 
 export async function flushGpsLogs(): Promise<void> {

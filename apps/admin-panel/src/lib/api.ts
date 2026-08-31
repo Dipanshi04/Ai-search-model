@@ -115,6 +115,11 @@ class ApiClient {
     return this.request<any>(`/api/v1/participants/stats/summary${query}`);
   }
 
+  async getTreeCounter(eventId?: string) {
+    const query = eventId ? `?eventId=${eventId}` : '';
+    return this.request<{ totalTrees: number; totalKm: number; totalCO2: number }>(`/api/v1/trees${query}`);
+  }
+
   async exportParticipantsCSV() {
     const headers: Record<string, string> = {};
     if (this.token) headers['Authorization'] = `Bearer ${this.token}`;

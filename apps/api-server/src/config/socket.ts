@@ -1,9 +1,18 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import { logger } from './logger.js';
-import { processGpsUpdate, flushGpsLogs, getRunnerDistance, evaluateGpsUpdate, distanceToFinishMeters, clearGpsTrackingState } from '../services/tracking.js';
+import { processGpsUpdate, flushGpsLogs, evaluateGpsUpdate, distanceToFinishMeters, clearGpsTrackingState } from '../services/tracking.js';
 import { getTrackingSettings } from '../services/settings.js';
 import { prisma } from './database.js';
 import { markRunnerFinished, recalcTreeCounter, updateParticipantTrees } from '../services/greenMission.js';
+
+// Minutes per km since the runner tapped Start. null before either exists,
+// or before any real distance has accrued — a 0-distance division would
+// otherwise report an infinite/nonsense pace on the very first GPS point.
+function computePaceMinPerKm(startedAt: Date | null, distanceKm: number): number | null {
+  if (!startedAt || distanceKm <= 0) return null;
+  const elapsedMin = (Date.now() - startedAt.getTime()) / 60000;
+  return elapsedMin / distanceKm;
+}
 
 let ioInstance: SocketIOServer | null = null;
 
@@ -68,39 +77,57 @@ export function setupSocketIO(io: SocketIOServer): void {
         // instead of the two this used to take.
         const participant = await prisma.participant.findUnique({
           where: { id: data.participantId },
-          select: { eventId: true, bibNumber: true, category: true, status: true, user: { select: { name: true } } },
+          select: { eventId: true, bibNumber: true, category: true, status: true, startedAt: true, user: { select: { name: true } } },
         });
         if (!participant?.eventId) return;
 
-        const rejectReason = await evaluateGpsUpdate(participant.eventId, data);
-        if (rejectReason) {
-          logger.info(`[Tracking] Rejected GPS point for ${data.participantId}: ${rejectReason}`);
+        const evaluation = await evaluateGpsUpdate(participant.eventId, data);
+        if (evaluation.reject) {
+          logger.info(`[Tracking] Rejected GPS point for ${data.participantId}: ${evaluation.reject}`);
           return;
         }
 
         await processGpsUpdate(data);
 
-        // Update total distance from GPS logs
-        const distance = await getRunnerDistance(data.participantId);
-        await prisma.participant.update({
+        // Add just this segment rather than re-summing the whole gps_logs
+        // table on every ping — that read used to race the write buffer
+        // (points are flushed every 10 or every 5s, not on every ping), so
+        // distance could sit stale — sometimes at 0 — for a runner's first
+        // several pings. See evaluateGpsUpdate in tracking.ts.
+        const updatedParticipant = await prisma.participant.update({
           where: { id: data.participantId },
-          data: { totalDistance: distance },
+          data: { totalDistance: { increment: evaluation.segmentKm } },
         });
+        const distance = updatedParticipant.totalDistance;
         await updateParticipantTrees(data.participantId);
 
+        let effectiveStatus = participant.status;
         if (participant.status !== 'FINISHED') {
           const settings = await getTrackingSettings(participant.eventId);
           const finishDistance = await distanceToFinishMeters(participant.eventId, participant.category, data.lat, data.lng);
           if (finishDistance !== null && finishDistance <= settings.finishThresholdMeters) {
             await markRunnerFinished(data.participantId);
             clearGpsTrackingState(data.participantId);
+            effectiveStatus = 'FINISHED';
           }
         }
 
-        // Broadcast runner position to tracking room
+        // Broadcast runner position to the tracking room (spectator app, LED
+        // board — everyone watching the whole field) and to the runner's own
+        // room — this is what the runner-app itself listens on, so without
+        // it a runner's own distance, status, and auto-finish never reach
+        // their own screen, even though they're broadcast to everyone else.
         const io = getSocketIO();
         if (participant?.eventId) {
-          io.to(`tracking:${participant.eventId}`).emit('runner:update', {
+          const pace = computePaceMinPerKm(participant.startedAt, distance);
+          // Rank within category — 1 + how many others in the same category
+          // are currently ahead. Cheap relative to the leaderboard query
+          // just below, which already scans every participant per ping.
+          const rank = 1 + await prisma.participant.count({
+            where: { eventId: participant.eventId, category: participant.category, totalDistance: { gt: distance } },
+          });
+
+          const updatePayload = {
             participantId: data.participantId,
             eventId: participant.eventId,
             bibNumber: participant.bibNumber,
@@ -111,18 +138,23 @@ export function setupSocketIO(io: SocketIOServer): void {
             accuracy: data.accuracy,
             speed: data.speed,
             distance,
+            pace,
+            rank,
+            status: effectiveStatus,
             timestamp: data.timestamp,
-          });
+          };
+          io.to(`tracking:${participant.eventId}`).emit('runner:update', updatePayload);
+          io.to(`runner:${data.participantId}`).emit('runner:update', updatePayload);
 
           // Emit leaderboard update for all categories
           const categories = ['overall', participant.category];
           for (const cat of categories) {
             const where: any = { eventId: participant.eventId };
             if (cat !== 'overall') where.category = cat;
-            
+
             const top10 = await prisma.participant.findMany({
               where,
-              include: { 
+              include: {
                 user: { select: { name: true, email: true } },
                 company: { select: { name: true } },
               },
@@ -143,7 +175,7 @@ export function setupSocketIO(io: SocketIOServer): void {
                 category: p.category,
                 distance: p.totalDistance,
                 totalDistance: p.totalDistance,
-                pace: null,
+                pace: computePaceMinPerKm(p.startedAt, p.totalDistance),
                 status: p.status,
               })),
             });

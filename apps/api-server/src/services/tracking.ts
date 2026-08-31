@@ -11,22 +11,46 @@ const lastAcceptedPoint = new Map<string, { lat: number; lng: number; timestamp:
 
 export type GpsRejectReason = 'inaccurate' | 'outlier' | null;
 
+export interface GpsEvaluation {
+  reject: GpsRejectReason;
+  // Distance in km covered since the runner's last accepted point — the
+  // caller adds this straight to totalDistance rather than re-deriving it
+  // by re-scanning gps_logs (see the comment on segmentKm's caller).
+  segmentKm: number;
+}
+
 /**
  * Accuracy and outlier gate, run before a point ever reaches the buffer.
  * Keeps a single bad GPS fix (a building-bounce, an implausible jump) from
- * corrupting distance, the leaderboard, and the tree counter.
+ * corrupting distance, the leaderboard, and the tree counter. Also hands
+ * back the incremental distance for this one segment — see socket.ts.
  */
 export async function evaluateGpsUpdate(
   eventId: string,
   data: { participantId: string; lat: number; lng: number; accuracy: number; timestamp: string }
-): Promise<GpsRejectReason> {
+): Promise<GpsEvaluation> {
   const settings = await getTrackingSettings(eventId);
 
   if (data.accuracy > settings.maxAccuracyMeters) {
-    return 'inaccurate';
+    return { reject: 'inaccurate', segmentKm: 0 };
   }
 
-  const last = lastAcceptedPoint.get(data.participantId);
+  let last = lastAcceptedPoint.get(data.participantId);
+  if (!last) {
+    // Not the runner's actual first point necessarily — just the first one
+    // this process has seen (e.g. right after a restart). Check for a real
+    // last position so a restart doesn't silently drop that segment.
+    const lastLog = await prisma.gpsLog.findFirst({
+      where: { participantId: data.participantId },
+      orderBy: { timestamp: 'desc' },
+      select: { lat: true, lng: true, timestamp: true },
+    });
+    if (lastLog) {
+      last = { lat: lastLog.lat, lng: lastLog.lng, timestamp: lastLog.timestamp.getTime() };
+    }
+  }
+
+  let segmentKm = 0;
   if (last) {
     const jumpMeters = calculateDistance(last.lat, last.lng, data.lat, data.lng) * 1000;
     if (jumpMeters > settings.outlierDistanceMeters) {
@@ -36,9 +60,10 @@ export async function evaluateGpsUpdate(
       // on the next ping shouldn't be rejected just for a sparse buffer.
       const impliedKmh = (jumpMeters / 1000) / (elapsedSec / 3600);
       if (impliedKmh > 25) {
-        return 'outlier';
+        return { reject: 'outlier', segmentKm: 0 };
       }
     }
+    segmentKm = jumpMeters / 1000;
   }
 
   lastAcceptedPoint.set(data.participantId, {
@@ -46,7 +71,7 @@ export async function evaluateGpsUpdate(
     lng: data.lng,
     timestamp: new Date(data.timestamp).getTime(),
   });
-  return null;
+  return { reject: null, segmentKm };
 }
 
 export function clearGpsTrackingState(participantId: string): void {
@@ -142,6 +167,9 @@ export async function getRunnerPosition(participantId: string) {
   return latestLog;
 }
 
+// Not used on the live GPS path anymore — evaluateGpsUpdate's segmentKm
+// covers that incrementally. Kept for a from-scratch recompute (e.g. an
+// admin "recalculate this runner's distance" tool) if that's ever needed.
 export async function getRunnerDistance(participantId: string): Promise<number> {
   const logs = await prisma.gpsLog.findMany({
     where: { participantId },

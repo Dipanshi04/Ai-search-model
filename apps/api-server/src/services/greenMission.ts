@@ -41,12 +41,16 @@ export async function recalcTreeCounter(eventId: string): Promise<void> {
     // reflects trees earned in real time as distance accrues, not only at the finish line.
     const stats = await prisma.participant.aggregate({
       where: { eventId },
-      _sum: { totalDistance: true, treesCount: true },
+      _sum: { totalDistance: true },
       _count: { id: true },
     });
 
-    const totalTrees = stats._sum.treesCount || 0;
     const totalKm = stats._sum.totalDistance || 0;
+    // Floor the combined distance, not the sum of each runner's own floored
+    // count — two runners at 2.5km each is 5km together (1 tree), but
+    // summing floor(2.5/3) + floor(2.5/3) = 0 + 0 undercounts to zero.
+    // Per-runner treesCount stays as-is; it's what each certificate shows.
+    const totalTrees = calculateTreesFromDistance(totalKm);
     const totalCO2 = calculateCO2FromTrees(totalTrees);
 
     await prisma.treeCounter.upsert({

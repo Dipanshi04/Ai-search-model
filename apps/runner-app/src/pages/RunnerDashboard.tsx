@@ -235,6 +235,30 @@ export default function RunnerDashboard({ participantId, token, category, eventI
     setState((s) => ({ ...s, isTracking: false }));
   };
 
+  // Stops tracking without telling the server to pause — used when the
+  // server already marked this runner FINISHED (reached the finish line).
+  // Reusing pauseTracking() here would emit runner:pause, which overwrites
+  // FINISHED back to PAUSED on the very update that just set it.
+  const stopTrackingOnFinish = () => {
+    if (watchIdRef.current !== null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
+    clearTicking();
+    setState((s) => ({ ...s, isTracking: false }));
+  };
+
+  // Reacts to the server auto-finishing this runner (GPS proximity to the
+  // finish point) — the manual Finish button already stops tracking itself,
+  // this covers the case where the race ends without the runner tapping it.
+  useEffect(() => {
+    if (state.status === 'FINISHED' && state.isTracking) {
+      stopTrackingOnFinish();
+      setRaceStatus('COMPLETED');
+    }
+  }, [state.status]);
+
   const finishRace = () => {
     if (socketRef.current) {
       socketRef.current.emit('runner:finish', { participantId });

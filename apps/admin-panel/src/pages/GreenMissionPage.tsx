@@ -8,6 +8,9 @@ interface GreenStats {
   distanceCovered: number;
 }
 
+const KM_PER_TREE = 3;
+const CO2_PER_TREE_KG = 22;
+
 export default function GreenMissionPage() {
   const [stats, setStats] = useState<GreenStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -15,14 +18,17 @@ export default function GreenMissionPage() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await api.getParticipantStats();
-        if (res.success && res.data) {
-          const finished = res.data.finished || 0;
+        const [statsRes, treesRes] = await Promise.all([
+          api.getParticipantStats(),
+          api.getTreeCounter(),
+        ]);
+        const finished = (statsRes.success && statsRes.data?.finished) || 0;
+        if (treesRes.success && treesRes.data) {
           setStats({
             totalFinished: finished,
-            treesPlanted: Math.floor(finished * 0.5),
-            co2Saved: parseFloat((finished * 2.1).toFixed(1)),
-            distanceCovered: parseFloat((finished * 4.2).toFixed(1)),
+            treesPlanted: treesRes.data.totalTrees,
+            co2Saved: parseFloat(treesRes.data.totalCO2.toFixed(1)),
+            distanceCovered: parseFloat(treesRes.data.totalKm.toFixed(1)),
           });
         }
       } finally {
@@ -106,21 +112,21 @@ export default function GreenMissionPage() {
         <div className="max-w-2xl">
           <h2 className="text-lg font-semibold text-slate-950 mb-3">Our Green Commitment</h2>
           <p className="text-sm text-slate-600 leading-relaxed mb-4">
-            For every participant who completes the marathon, we plant trees in partnership with local environmental organizations.
-            Each finisher contributes to reducing carbon emissions and restoring green cover in urban areas.
+            For every 3 kilometers covered by the field &mdash; combined, not per runner &mdash; we plant a tree in
+            partnership with local environmental organizations, updated live as distance accrues.
           </p>
           <div className="grid grid-cols-3 gap-4 mt-6">
             <div className="text-center p-4 rounded-2xl bg-emerald-50 border border-emerald-100">
               <p className="text-2xl font-bold text-emerald-600">1 tree</p>
-              <p className="text-xs text-slate-500 mt-1">per 2 finishers</p>
+              <p className="text-xs text-slate-500 mt-1">per {KM_PER_TREE} km covered</p>
             </div>
             <div className="text-center p-4 rounded-2xl bg-teal-50 border border-teal-100">
-              <p className="text-2xl font-bold text-teal-600">2.1 kg</p>
-              <p className="text-xs text-slate-500 mt-1">CO2 saved per runner</p>
+              <p className="text-2xl font-bold text-teal-600">{CO2_PER_TREE_KG} kg</p>
+              <p className="text-xs text-slate-500 mt-1">CO2 saved per tree</p>
             </div>
             <div className="text-center p-4 rounded-2xl bg-violet-50 border border-violet-100">
-              <p className="text-2xl font-bold text-violet-600">4.2 km</p>
-              <p className="text-xs text-slate-500 mt-1">avg distance per finisher</p>
+              <p className="text-2xl font-bold text-violet-600">{stats?.distanceCovered || 0} km</p>
+              <p className="text-xs text-slate-500 mt-1">total distance covered</p>
             </div>
           </div>
         </div>

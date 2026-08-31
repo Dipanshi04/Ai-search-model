@@ -253,6 +253,30 @@ export default function LEDScreen() {
     setMapLoaded(true);
   };
 
+  // Single source of truth for the elapsed-time refs, used on first load,
+  // on every race:status broadcast, and re-run on every socket (re)connect
+  // — a missed one-time broadcast (tab was asleep, brief disconnect) used
+  // to leave the clock frozen forever with no way to catch up.
+  function applyRaceStatus(status: string, elapsedMs: number, startedAt?: string) {
+    if (status === 'ACTIVE') {
+      if (elapsedMs > 0) {
+        raceStartRef.current = new Date(Date.now() - elapsedMs);
+      } else if (startedAt) {
+        raceStartRef.current = new Date(startedAt);
+      } else {
+        raceStartRef.current = new Date();
+      }
+      accumulatedElapsedRef.current = 0;
+    } else if (status === 'COMPLETED') {
+      raceStartRef.current = null;
+      accumulatedElapsedRef.current = 0;
+    } else {
+      // PAUSED, UPCOMING, or anything else — frozen, not ticking.
+      raceStartRef.current = null;
+      accumulatedElapsedRef.current = elapsedMs || 0;
+    }
+  }
+
   useEffect(() => {
     async function loadInitial() {
       try {
@@ -262,15 +286,7 @@ export default function LEDScreen() {
         if (statusData.success && statusData.data?.event) {
           const ev = statusData.data.event;
           eventId = ev.id;
-          // Initialize timer from elapsedMs (includes accumulated pause time)
-          const elapsedMs = ev.elapsedMs || 0;
-          if (elapsedMs > 0) {
-            const now = new Date();
-            raceStartRef.current = new Date(now.getTime() - elapsedMs);
-            accumulatedElapsedRef.current = elapsedMs;
-          } else if (ev.startedAt) {
-            raceStartRef.current = new Date(ev.startedAt);
-          }
+          applyRaceStatus(ev.status, ev.elapsedMs || 0, ev.startedAt);
         }
 
         if (!eventId) return;
@@ -426,6 +442,17 @@ export default function LEDScreen() {
       socket.emit('join:tracking', eventId);
       socket.emit('join:leaderboard', eventId);
       socket.emit('join:event', eventId);
+
+      // Re-fetch rather than trust that no race:status broadcast was missed
+      // while this connection was down (or hadn't opened yet).
+      fetch(`${API_URL}/api/v1/race/status?eventId=${eventId}`)
+        .then((r) => r.json())
+        .then((res) => {
+          if (res.success && res.data?.event) {
+            applyRaceStatus(res.data.event.status, res.data.event.elapsedMs || 0, res.data.event.startedAt);
+          }
+        })
+        .catch(() => {});
     });
 
     socket.on('race:start', (data: any) => {
@@ -503,25 +530,7 @@ export default function LEDScreen() {
     });
 
     socket.on('race:status', (data: any) => {
-      if (data.status === 'ACTIVE') {
-        if (data.elapsedMs && data.elapsedMs > 0) {
-          const now = new Date();
-          raceStartRef.current = new Date(now.getTime() - data.elapsedMs);
-          accumulatedElapsedRef.current = 0;
-        } else if (!raceStartRef.current) {
-          raceStartRef.current = new Date();
-        }
-      } else if (data.status === 'PAUSED') {
-        if (data.elapsedMs && data.elapsedMs > 0) {
-          accumulatedElapsedRef.current = data.elapsedMs;
-        } else if (raceStartRef.current) {
-          accumulatedElapsedRef.current = Date.now() - raceStartRef.current.getTime();
-        }
-        raceStartRef.current = null;
-      } else if (data.status === 'COMPLETED') {
-        raceStartRef.current = null;
-        accumulatedElapsedRef.current = 0;
-      }
+      applyRaceStatus(data.status, data.elapsedMs || 0, data.startedAt);
     });
 
     socketRef.current = socket;

@@ -17,6 +17,57 @@ export default function PaymentDetailsPage() {
     const params = new URLSearchParams(window.location.search);
     const returnParams: Record<string, string> = Object.fromEntries(params.entries());
 
+    function handlePollResult(res: { success: boolean; data?: { status?: string; bibNumber?: string } }) {
+      // A 404 body still comes back as a resolved response here, not a
+      // thrown error — check `success` explicitly, or an unrecognized
+      // reference would sit in "Confirming..." forever instead of ever
+      // telling the runner something's wrong.
+      if (!res.success) {
+        setView('no-reference');
+        return;
+      }
+      const status = res.data?.status;
+      if (status === 'COMPLETED') {
+        setBibNumber(res.data?.bibNumber || null);
+        setView('verified');
+        return true;
+      }
+      if (status === 'FAILED') {
+        setView('failed');
+        return true;
+      }
+      setView('waiting');
+      return false;
+    }
+
+    // Cashfree carries our own order id straight through on its return_url —
+    // a real webhook already drives the status, so this is a plain poll,
+    // no claim/reconcile step needed. See routes/cashfree.ts.
+    const cashfreeOrderId = returnParams.cf_order_id;
+    if (cashfreeOrderId) {
+      function pollCashfree() {
+        api.getCashfreePaymentStatus(cashfreeOrderId!).then((res) => {
+          const done = handlePollResult(res);
+          if (!done) {
+            pollCount.current += 1;
+            if (pollCount.current < MAX_POLLS) {
+              pollTimer.current = setTimeout(pollCashfree, POLL_INTERVAL_MS);
+            }
+          }
+        }).catch(() => {
+          setView('waiting');
+          pollCount.current += 1;
+          if (pollCount.current < MAX_POLLS) {
+            pollTimer.current = setTimeout(pollCashfree, POLL_INTERVAL_MS);
+          }
+        });
+      }
+      pollCashfree();
+      return () => {
+        if (pollTimer.current) clearTimeout(pollTimer.current);
+      };
+    }
+
     // Our own reference (set right before we sent the runner to ShowtimeBro)
     // is the reliable correlator. A `ref` query param is a best-effort
     // fallback only — we never know for certain ShowtimeBro preserves it.
@@ -36,30 +87,12 @@ export default function PaymentDetailsPage() {
 
     function poll(ref: string) {
       api.getShowtimeBroPaymentStatus(ref).then((res) => {
-        // A 404 body still comes back as a resolved response here, not a
-        // thrown error — check `success` explicitly, or an unrecognized
-        // reference would sit in "Confirming..." forever instead of ever
-        // telling the runner something's wrong.
-        if (!res.success) {
-          setView('no-reference');
-          return;
-        }
-
-        const status = res.data?.status;
-        if (status === 'COMPLETED') {
-          setBibNumber(res.data?.bibNumber || null);
-          setView('verified');
-          return;
-        }
-        if (status === 'FAILED') {
-          setView('failed');
-          return;
-        }
-
-        setView('waiting');
-        pollCount.current += 1;
-        if (pollCount.current < MAX_POLLS) {
-          pollTimer.current = setTimeout(() => poll(ref), POLL_INTERVAL_MS);
+        const done = handlePollResult(res);
+        if (!done) {
+          pollCount.current += 1;
+          if (pollCount.current < MAX_POLLS) {
+            pollTimer.current = setTimeout(() => poll(ref), POLL_INTERVAL_MS);
+          }
         }
       }).catch(() => {
         // A network hiccup, not a definitive answer — keep retrying rather

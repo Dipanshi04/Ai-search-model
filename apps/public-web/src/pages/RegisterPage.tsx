@@ -1,6 +1,14 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { api } from '../lib/api';
 import Footer from '../components/Footer';
+
+declare global {
+  interface Window {
+    Cashfree: (opts: { mode: 'sandbox' | 'production' }) => {
+      checkout: (opts: { paymentSessionId: string; redirectTarget: '_self' }) => void;
+    };
+  }
+}
 
 const CATEGORY_FEES = {
   RUN_3K: { label: '3K Fun Run', amount: 299 },
@@ -58,6 +66,15 @@ export default function RegisterPage() {
     await handleFormSubmit();
   };
 
+  useEffect(() => {
+    if (!document.querySelector('script[src="https://sdk.cashfree.com/js/v3/cashfree.js"]')) {
+      const script = document.createElement('script');
+      script.src = 'https://sdk.cashfree.com/js/v3/cashfree.js';
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
+
   const handleFormSubmit = async () => {
     setLoading(true);
     setError('');
@@ -72,15 +89,12 @@ export default function RegisterPage() {
     setLoading(false);
   };
 
-  // Active payment path: redirect out to ShowtimeBro's hosted checkout.
-  // (The Razorpay flow this replaced is still implemented server-side in
-  // routes/payment.ts, dormant, for when ISA's NGO KYC clears — swapping
-  // back is a button change there, not a rewrite.)
-  // There's no signed webhook on their side, so this only gets the runner
-  // there — /payments/showtimebro/claim (called from /details on return)
-  // records that the redirect came back, and an admin still has to
-  // reconcile it against ShowtimeBro's sales report before anyone is
-  // actually marked paid. See routes/payment.ts for the full reasoning.
+  // Dormant — replaced by Cashfree (handlePayCashfree, below) as the main
+  // payment path. Left fully working, not deleted: no signed webhook on
+  // ShowtimeBro's side means it needs an admin to reconcile against their
+  // sales report before anyone's marked paid, so it's a reasonable fallback
+  // if Cashfree is ever unavailable. See routes/payment.ts and routes/
+  // cashfree.ts for the full reasoning on each.
   const handlePayShowtimeBro = async () => {
     setPaymentLoading(true);
     setError('');
@@ -104,6 +118,42 @@ export default function RegisterPage() {
     // correlator, independent of whatever ShowtimeBro's redirect carries.
     sessionStorage.setItem('isa_payment_reference', res.data.reference);
     window.location.href = res.data.redirectUrl;
+  };
+  // Not wired to a button while Cashfree is main — kept callable, not dead
+  // code the compiler should flag as unused.
+  void handlePayShowtimeBro;
+
+  // Active payment path — Cashfree, a real gateway with a signed webhook,
+  // so a payment completes automatically once it succeeds instead of
+  // waiting on an admin to reconcile a sales report. See routes/cashfree.ts.
+  const handlePayCashfree = async () => {
+    setPaymentLoading(true);
+    setError('');
+
+    const participantId = result?.participant?.id;
+    if (!participantId) {
+      setError('Participant not found');
+      setPaymentLoading(false);
+      return;
+    }
+
+    const res = await api.startCashfreePayment(participantId);
+    if (!res.success || !res.data?.paymentSessionId) {
+      setError(res.message || 'Failed to start payment. Please try again.');
+      setPaymentLoading(false);
+      return;
+    }
+
+    if (!window.Cashfree) {
+      setError('Payment gateway is still loading. Please try again in a moment.');
+      setPaymentLoading(false);
+      return;
+    }
+
+    // /details finds its way back to this order via the cf_order_id query
+    // param Cashfree appends to our return_url — nothing to stash here.
+    const cashfree = window.Cashfree({ mode: res.data.environment });
+    cashfree.checkout({ paymentSessionId: res.data.paymentSessionId, redirectTarget: '_self' });
   };
 
   if (step === 'success') {
@@ -186,7 +236,7 @@ export default function RegisterPage() {
 
           <div className="space-y-3 sm:space-y-4">
             <button
-              onClick={handlePayShowtimeBro}
+              onClick={handlePayCashfree}
               disabled={paymentLoading}
               className="w-full py-3 sm:py-4 bg-brand-orange text-white hover:opacity-90 disabled:opacity-50 font-bold rounded-xl transition-all flex items-center justify-center gap-2 text-base sm:text-lg"
             >
@@ -202,7 +252,7 @@ export default function RegisterPage() {
           </div>
 
           <p className="hero-body text-xs text-brand-navy/50 text-center mt-5 sm:mt-6">
-            You'll be taken to our secure checkout partner, ShowtimeBro, to complete payment.
+            You'll be taken to our secure checkout partner, Cashfree, to complete payment.
           </p>
         </div>
       </div>
@@ -447,7 +497,7 @@ export default function RegisterPage() {
                   <div className="border-t border-brand-navy/10 pt-2 mt-2">
                     <div className="flex justify-between">
                       <span className="text-brand-navy/60">Payment Method</span>
-                      <span className="text-brand-navy/60">ShowtimeBro (secure external checkout)</span>
+                      <span className="text-brand-navy/60">Cashfree (secure external checkout)</span>
                     </div>
                   </div>
                 </div>

@@ -290,6 +290,7 @@ model Payment {
 enum PaymentProvider {
   RAZORPAY
   SHOWTIMEBRO
+  CASHFREE
 }
 
 model BulkRegistration {

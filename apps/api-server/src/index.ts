@@ -36,6 +36,7 @@ import { paymentRouter } from './routes/payment.js';
 import { bulkRegistrationRouter } from './routes/bulk-registration.js';
 import { hrRouter } from './routes/hr.js';
 import { settingsRouter } from './routes/settings.js';
+import { cashfreeRouter } from './routes/cashfree.js';
 
 const PORT = parseInt(process.env.PORT || '4000', 10);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';
@@ -45,6 +46,12 @@ app.set('trust proxy', 1);
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({ origin: CORS_ORIGIN.split(','), credentials: true }));
+// Must be registered before the global express.json() below — Cashfree's
+// webhook signature is computed over the exact raw bytes it sent, and a
+// JSON-parsed-then-reserialized body will not match. body-parser skips a
+// path once req.body has already been set, so express.json() leaves this
+// one alone.
+app.use('/api/v1/payments/cashfree/webhook', express.raw({ type: '*/*' }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -67,6 +74,7 @@ app.use('/api/v1/green', greenRouter);
 app.use('/api/v1/trees', treesRouter);
 app.use('/api/v1/events', eventsRouter);
 app.use('/api/v1/payments', paymentRouter);
+app.use('/api/v1/payments/cashfree', cashfreeRouter);
 app.use('/api/v1/qrcode', qrcodeRouter);
 app.use('/api/v1/certificates', certificateRouter);
 app.use('/api/v1/analytics', analyticsRouter);

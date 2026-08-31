@@ -19,7 +19,7 @@ const CATEGORY_FEES: Record<string, number> = {
   RUN_5K: 499,
 };
 
-function feeForCategory(category: string): number {
+export function feeForCategory(category: string): number {
   return CATEGORY_FEES[category] ?? CATEGORY_FEES.RUN_3K!;
 }
 

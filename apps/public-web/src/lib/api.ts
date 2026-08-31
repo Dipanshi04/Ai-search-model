@@ -101,6 +101,19 @@ class ApiClient {
     );
   }
 
+  async startCashfreePayment(participantId: string) {
+    return this.request<{ paymentSessionId: string; orderId: string; amount: number; environment: 'sandbox' | 'production' }>(
+      '/api/v1/payments/cashfree/start',
+      { method: 'POST', body: JSON.stringify({ participantId }) }
+    );
+  }
+
+  async getCashfreePaymentStatus(orderId: string) {
+    return this.request<{ status: string; bibNumber: string }>(
+      `/api/v1/payments/cashfree/status?orderId=${encodeURIComponent(orderId)}`
+    );
+  }
+
   async getLeaderboard(category?: string, limit?: number) {
     const params = new URLSearchParams();
     if (category) params.set('category', category);

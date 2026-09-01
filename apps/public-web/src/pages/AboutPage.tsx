@@ -23,9 +23,9 @@ export default function AboutPage() {
         <div className="bg-white p-6 rounded-xl border border-brand-navy/10 shadow-sm">
           <h2 className="hero-title text-xl font-bold text-brand-orange mb-3">The Green Mission</h2>
           <p className="hero-body text-brand-navy/80">
-            Partnering with reforestation organizations, we plant one tree for every 3 kilometers run
-            by all participants. With thousands of runners across multiple categories, we aim to
-            plant over 15,000 trees this year alone.
+            Partnering with reforestation organizations, we plant one tree for every 5 kilometers run
+            by all participants combined &mdash; 3K and 5K runners alike. With thousands of runners across
+            both categories, we aim to plant over 9,000 trees this year alone.
           </p>
           <a href="/green" className="hero-body inline-block mt-4 text-emerald-600 hover:text-emerald-700 text-sm font-bold transition">
             View live tree counter &rarr;

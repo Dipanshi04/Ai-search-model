@@ -44,6 +44,8 @@ export default function RouteBuilderPage() {
   const [mapReady, setMapReady] = useState(false);
   const [eventName, setEventName] = useState(searchParams.get('eventName') || '');
   const [marathonName] = useState(searchParams.get('marathonName') || '');
+  const [raceStatus, setRaceStatus] = useState<any>(null);
+  const [raceLoading, setRaceLoading] = useState(false);
 
   const [startLatStr, setStartLatStr] = useState('');
   const [startLngStr, setStartLngStr] = useState('');
@@ -86,6 +88,61 @@ export default function RouteBuilderPage() {
 
   const paramDistance = searchParams.get('distance');
   const paramRaceDistanceId = searchParams.get('raceDistanceId');
+
+  useEffect(() => {
+    if (!eventId) return;
+    loadRaceStatus();
+    const interval = setInterval(loadRaceStatus, 10000);
+    return () => clearInterval(interval);
+  }, [eventId]);
+
+  async function loadRaceStatus() {
+    try {
+      const res = await api.getRaceStatus(eventId);
+      if (res.success) setRaceStatus(res.data);
+    } catch (e) {
+      console.error('Failed to load race status:', e);
+    }
+  }
+
+  async function handleStartRace() {
+    if (!confirm(`Start "${eventName || 'this event'}"?`)) return;
+    setRaceLoading(true);
+    try {
+      await api.startRace(eventId);
+      await loadRaceStatus();
+    } catch (e) {
+      console.error('Failed to start race:', e);
+    } finally {
+      setRaceLoading(false);
+    }
+  }
+
+  async function handlePauseRace() {
+    if (!confirm('Pause the race?')) return;
+    setRaceLoading(true);
+    try {
+      await api.pauseRace(eventId);
+      await loadRaceStatus();
+    } catch (e) {
+      console.error('Failed to pause race:', e);
+    } finally {
+      setRaceLoading(false);
+    }
+  }
+
+  async function handleEndRace() {
+    if (!confirm('End the race? This cannot be undone!')) return;
+    setRaceLoading(true);
+    try {
+      await api.endRace(eventId);
+      await loadRaceStatus();
+    } catch (e) {
+      console.error('Failed to end race:', e);
+    } finally {
+      setRaceLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (eventId) return;
@@ -359,6 +416,39 @@ export default function RouteBuilderPage() {
           </div>
         )}
       </div>
+
+      {eventId && (
+        <div className="flex items-center justify-between bg-white/80 border border-white/70 rounded-3xl px-4 py-3">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-slate-500">Race status:</span>
+            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+              raceStatus?.event?.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+              : raceStatus?.event?.status === 'PAUSED' ? 'bg-amber-50 text-amber-700 border border-amber-200'
+              : raceStatus?.event?.status === 'COMPLETED' ? 'bg-slate-100 text-slate-600 border border-slate-200'
+              : 'bg-blue-50 text-blue-700 border border-blue-200'
+            }`}>
+              {raceStatus?.event?.status || 'UPCOMING'}
+            </span>
+          </div>
+          <div className="flex gap-2">
+            {raceStatus?.event?.status !== 'ACTIVE' && raceStatus?.event?.status !== 'COMPLETED' && (
+              <button onClick={handleStartRace} disabled={raceLoading} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-3xl text-sm font-semibold disabled:opacity-50">
+                {raceStatus?.event?.status === 'PAUSED' ? 'Resume Race' : 'Start Race'}
+              </button>
+            )}
+            {raceStatus?.event?.status === 'ACTIVE' && (
+              <button onClick={handlePauseRace} disabled={raceLoading} className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-3xl text-sm font-semibold disabled:opacity-50">
+                Pause Race
+              </button>
+            )}
+            {(raceStatus?.event?.status === 'ACTIVE' || raceStatus?.event?.status === 'PAUSED') && (
+              <button onClick={handleEndRace} disabled={raceLoading} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-3xl text-sm font-semibold disabled:opacity-50">
+                End Race
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {saved && (
         <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-3xl text-sm font-medium">

@@ -2,7 +2,7 @@ import { prisma } from '../config/database.js';
 import { logger } from '../config/logger.js';
 import { getSocketIO } from '../config/socket.js';
 
-const KM_PER_TREE = 3;
+const KM_PER_TREE = 5;
 const CO2_PER_TREE_KG = 22;
 
 export function calculateTreesFromDistance(distanceKm: number): number {

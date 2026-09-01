@@ -11,11 +11,12 @@ import PaymentDetailsPage from './pages/PaymentDetailsPage';
 import Footer from './components/Footer';
 import logoDark from './components/logo-dark.png';
 import heroRunner from './components/hero-runner.webp';
+import nrcGroupLogo from './components/nrc-group-logo.png';
 import { useEffect, useState } from "react";
 
 
 const Logo = ({ size = 'h-16' }: { size?: string }) => (
-  <img src={logoDark} alt="ISA Marathon" className={`${size} w-auto max-w-full object-contain`} />
+  <img src={logoDark} alt="ISA Marathon" className={`${size} w-auto max-w-full object-contain shrink-0`} />
 );
 
 function CountdownTimer() {
@@ -89,10 +90,17 @@ function HomePage() {
 
       {/* Top bar: logo lockups, matching the poster's two-corner layout */}
       <div className="hero-anim flex items-center justify-between px-4 sm:px-8 pt-4 sm:pt-6 relative z-10 shrink-0" style={{ animationDelay: '0ms' }}>
-        <Logo size="h-14 sm:h-20 xl:h-24" />
-        <div className="hero-kicker text-right leading-tight">
-          <div className="text-[10px] sm:text-xs font-extrabold tracking-[0.15em] uppercase" style={{ color: '#1B2A5B' }}>Indore Software</div>
-          <div className="text-[10px] sm:text-xs font-extrabold tracking-[0.15em] uppercase" style={{ color: '#1B2A5B' }}>Association</div>
+        <div className="flex items-center gap-3 sm:gap-5 shrink-0">
+          <div className="bg-white rounded-2xl shadow-sm px-3 py-2 sm:px-4 sm:py-3 border shrink-0" style={{ borderColor: 'rgba(27,42,91,0.08)' }}>
+            <img src={nrcGroupLogo} alt="NRC Group" className="h-20 sm:h-24 xl:h-32 w-auto object-contain shrink-0" />
+          </div>
+          <div className="bg-white rounded-2xl shadow-sm px-3 py-2 sm:px-4 sm:py-3 border shrink-0" style={{ borderColor: 'rgba(27,42,91,0.08)' }}>
+            <Logo size="h-20 sm:h-24 xl:h-32" />
+          </div>
+        </div>
+        <div className="hero-kicker text-right leading-tight shrink-0">
+          <div className="text-lg sm:text-2xl xl:text-3xl font-extrabold tracking-[0.1em] uppercase" style={{ color: '#1B2A5B' }}>Indore Software</div>
+          <div className="text-lg sm:text-2xl xl:text-3xl font-extrabold tracking-[0.1em] uppercase" style={{ color: '#1B2A5B' }}>Association</div>
         </div>
       </div>
 
@@ -110,7 +118,7 @@ function HomePage() {
             Where central India's biggest IT community unites for technology, fitness and responsibility.
           </p>
           <p className="hero-anim hero-body text-sm sm:text-base xl:text-lg mb-5 sm:mb-6" style={{ animationDelay: '250ms', color: '#1B2A5B', opacity: 0.75 }}>
-            Run for a <span className="font-bold" style={{ color: '#10b981' }}>Greener</span> Tomorrow &mdash; every 3km plants a tree.
+            Run for a <span className="font-bold" style={{ color: '#10b981' }}>Greener</span> Tomorrow  every 5km plant a tree.
           </p>
 
           <div className="hero-anim flex flex-wrap items-center gap-3 mb-6 sm:mb-7" style={{ animationDelay: '320ms' }}>

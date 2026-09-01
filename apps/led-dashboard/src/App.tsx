@@ -6,6 +6,7 @@ import { formatDuration } from '@isa/utils';
 import logoDark from './components/logo-dark.png';
 import logoLight from './components/logo-light.png';
 import liseInfoTechLogo from './components/Lise Logo 2.png';
+import nrcGroupLogo from './components/nrc-group-logo.png';
 
 const Logo = ({ size = 'h-18', theme = 'dark' }: { size?: string; theme?: 'light' | 'dark' }) => (
   <img src={theme === 'dark' ? logoLight : logoDark} alt="ISA Marathon" className={`${size} w-auto max-w-full object-contain drop-shadow-md`} />
@@ -34,6 +35,7 @@ interface LeaderboardEntry {
   companyName?: string;
   distance: number;
   pace: number | null;
+  category?: string;
 }
 
 function SponsorTicker({ sponsors }: { sponsors: { id: string; name: string; logoUrl?: string; tier?: string }[] }) {
@@ -115,9 +117,8 @@ export default function LEDScreen() {
   const [currentCategory, setCurrentCategory] = useState('overall');
   const [announcement, setAnnouncement] = useState<{ title: string; message: string } | null>(null);
   const [sponsors, setSponsors] = useState<{ id: string; name: string; logoUrl?: string; tier?: string }[]>([]);
-  const [sidebarView, setSidebarView] = useState<'leaderboard3k' | 'leaderboard5k' | 'sponsors'>('leaderboard3k');
-  const [leaderboard3k, setLeaderboard3k] = useState<LeaderboardEntry[]>([]);
-  const [leaderboard5k, setLeaderboard5k] = useState<LeaderboardEntry[]>([]);
+  const [sidebarView, setSidebarView] = useState<'leaderboard' | 'sponsors'>('leaderboard');
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [fadeSidebar, setFadeSidebar] = useState(false);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [socketReady, setSocketReady] = useState(false);
@@ -515,8 +516,7 @@ export default function LEDScreen() {
     });
 
     socket.on('leaderboard:update', (data: any) => {
-      if (data.category === 'RUN_3K') setLeaderboard3k(mapLeaderboard(data.top10));
-      else if (data.category === 'RUN_5K') setLeaderboard5k(mapLeaderboard(data.top10));
+      if (data.category === 'overall') setLeaderboard(mapLeaderboard(data.top10));
     });
 
     socket.on('trees:update', (data: any) => {
@@ -577,11 +577,7 @@ export default function LEDScreen() {
     const interval = setInterval(() => {
       setFadeSidebar(true);
       setTimeout(() => {
-        setSidebarView(v => {
-          if (v === 'leaderboard3k') return 'leaderboard5k';
-          if (v === 'leaderboard5k') return 'sponsors';
-          return 'leaderboard3k';
-        });
+        setSidebarView(v => (v === 'leaderboard' ? 'sponsors' : 'leaderboard'));
         setFadeSidebar(false);
       }, 400);
     }, 7000);
@@ -599,18 +595,15 @@ export default function LEDScreen() {
       companyName: p.company?.name || p.companyName,
       distance: p.totalDistance ?? p.distance ?? 0,
       pace: null,
+      category: p.category,
     }));
 
   useEffect(() => {
     const eventId = resolvedEventIdRef.current || EVENT_ID;
     if (!eventId) return;
-    fetch(`${API_URL}/api/v1/participants/leaderboard?eventId=${eventId}&category=RUN_3K&limit=10`)
+    fetch(`${API_URL}/api/v1/participants/leaderboard?eventId=${eventId}&limit=10`)
       .then(r => r.json())
-      .then(res => { if (res.success) setLeaderboard3k(mapLeaderboard(res.data)); })
-      .catch(() => {});
-    fetch(`${API_URL}/api/v1/participants/leaderboard?eventId=${eventId}&category=RUN_5K&limit=10`)
-      .then(r => r.json())
-      .then(res => { if (res.success) setLeaderboard5k(mapLeaderboard(res.data)); })
+      .then(res => { if (res.success) setLeaderboard(mapLeaderboard(res.data)); })
       .catch(() => {});
   }, [sponsors, socketReady]);
 
@@ -618,8 +611,18 @@ export default function LEDScreen() {
     <div className="w-screen h-screen bg-[#0a0f1a] text-white flex flex-col overflow-hidden select-none font-sans">
       {/* Header */}
       <header className="h-[120px] bg-[#0d1320] border-b border-slate-800/60 flex items-center justify-between px-12 shrink-0 z-30">
-        <div className="flex items-center gap-8">
+        <div className="flex items-center gap-6">
           <Logo size="h-18" />
+          <div className="w-px h-14 bg-slate-700/60" />
+          <div className="flex items-center gap-3">
+            <div className="bg-white rounded-lg px-2.5 py-1.5">
+              <img src={nrcGroupLogo} alt="NRC Group" className="h-11 w-auto object-contain" />
+            </div>
+            <div className="leading-tight">
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.25em]">Main Sponsor</p>
+              <p className="text-lg font-extrabold text-white uppercase tracking-wide">NRC Group</p>
+            </div>
+          </div>
         </div>
         <div className="flex items-center gap-16">
           <div className="text-center">
@@ -688,48 +691,30 @@ export default function LEDScreen() {
         {/* Sidebar */}
         <aside className="w-[480px] xl:w-[520px] bg-[#0d1320] border-l border-slate-800/60 flex flex-col shrink-0">
           <div className="flex-1 min-h-0 relative">
-            {/* 3K Leaderboard */}
-            <div className={`absolute inset-0 transition-all duration-400 ${sidebarView === 'leaderboard3k' && !fadeSidebar ? 'opacity-100 translate-x-0' : sidebarView === 'leaderboard3k' ? 'opacity-0 translate-x-4' : 'opacity-0 -translate-x-4 pointer-events-none'}`} style={{ transitionDuration: '400ms' }}>
+            {/* Combined Leaderboard (3K + 5K) */}
+            <div className={`absolute inset-0 transition-all duration-400 ${sidebarView === 'leaderboard' && !fadeSidebar ? 'opacity-100 translate-x-0' : sidebarView === 'leaderboard' ? 'opacity-0 translate-x-4' : 'opacity-0 -translate-x-4 pointer-events-none'}`} style={{ transitionDuration: '400ms' }}>
               <div className="p-6 h-full flex flex-col">
                 <div className="flex items-center justify-between mb-5 shrink-0">
                   <h2 className="text-lg font-extrabold text-amber-400 uppercase tracking-widest">Leaderboard</h2>
-                  <span className="text-sm bg-slate-800 text-slate-400 px-4 py-1.5 rounded-full font-semibold uppercase tracking-wider">3K</span>
+                  <span className="text-sm bg-slate-800 text-slate-400 px-4 py-1.5 rounded-full font-semibold uppercase tracking-wider">3K + 5K</span>
                 </div>
                 <div className="space-y-2.5 flex-1 min-h-0 overflow-hidden">
-                  {leaderboard3k.map((entry) => (
+                  {leaderboard.map((entry) => (
                     <div key={entry.rank} className={`flex items-center gap-4 px-5 py-3.5 rounded-lg ${entry.rank === 1 ? 'bg-amber-500/10 border border-amber-500/30' : entry.rank <= 3 ? 'bg-slate-800/60 border border-slate-700/50' : 'bg-slate-900/40'}`}>
                       <span className={`text-lg font-bold w-8 text-center shrink-0 ${entry.rank === 1 ? 'text-amber-400' : entry.rank === 2 ? 'text-slate-300' : entry.rank === 3 ? 'text-orange-400' : 'text-slate-400'}`}>{entry.rank}</span>
                       <div className="flex-1 min-w-0">
                         <p className="text-lg font-bold truncate leading-tight text-white">{entry.name}</p>
                         <p className="text-base text-slate-400 truncate">#{entry.bibNumber}{entry.companyName ? ` · ${entry.companyName}` : ''}</p>
                       </div>
+                      {entry.category && (
+                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full shrink-0 uppercase tracking-wider ${entry.category === 'RUN_5K' ? 'bg-orange-500/15 text-orange-400' : 'bg-sky-500/15 text-sky-400'}`}>
+                          {entry.category === 'RUN_5K' ? '5K' : '3K'}
+                        </span>
+                      )}
                       <span className="text-lg font-mono font-bold text-emerald-400 shrink-0">{entry.distance.toFixed(2)} km</span>
                     </div>
                   ))}
-                  {leaderboard3k.length === 0 && <div className="h-32 flex items-center justify-center"><p className="text-slate-500 text-xl">Waiting for race...</p></div>}
-                </div>
-              </div>
-            </div>
-
-            {/* 5K Leaderboard */}
-            <div className={`absolute inset-0 transition-all duration-400 ${sidebarView === 'leaderboard5k' && !fadeSidebar ? 'opacity-100 translate-x-0' : sidebarView === 'leaderboard5k' ? 'opacity-0 translate-x-4' : 'opacity-0 -translate-x-4 pointer-events-none'}`} style={{ transitionDuration: '400ms' }}>
-              <div className="p-6 h-full flex flex-col">
-                <div className="flex items-center justify-between mb-5 shrink-0">
-                  <h2 className="text-lg font-extrabold text-amber-400 uppercase tracking-widest">Leaderboard</h2>
-                  <span className="text-sm bg-slate-800 text-slate-400 px-4 py-1.5 rounded-full font-semibold uppercase tracking-wider">5K</span>
-                </div>
-                <div className="space-y-2.5 flex-1 min-h-0 overflow-hidden">
-                  {leaderboard5k.map((entry) => (
-                    <div key={entry.rank} className={`flex items-center gap-4 px-5 py-3.5 rounded-lg ${entry.rank === 1 ? 'bg-amber-500/10 border border-amber-500/30' : entry.rank <= 3 ? 'bg-slate-800/60 border border-slate-700/50' : 'bg-slate-900/40'}`}>
-                      <span className={`text-lg font-bold w-8 text-center shrink-0 ${entry.rank === 1 ? 'text-amber-400' : entry.rank === 2 ? 'text-slate-300' : entry.rank === 3 ? 'text-orange-400' : 'text-slate-400'}`}>{entry.rank}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-lg font-bold truncate leading-tight text-white">{entry.name}</p>
-                        <p className="text-base text-slate-400 truncate">#{entry.bibNumber}{entry.companyName ? ` · ${entry.companyName}` : ''}</p>
-                      </div>
-                      <span className="text-lg font-mono font-bold text-emerald-400 shrink-0">{entry.distance.toFixed(2)} km</span>
-                    </div>
-                  ))}
-                  {leaderboard5k.length === 0 && <div className="h-32 flex items-center justify-center"><p className="text-slate-500 text-xl">Waiting for race...</p></div>}
+                  {leaderboard.length === 0 && <div className="h-32 flex items-center justify-center"><p className="text-slate-500 text-xl">Waiting for race...</p></div>}
                 </div>
               </div>
             </div>

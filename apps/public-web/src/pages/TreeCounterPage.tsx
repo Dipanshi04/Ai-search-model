@@ -58,7 +58,7 @@ export default function TreeCounterPage() {
           )}
         </div>
         <p className="hero-body text-brand-navy/60 mb-12">
-          Every 3 kilometers run during the ISA Tech Marathon plants a tree.
+          Every 5 kilometers run during the ISA Tech Marathon plants a tree.
           Together, we're making a real impact on the environment.
         </p>
 
@@ -84,7 +84,7 @@ export default function TreeCounterPage() {
         <div className="mt-10 bg-white p-8 rounded-2xl border border-brand-navy/10 shadow-sm">
           <h2 className="hero-title text-xl font-bold text-brand-orange mb-4">How It Works</h2>
           <div className="hero-body space-y-3 text-brand-navy/80">
-            <p>For every 3 kilometers run by participants, our partners plant a tree in your name.</p>
+            <p>For every 5 kilometers run by participants, our partners plant a tree in your name.</p>
             <p>The tree counter above updates live as runners make progress &mdash; not just at the finish line.</p>
             <p>After the marathon, you'll receive a certificate with the number of trees planted on your behalf.</p>
           </div>

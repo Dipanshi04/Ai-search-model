@@ -8,7 +8,7 @@ interface GreenStats {
   distanceCovered: number;
 }
 
-const KM_PER_TREE = 3;
+const KM_PER_TREE = 5;
 const CO2_PER_TREE_KG = 22;
 
 export default function GreenMissionPage() {
@@ -112,7 +112,7 @@ export default function GreenMissionPage() {
         <div className="max-w-2xl">
           <h2 className="text-lg font-semibold text-slate-950 mb-3">Our Green Commitment</h2>
           <p className="text-sm text-slate-600 leading-relaxed mb-4">
-            For every 3 kilometers covered by the field &mdash; combined, not per runner &mdash; we plant a tree in
+            For every {KM_PER_TREE} kilometers covered by the field &mdash; combined, not per runner &mdash; we plant a tree in
             partnership with local environmental organizations, updated live as distance accrues.
           </p>
           <div className="grid grid-cols-3 gap-4 mt-6">

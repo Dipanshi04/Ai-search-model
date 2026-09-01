@@ -152,7 +152,21 @@ eventsRouter.delete('/:id', authenticate, requireRole('SUPER_ADMIN'), async (req
     }
     await prisma.event.delete({ where: { id: req.params.id as string } });
     res.json({ success: true, message: 'Event deleted' });
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.code === 'P2003' || error?.code === 'P2014') {
+      const eventId = req.params.id as string;
+      const [participants, sponsors, announcements] = await Promise.all([
+        prisma.participant.count({ where: { eventId } }),
+        prisma.sponsor.count({ where: { eventId } }),
+        prisma.announcement.count({ where: { eventId } }),
+      ]);
+      res.status(409).json({
+        success: false,
+        message: `Cannot delete event: it still has ${participants} participant(s), ${sponsors} sponsor(s), and ${announcements} announcement(s) attached. Remove or reassign those first.`,
+      });
+      return;
+    }
+    console.error('[Events] Failed to delete event:', error);
     res.status(500).json({ success: false, message: 'Failed to delete event' });
   }
 });

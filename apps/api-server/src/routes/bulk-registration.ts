@@ -106,7 +106,11 @@ bulkRegistrationRouter.post('/', async (req: Request, res: Response) => {
       data: {
         email: hrEmail,
         name: hrName,
-        phone: '',
+        // HR accounts created here don't collect a phone number, but the
+        // column is unique and non-nullable — a shared '' placeholder let
+        // only the first-ever bulk registration succeed and broke every
+        // one after it. Each user needs its own unique placeholder instead.
+        phone: `HR-${bulkRegistration.id}`,
         passwordHash: hrPasswordHash,
         pinHash,
         role: 'HR',
@@ -130,8 +134,12 @@ bulkRegistrationRouter.post('/', async (req: Request, res: Response) => {
         createdAt: bulkRegistration.createdAt,
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Create bulk registration error:', error);
+    if (error?.code === 'P2002') {
+      res.status(409).json({ success: false, message: `A user with this ${error.meta?.target?.[0] || 'field'} already exists` });
+      return;
+    }
     res.status(500).json({ success: false, message: 'Failed to create bulk registration' });
   }
 });

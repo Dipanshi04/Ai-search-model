@@ -20,8 +20,12 @@ export interface ResetTokenPayload {
 }
 
 export function generateAccessToken(payload: JwtPayload): string {
+  // Runners stay logged in for the whole event window (14 days) so a
+  // background-killed tracking session doesn't force a re-login mid-race.
+  // Staff roles (admin/HR/etc.) keep the shorter default.
+  const expiresIn = payload.role === 'PARTICIPANT' ? '14d' : JWT_CONFIG.ACCESS_TOKEN_EXPIRY;
   return jwt.sign(payload, process.env.JWT_SECRET!, {
-    expiresIn: JWT_CONFIG.ACCESS_TOKEN_EXPIRY,
+    expiresIn,
   } as jwt.SignOptions);
 }
 

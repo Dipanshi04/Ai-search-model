@@ -12,6 +12,28 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 };
 
+// GPS points captured while offline (no signal, or the socket just hasn't
+// reconnected yet) are queued to localStorage instead of dropped — the
+// queue survives a page reload or the app getting killed mid-run, and
+// drains in order the moment the socket reconnects.
+const GPS_QUEUE_PREFIX = 'gps_queue_';
+const GPS_QUEUE_MAX = 5000;
+
+function loadGpsQueue(participantId: string): any[] {
+  try {
+    const raw = localStorage.getItem(GPS_QUEUE_PREFIX + participantId);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveGpsQueue(participantId: string, queue: any[]) {
+  try {
+    localStorage.setItem(GPS_QUEUE_PREFIX + participantId, JSON.stringify(queue));
+  } catch {}
+}
+
 interface RunnerState {
   isTracking: boolean;
   distance: number;
@@ -21,6 +43,7 @@ interface RunnerState {
   accuracy: number | null;
   speed: number | null;
   pointCount: number;
+  queuedCount: number;
 }
 
 interface Props {
@@ -35,7 +58,7 @@ interface Props {
 export default function RunnerDashboard({ participantId, token, category, eventId, onHome }: Props) {
   const [state, setState] = useState<RunnerState>({
     isTracking: false, distance: 0, pace: null, rank: null,
-    status: 'REGISTERED', accuracy: null, speed: null, pointCount: 0,
+    status: 'REGISTERED', accuracy: null, speed: null, pointCount: 0, queuedCount: 0,
   });
   const [elapsedTime, setElapsedTime] = useState(0);
   const [mapReady, setMapReady] = useState(false);
@@ -48,6 +71,19 @@ export default function RunnerDashboard({ participantId, token, category, eventI
   const watchIdRef = useRef<number | null>(null);
   const timerIvRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const totalDistanceKmRef = useRef(5);
+  const gpsQueueRef = useRef<any[]>(loadGpsQueue(participantId));
+  const wakeLockRef = useRef<any>(null);
+
+  const flushGpsQueue = () => {
+    const socket = socketRef.current;
+    if (!socket?.connected) return;
+    const queue = gpsQueueRef.current;
+    while (queue.length > 0) {
+      socket.emit('gps:update', queue.shift());
+    }
+    saveGpsQueue(participantId, queue);
+    setState((s) => ({ ...s, queuedCount: 0 }));
+  };
 
   const progressPercent = Math.min((state.distance / totalDistanceKmRef.current) * 100, 100);
 
@@ -102,6 +138,7 @@ export default function RunnerDashboard({ participantId, token, category, eventI
       socket.emit('join:runner', participantId);
       socket.emit('join:event', eventId);
       socket.emit('runner:start', { participantId });
+      flushGpsQueue();
     });
 
     socket.on('runner:update', (data: any) => {
@@ -115,9 +152,25 @@ export default function RunnerDashboard({ participantId, token, category, eventI
     socketRef.current = socket;
     resyncIv = setInterval(fetchAndDisplay, 30000);
 
+    // Backgrounding a tab suspends JS on most mobile browsers (iOS Safari
+    // especially) — watchPosition stops firing and the Wake Lock is
+    // force-released by the OS. Nothing in JS can prevent that; the best
+    // recovery is to catch the moment the runner comes back to this tab and
+    // immediately reconnect, resync, and re-arm the wake lock rather than
+    // silently sitting stale until the next 30s poll.
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      fetchAndDisplay();
+      if (!socket.connected) socket.connect();
+      else flushGpsQueue();
+      if (watchIdRef.current !== null) requestWakeLock();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
     return () => {
       clearTicking();
       if (resyncIv !== null) clearInterval(resyncIv);
+      document.removeEventListener('visibilitychange', onVisible);
       socket.removeAllListeners();
       socket.disconnect();
       socketRef.current = null;
@@ -189,9 +242,23 @@ export default function RunnerDashboard({ participantId, token, category, eventI
     }
   }, [mapReady, category, eventId, token]);
 
+  const requestWakeLock = async () => {
+    try {
+      // Keeps the screen from auto-locking while tracking — the most common
+      // reason GPS silently stops mid-run. It does NOT survive switching to
+      // another app or the OS backgrounding the tab; the browser releases it
+      // automatically on that, and the visibilitychange handler below
+      // re-acquires it the moment the runner comes back to this tab.
+      wakeLockRef.current = await (navigator as any).wakeLock?.request?.('screen');
+    } catch {
+      wakeLockRef.current = null;
+    }
+  };
+
   const startTracking = async () => {
     if (!navigator.geolocation) return;
     setState((s) => ({ ...s, isTracking: true }));
+    requestWakeLock();
 
     if (!document.getElementById('pulse-kf')) {
       const s = document.createElement('style'); s.id = 'pulse-kf';
@@ -216,7 +283,11 @@ export default function RunnerDashboard({ participantId, token, category, eventI
           }
           map.panTo([g.lng, g.lat], { duration: 1000 });
         }
-        socketRef.current?.emit('gps:update', g);
+        gpsQueueRef.current.push(g);
+        if (gpsQueueRef.current.length > GPS_QUEUE_MAX) gpsQueueRef.current.shift();
+        saveGpsQueue(participantId, gpsQueueRef.current);
+        setState((s) => ({ ...s, queuedCount: gpsQueueRef.current.length }));
+        flushGpsQueue();
       },
       (err) => { setState((s) => ({ ...s, status: `GPS Error: ${err.message}` })); },
       { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
@@ -226,7 +297,10 @@ export default function RunnerDashboard({ participantId, token, category, eventI
 
   const pauseTracking = () => {
     if (watchIdRef.current !== null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
+    wakeLockRef.current?.release?.().catch(() => {});
+    wakeLockRef.current = null;
     if (socketRef.current) {
+      flushGpsQueue();
       socketRef.current.emit('runner:pause', { participantId });
       socketRef.current.disconnect();
       socketRef.current = null;
@@ -241,7 +315,10 @@ export default function RunnerDashboard({ participantId, token, category, eventI
   // FINISHED back to PAUSED on the very update that just set it.
   const stopTrackingOnFinish = () => {
     if (watchIdRef.current !== null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
+    wakeLockRef.current?.release?.().catch(() => {});
+    wakeLockRef.current = null;
     if (socketRef.current) {
+      flushGpsQueue();
       socketRef.current.disconnect();
       socketRef.current = null;
     }
@@ -271,6 +348,7 @@ export default function RunnerDashboard({ participantId, token, category, eventI
   useEffect(() => () => {
     clearTicking();
     if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
+    wakeLockRef.current?.release?.().catch(() => {});
     if (socketRef.current) { socketRef.current.disconnect(); socketRef.current = null; }
   }, []);
 
@@ -361,6 +439,11 @@ export default function RunnerDashboard({ participantId, token, category, eventI
               {state.isTracking ? 'Running' : raceStatus === 'ACTIVE' ? 'Ready' : raceStatus === 'PAUSED' ? 'Paused' : 'Waiting'}
             </span>
           </div>
+          {state.queuedCount > 0 && (
+            <span style={{ fontSize: '12px', fontWeight: 700, color: '#fbbf24', background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.35)', borderRadius: '999px', padding: '4px 10px' }}>
+              Offline · {state.queuedCount} pt{state.queuedCount === 1 ? '' : 's'} queued
+            </span>
+          )}
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', rowGap: '18px', columnGap: '24px' }}>

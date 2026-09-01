@@ -114,9 +114,14 @@ export async function distanceToFinishMeters(
   lng: number
 ): Promise<number | null> {
   const targetKm = category === 'RUN_5K' ? 5 : 3;
+  // Events can end up with more than one RaceDistance row for the same
+  // distanceKm (dupe seeds, re-created categories, etc). Picking "the
+  // first created" would silently match an empty duplicate and skip the
+  // one an admin actually drew a route on — so only consider distances
+  // that have a route, and prefer the most recently drawn one.
   const raceDistance = await prisma.raceDistance.findFirst({
-    where: { eventId, distanceKm: targetKm },
-    orderBy: { createdAt: 'asc' },
+    where: { eventId, distanceKm: targetKm, routePoints: { some: {} } },
+    orderBy: { updatedAt: 'desc' },
   });
   if (!raceDistance) return null;
 

@@ -152,6 +152,22 @@ export default function RunnerDashboard({ participantId, token, category, eventI
 
     fetchAndDisplay();
 
+    // A reload (common when iOS backgrounds and kills the tab) resets local
+    // React state, including the Duration ticker, back to 0 — even though
+    // distance/pace/rank correctly resync from the server a moment later.
+    // Pull the participant's real startedAt once on mount so Duration shows
+    // the actual elapsed time instead of misleadingly restarting near zero.
+    fetch(`${API_URL}/api/v1/participants/${participantId}`)
+      .then((r) => r.json())
+      .then((res) => {
+        const p = res?.data;
+        if (!res.success || !p?.startedAt) return;
+        if (p.status === 'RUNNING' || p.status === 'PAUSED') {
+          setElapsedTime(Math.max(0, Math.floor((Date.now() - new Date(p.startedAt).getTime()) / 1000)));
+        }
+      })
+      .catch(() => {});
+
     const socket = io(API_URL, { auth: { token }, transports: ['websocket'] });
 
     socket.on('connect', () => {
@@ -387,7 +403,12 @@ export default function RunnerDashboard({ participantId, token, category, eventI
     if (socketRef.current) {
       socketRef.current.emit('runner:finish', { participantId });
     }
-    pauseTracking();
+    // stopTrackingOnFinish, not pauseTracking — pauseTracking emits
+    // runner:pause right after, which the server processes immediately
+    // after runner:finish and overwrites FINISHED back to PAUSED. This is
+    // the same landmine documented on stopTrackingOnFinish's auto-finish
+    // path; the manual Finish button needs the same guard.
+    stopTrackingOnFinish();
     setRaceStatus('COMPLETED');
     setElapsedTime(0);
   };

@@ -188,9 +188,18 @@ export function setupSocketIO(io: SocketIOServer): void {
 
     socket.on('runner:start', async (data: { participantId: string }) => {
       try {
+        // The runner-app emits this on every socket connect, not just the
+        // real first start — a reconnect (network blip, tab backgrounded
+        // then resumed, page reload) fires it again. Overwriting startedAt
+        // each time reset the pace clock to "now" on every reconnect,
+        // making pace look impossibly fast right after. Only set it once.
+        const participant = await prisma.participant.findUnique({
+          where: { id: data.participantId },
+          select: { startedAt: true },
+        });
         await prisma.participant.update({
           where: { id: data.participantId },
-          data: { status: 'RUNNING', startedAt: new Date() },
+          data: { status: 'RUNNING', startedAt: participant?.startedAt ?? new Date() },
         });
         logger.info(`[Socket] Runner started: ${data.participantId}`);
       } catch (error) {

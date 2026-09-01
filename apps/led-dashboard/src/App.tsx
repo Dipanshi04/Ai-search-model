@@ -36,6 +36,8 @@ interface LeaderboardEntry {
   distance: number;
   pace: number | null;
   category?: string;
+  participantId?: string;
+  status?: string;
 }
 
 function SponsorTicker({ sponsors }: { sponsors: { id: string; name: string; logoUrl?: string; tier?: string }[] }) {
@@ -134,6 +136,11 @@ export default function LEDScreen() {
   const pendingRunnersRef = useRef<any[]>([]);
   const routesByCategoryRef = useRef<Map<string, { lat: number; lng: number }[]>>(new Map());
   const resolvedEventIdRef = useRef<string>(EVENT_ID);
+  // Last time each runner's GPS actually reached the server — lets the
+  // leaderboard show a live/delayed/stopped signal per runner instead of
+  // silently going stale with no indication anything's wrong.
+  const lastSeenRef = useRef<Map<string, number>>(new Map());
+  const [nowTick, setNowTick] = useState(Date.now());
 
   const getColorForRunner = (participantId: string): string => {
     if (markerColorsRef.current.has(participantId)) {
@@ -462,6 +469,7 @@ export default function LEDScreen() {
     });
 
     socket.on('runner:update', (data: any) => {
+      if (data.participantId) lastSeenRef.current.set(data.participantId, Date.now());
       const map = mapRef.current;
       if (!map || !data.lat || !data.lng) {
         // Queue if map not ready
@@ -550,6 +558,11 @@ export default function LEDScreen() {
   }, []);
 
   useEffect(() => {
+    const interval = setInterval(() => setNowTick(Date.now()), 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
     const categories = ['overall', 'RUN_3K', 'RUN_5K', 'company'];
     const interval = setInterval(() => {
       setCurrentCategory((prev) => {
@@ -596,7 +609,23 @@ export default function LEDScreen() {
       distance: p.totalDistance ?? p.distance ?? 0,
       pace: null,
       category: p.category,
+      participantId: p.participantId || p.id,
+      status: p.status,
     }));
+
+  // Heartbeat status from the last GPS ping actually received for this
+  // runner — null when they haven't started tracking yet or have already
+  // finished, so the dot only appears for runners who should be actively
+  // sending points right now.
+  const trackingStatus = (entry: LeaderboardEntry): 'live' | 'delayed' | 'stopped' | null => {
+    if (!entry.participantId || entry.status === 'FINISHED' || entry.status === 'REGISTERED') return null;
+    const lastSeen = lastSeenRef.current.get(entry.participantId);
+    if (!lastSeen) return null;
+    const ageSec = (nowTick - lastSeen) / 1000;
+    if (ageSec < 30) return 'live';
+    if (ageSec < 60) return 'delayed';
+    return 'stopped';
+  };
 
   useEffect(() => {
     const eventId = resolvedEventIdRef.current || EVENT_ID;
@@ -699,9 +728,18 @@ export default function LEDScreen() {
                   <span className="text-sm bg-slate-800 text-slate-400 px-4 py-1.5 rounded-full font-semibold uppercase tracking-wider">3K + 5K</span>
                 </div>
                 <div className="space-y-2.5 flex-1 min-h-0 overflow-hidden">
-                  {leaderboard.map((entry) => (
+                  {leaderboard.map((entry) => {
+                    const tStatus = trackingStatus(entry);
+                    return (
                     <div key={entry.rank} className={`flex items-center gap-4 px-5 py-3.5 rounded-lg ${entry.rank === 1 ? 'bg-amber-500/10 border border-amber-500/30' : entry.rank <= 3 ? 'bg-slate-800/60 border border-slate-700/50' : 'bg-slate-900/40'}`}>
                       <span className={`text-lg font-bold w-8 text-center shrink-0 ${entry.rank === 1 ? 'text-amber-400' : entry.rank === 2 ? 'text-slate-300' : entry.rank === 3 ? 'text-orange-400' : 'text-slate-400'}`}>{entry.rank}</span>
+                      {tStatus && (
+                        <span
+                          className={`w-2.5 h-2.5 rounded-full shrink-0 ${tStatus === 'live' ? 'bg-emerald-400' : tStatus === 'delayed' ? 'bg-amber-400' : 'bg-red-500'}`}
+                          style={tStatus === 'live' ? { boxShadow: '0 0 6px rgba(52,211,153,0.8)' } : undefined}
+                          title={tStatus === 'live' ? 'Live' : tStatus === 'delayed' ? 'Signal delayed' : 'Tracking stopped'}
+                        />
+                      )}
                       <div className="flex-1 min-w-0">
                         <p className="text-lg font-bold truncate leading-tight text-white">{entry.name}</p>
                         <p className="text-base text-slate-400 truncate">#{entry.bibNumber}{entry.companyName ? ` · ${entry.companyName}` : ''}</p>
@@ -713,7 +751,8 @@ export default function LEDScreen() {
                       )}
                       <span className="text-lg font-mono font-bold text-emerald-400 shrink-0">{entry.distance.toFixed(2)} km</span>
                     </div>
-                  ))}
+                    );
+                  })}
                   {leaderboard.length === 0 && <div className="h-32 flex items-center justify-center"><p className="text-slate-500 text-xl">Waiting for race...</p></div>}
                 </div>
               </div>

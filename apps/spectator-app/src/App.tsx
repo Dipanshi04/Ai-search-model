@@ -74,6 +74,41 @@ export default function SpectatorTracking() {
   const accumulatedElapsedRef = useRef(0);
   const resolvedEventIdRef = useRef('');
   const [socketReady, setSocketReady] = useState(false);
+  // Last time each runner's GPS actually reached the server — drives a
+  // live/delayed/stopped signal per runner instead of the list silently
+  // going stale with no indication anything's wrong.
+  const lastSeenRef = useRef<Map<string, number>>(new Map());
+  const [nowTick, setNowTick] = useState(Date.now());
+
+  useEffect(() => {
+    const interval = setInterval(() => setNowTick(Date.now()), 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const trackingStatus = (runner: RunnerPosition): 'live' | 'delayed' | 'stopped' | null => {
+    if (!runner.participantId || runner.status === 'FINISHED' || runner.status === 'REGISTERED') return null;
+    const lastSeen = lastSeenRef.current.get(runner.participantId);
+    if (!lastSeen) return null;
+    const ageSec = (nowTick - lastSeen) / 1000;
+    if (ageSec < 30) return 'live';
+    if (ageSec < 60) return 'delayed';
+    return 'stopped';
+  };
+
+  const StatusDot = ({ runner }: { runner: RunnerPosition }) => {
+    const s = trackingStatus(runner);
+    if (!s) return null;
+    return (
+      <span
+        style={{
+          display: 'inline-block', width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
+          background: s === 'live' ? '#34d399' : s === 'delayed' ? '#fbbf24' : '#ef4444',
+          boxShadow: s === 'live' ? '0 0 6px rgba(52,211,153,0.8)' : undefined,
+        }}
+        title={s === 'live' ? 'Live' : s === 'delayed' ? 'Signal delayed' : 'Tracking stopped'}
+      />
+    );
+  };
 
   useEffect(() => {
     async function loadInitial() {
@@ -153,6 +188,7 @@ export default function SpectatorTracking() {
     });
 
     socket.on('runner:update', (data: RunnerPosition) => {
+      if (data.participantId) lastSeenRef.current.set(data.participantId, Date.now());
       setRunners((prev) => {
         const idx = prev.findIndex((r) => r.participantId === data.participantId);
         if (idx >= 0) {
@@ -263,6 +299,7 @@ export default function SpectatorTracking() {
     return (
       <div key={runner.participantId} className="px-5 py-4 flex items-center gap-4 hover:bg-white/[0.02] transition-colors">
         {rankBadge(idx)}
+        <StatusDot runner={runner} />
         <div className="flex-1 min-w-0">
           <p className="text-base font-semibold text-white truncate">{runner.name}</p>
           <p className="text-sm text-slate-400">
@@ -534,6 +571,7 @@ export default function SpectatorTracking() {
                       return (
                         <div key={runner.participantId} className={`px-5 py-4 flex items-center gap-4 hover:bg-white/[0.02] transition-colors ${idx < 3 ? 'bg-white/[0.02]' : ''}`}>
                           {rankBadge(idx)}
+                          <StatusDot runner={runner} />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
                               <p className="text-base font-semibold text-white truncate">{runner.name}</p>

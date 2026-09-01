@@ -19,6 +19,23 @@ const CATEGORY_LABELS: Record<string, string> = {
 const GPS_QUEUE_PREFIX = 'gps_queue_';
 const GPS_QUEUE_MAX = 5000;
 
+// Sending every single watchPosition fix (which can be sub-second on some
+// devices) burns battery and network for no real accuracy gain at running
+// pace — gate sends to whichever comes first: a minimum time gap or a
+// minimum distance moved. The map marker/point counter still update on
+// every fix for a smooth-looking live view; only what gets queued/sent
+// to the server is throttled.
+const MIN_SEND_INTERVAL_MS = 5000;
+const MIN_SEND_DISTANCE_M = 20;
+
+function haversineMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
 function loadGpsQueue(participantId: string): any[] {
   try {
     const raw = localStorage.getItem(GPS_QUEUE_PREFIX + participantId);
@@ -44,6 +61,7 @@ interface RunnerState {
   speed: number | null;
   pointCount: number;
   queuedCount: number;
+  resumedGapSec: number | null;
 }
 
 interface Props {
@@ -58,7 +76,7 @@ interface Props {
 export default function RunnerDashboard({ participantId, token, category, eventId, onHome }: Props) {
   const [state, setState] = useState<RunnerState>({
     isTracking: false, distance: 0, pace: null, rank: null,
-    status: 'REGISTERED', accuracy: null, speed: null, pointCount: 0, queuedCount: 0,
+    status: 'REGISTERED', accuracy: null, speed: null, pointCount: 0, queuedCount: 0, resumedGapSec: null,
   });
   const [elapsedTime, setElapsedTime] = useState(0);
   const [mapReady, setMapReady] = useState(false);
@@ -73,6 +91,8 @@ export default function RunnerDashboard({ participantId, token, category, eventI
   const totalDistanceKmRef = useRef(5);
   const gpsQueueRef = useRef<any[]>(loadGpsQueue(participantId));
   const wakeLockRef = useRef<any>(null);
+  const hiddenAtRef = useRef<number | null>(null);
+  const lastSentRef = useRef<{ lat: number; lng: number; t: number } | null>(null);
 
   const flushGpsQueue = () => {
     const socket = socketRef.current;
@@ -159,11 +179,29 @@ export default function RunnerDashboard({ participantId, token, category, eventI
     // immediately reconnect, resync, and re-arm the wake lock rather than
     // silently sitting stale until the next 30s poll.
     const onVisible = () => {
-      if (document.visibilityState !== 'visible') return;
+      if (document.visibilityState !== 'visible') {
+        hiddenAtRef.current = Date.now();
+        return;
+      }
+      const hiddenAt = hiddenAtRef.current;
+      hiddenAtRef.current = null;
       fetchAndDisplay();
       if (!socket.connected) socket.connect();
       else flushGpsQueue();
-      if (watchIdRef.current !== null) requestWakeLock();
+      if (watchIdRef.current !== null) {
+        requestWakeLock();
+        // Don't wait for watchPosition's next tick to fire — grab one fresh
+        // fix immediately so the gap shown is as short as possible, and
+        // surface how long tracking was actually dark for.
+        navigator.geolocation.getCurrentPosition((pos) => capturePoint(pos, true), () => {}, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+        if (hiddenAt) {
+          const gapSec = Math.round((Date.now() - hiddenAt) / 1000);
+          if (gapSec >= 10) {
+            setState((s) => ({ ...s, resumedGapSec: gapSec }));
+            setTimeout(() => setState((s) => ({ ...s, resumedGapSec: null })), 6000);
+          }
+        }
+      }
     };
     document.addEventListener('visibilitychange', onVisible);
 
@@ -255,6 +293,34 @@ export default function RunnerDashboard({ participantId, token, category, eventI
     }
   };
 
+  const capturePoint = (pos: GeolocationPosition, force = false) => {
+    const g = { participantId, lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy, speed: pos.coords.speed, altitude: pos.coords.altitude, timestamp: new Date().toISOString() };
+    setState((s) => ({ ...s, isTracking: true, accuracy: pos.coords.accuracy, speed: pos.coords.speed, pointCount: s.pointCount + 1 }));
+    const map = mapRef.current;
+    if (map) {
+      if (positionMarkerRef.current) { positionMarkerRef.current.setLngLat([g.lng, g.lat]); }
+      else {
+        const d = document.createElement('div'); d.style.cssText = 'position:relative;width:24px;height:24px;';
+        const p = document.createElement('div'); p.style.cssText = 'position:absolute;top:-4px;left:-4px;width:32px;height:32px;border-radius:50%;border:2px solid rgba(249,115,22,.3);animation:pr 2s ease-out infinite;'; d.appendChild(p);
+        const c = document.createElement('div'); c.style.cssText = 'position:absolute;top:2px;left:2px;width:20px;height:20px;background:#f97316;border-radius:50%;border:3px solid #fff;animation:rg 2s ease-in-out infinite;box-shadow:0 1px 4px rgba(0,0,0,.2);'; d.appendChild(c);
+        positionMarkerRef.current = new mapboxgl.Marker({ element: d, offset: [-12, -12] }).setLngLat([g.lng, g.lat]).addTo(map);
+      }
+      map.panTo([g.lng, g.lat], { duration: 1000 });
+    }
+
+    const last = lastSentRef.current;
+    const elapsedMs = last ? Date.now() - last.t : Infinity;
+    const movedM = last ? haversineMeters(last.lat, last.lng, g.lat, g.lng) : Infinity;
+    if (!force && elapsedMs < MIN_SEND_INTERVAL_MS && movedM < MIN_SEND_DISTANCE_M) return;
+
+    lastSentRef.current = { lat: g.lat, lng: g.lng, t: Date.now() };
+    gpsQueueRef.current.push(g);
+    if (gpsQueueRef.current.length > GPS_QUEUE_MAX) gpsQueueRef.current.shift();
+    saveGpsQueue(participantId, gpsQueueRef.current);
+    setState((s) => ({ ...s, queuedCount: gpsQueueRef.current.length }));
+    flushGpsQueue();
+  };
+
   const startTracking = async () => {
     if (!navigator.geolocation) return;
     setState((s) => ({ ...s, isTracking: true }));
@@ -269,26 +335,7 @@ export default function RunnerDashboard({ participantId, token, category, eventI
     startTicking(elapsedTime);
 
     const watchId = navigator.geolocation.watchPosition(
-      (pos) => {
-        const g = { participantId, lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy, speed: pos.coords.speed, altitude: pos.coords.altitude, timestamp: new Date().toISOString() };
-        setState((s) => ({ ...s, isTracking: true, accuracy: pos.coords.accuracy, speed: pos.coords.speed, pointCount: s.pointCount + 1 }));
-        const map = mapRef.current;
-        if (map) {
-          if (positionMarkerRef.current) { positionMarkerRef.current.setLngLat([g.lng, g.lat]); }
-          else {
-            const d = document.createElement('div'); d.style.cssText = 'position:relative;width:24px;height:24px;';
-            const p = document.createElement('div'); p.style.cssText = 'position:absolute;top:-4px;left:-4px;width:32px;height:32px;border-radius:50%;border:2px solid rgba(249,115,22,.3);animation:pr 2s ease-out infinite;'; d.appendChild(p);
-            const c = document.createElement('div'); c.style.cssText = 'position:absolute;top:2px;left:2px;width:20px;height:20px;background:#f97316;border-radius:50%;border:3px solid #fff;animation:rg 2s ease-in-out infinite;box-shadow:0 1px 4px rgba(0,0,0,.2);'; d.appendChild(c);
-            positionMarkerRef.current = new mapboxgl.Marker({ element: d, offset: [-12, -12] }).setLngLat([g.lng, g.lat]).addTo(map);
-          }
-          map.panTo([g.lng, g.lat], { duration: 1000 });
-        }
-        gpsQueueRef.current.push(g);
-        if (gpsQueueRef.current.length > GPS_QUEUE_MAX) gpsQueueRef.current.shift();
-        saveGpsQueue(participantId, gpsQueueRef.current);
-        setState((s) => ({ ...s, queuedCount: gpsQueueRef.current.length }));
-        flushGpsQueue();
-      },
+      capturePoint,
       (err) => { setState((s) => ({ ...s, status: `GPS Error: ${err.message}` })); },
       { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
     );
@@ -439,12 +486,27 @@ export default function RunnerDashboard({ participantId, token, category, eventI
               {state.isTracking ? 'Running' : raceStatus === 'ACTIVE' ? 'Ready' : raceStatus === 'PAUSED' ? 'Paused' : 'Waiting'}
             </span>
           </div>
-          {state.queuedCount > 0 && (
+          {state.resumedGapSec !== null ? (
+            <span style={{ fontSize: '12px', fontWeight: 700, color: '#fca5a5', background: 'rgba(248,113,113,0.15)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: '999px', padding: '4px 10px' }}>
+              Tracking paused {state.resumedGapSec}s — resumed
+            </span>
+          ) : state.queuedCount > 0 && (
             <span style={{ fontSize: '12px', fontWeight: 700, color: '#fbbf24', background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.35)', borderRadius: '999px', padding: '4px 10px' }}>
               Offline · {state.queuedCount} pt{state.queuedCount === 1 ? '' : 's'} queued
             </span>
           )}
         </div>
+
+        {state.isTracking && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', padding: '10px 14px', borderRadius: '12px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <circle cx="12" cy="12" r="9" /><path d="M12 8v4l2.5 2.5" />
+            </svg>
+            <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', lineHeight: 1.4 }}>
+              Keep this tab open and your screen unlocked — switching apps or locking your phone pauses GPS tracking.
+            </span>
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', rowGap: '18px', columnGap: '24px' }}>
           <div>

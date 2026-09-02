@@ -6,10 +6,9 @@ import { sendWelcomeEmail } from '../services/email.js';
 import { feeForCategory } from './payment.js';
 
 // ============================================================================
-// Cashfree — the main payment gateway. Unlike ShowtimeBro, this has a real
-// signed webhook, so a payment can move straight to COMPLETED automatically
-// once the signature checks out — no admin reconciliation step needed.
-// Razorpay and ShowtimeBro are left exactly as they were; this is additive.
+// Cashfree — the main, active payment gateway. Has a real signed webhook,
+// so a payment can move straight to COMPLETED automatically once the
+// signature checks out — no admin reconciliation step needed.
 // ============================================================================
 
 function getCashfreeClient(): Cashfree | null {

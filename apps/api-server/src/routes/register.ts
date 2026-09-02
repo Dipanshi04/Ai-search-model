@@ -111,10 +111,10 @@ registerRouter.post('/', async (req: Request, res: Response) => {
 
     // Send the PIN immediately — it's their login credential and doesn't
     // depend on payment. The "Registration Confirmed" welcome email is
-    // intentionally NOT sent here: with the ShowtimeBro redirect flow,
-    // payment is confirmed asynchronously (admin reconciliation), so saying
-    // "confirmed" before that would be false. It goes out from the
-    // payment-verify step instead (see routes/payment.ts).
+    // intentionally NOT sent here: payment isn't confirmed yet at this
+    // point, so saying "confirmed" before that would be false. It goes out
+    // once Cashfree's webhook actually confirms payment instead (see
+    // routes/cashfree.ts).
     if (isNewUser && pin) {
       sendPinEmail(user.email, user.name, pin).catch((e) => logger.error('PIN email failed:', e));
     }
@@ -125,6 +125,11 @@ registerRouter.post('/', async (req: Request, res: Response) => {
         participant,
         bibNumber,
         qrCodeUrl: `/api/v1/participants/${participant.id}/qr`,
+        // Only ever available right here — pin is bcrypt-hashed immediately
+        // after this and the plaintext is discarded server-side. Only for a
+        // brand-new account; an existing user re-registering already has
+        // their real pin and shouldn't get a fresh one exposed here.
+        pin: isNewUser ? pin : undefined,
       },
     });
   } catch (error) {

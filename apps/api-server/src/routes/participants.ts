@@ -288,9 +288,9 @@ participantsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MA
         ...(tshirtSize !== undefined && { tshirtSize }),
         ...(kitDistributed !== undefined && { kitDistributed: Boolean(kitDistributed) }),
         ...(foodDistributed !== undefined && { foodDistributed: Boolean(foodDistributed) }),
-        // Manual override for cash-at-venue payments and other edge cases the
-        // ShowtimeBro reconciliation queue doesn't cover — see payment.ts for
-        // the normal verify/reject flow this sits alongside.
+        // Manual override for cash-at-venue payments and other edge cases —
+        // see payment.ts's /:id/verify and /:id/reject for the normal flow
+        // this sits alongside.
         ...(paymentStatus !== undefined && { paymentStatus }),
       },
       include: { user: true, company: true },

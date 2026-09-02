@@ -82,46 +82,18 @@ export default function RegisterPage() {
     const res = await api.register(form);
     if (res.success) {
       setResult(res.data);
+      // Only ever available in this one response — the PIN is bcrypt-hashed
+      // server-side immediately after this and the plaintext is discarded.
+      // Stashed here so the post-payment confirmation page can show it.
+      if (res.data?.pin) {
+        sessionStorage.setItem('isa_runner_pin', res.data.pin);
+      }
       setStep('payment');
     } else {
       setError(res.message || 'Registration failed');
     }
     setLoading(false);
   };
-
-  // Dormant — replaced by Cashfree (handlePayCashfree, below) as the main
-  // payment path. Left fully working, not deleted: no signed webhook on
-  // ShowtimeBro's side means it needs an admin to reconcile against their
-  // sales report before anyone's marked paid, so it's a reasonable fallback
-  // if Cashfree is ever unavailable. See routes/payment.ts and routes/
-  // cashfree.ts for the full reasoning on each.
-  const handlePayShowtimeBro = async () => {
-    setPaymentLoading(true);
-    setError('');
-
-    const participantId = result?.participant?.id;
-    if (!participantId) {
-      setError('Participant not found');
-      setPaymentLoading(false);
-      return;
-    }
-
-    const res = await api.startShowtimeBroPayment(participantId);
-    if (!res.success || !res.data?.redirectUrl) {
-      setError(res.message || 'Failed to start payment. Please try again.');
-      setPaymentLoading(false);
-      return;
-    }
-
-    // The browser is about to leave the site entirely. Stash the reference
-    // so /details can find it again on return — this is the reliable
-    // correlator, independent of whatever ShowtimeBro's redirect carries.
-    sessionStorage.setItem('isa_payment_reference', res.data.reference);
-    window.location.href = res.data.redirectUrl;
-  };
-  // Not wired to a button while Cashfree is main — kept callable, not dead
-  // code the compiler should flag as unused.
-  void handlePayShowtimeBro;
 
   // Active payment path — Cashfree, a real gateway with a signed webhook,
   // so a payment completes automatically once it succeeds instead of

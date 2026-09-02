@@ -10,6 +10,7 @@ interface ApiResponse<T> {
     limit: number;
     totalPages: number;
   };
+  summary?: { total: number; completed: number; failed: number; pending: number };
 }
 
 class ApiClient {
@@ -319,15 +320,20 @@ class ApiClient {
     return this.request<void>(`/api/v1/sponsors/${id}`, { method: 'DELETE' });
   }
 
-  async getShowtimeBroPending() {
-    return this.request<any[]>('/api/v1/payments/showtimebro/pending');
+  async getPayments(filters?: { status?: string; provider?: string; limit?: number }) {
+    const params = new URLSearchParams();
+    if (filters?.status && filters.status !== 'ALL') params.set('status', filters.status);
+    if (filters?.provider && filters.provider !== 'ALL') params.set('provider', filters.provider);
+    if (filters?.limit) params.set('limit', String(filters.limit));
+    const query = params.toString() ? `?${params.toString()}` : '';
+    return this.request<any[]>(`/api/v1/payments${query}`);
   }
 
-  async verifyShowtimeBroPayment(id: string) {
+  async verifyPaymentManual(id: string) {
     return this.request<any>(`/api/v1/payments/${id}/verify`, { method: 'POST' });
   }
 
-  async rejectShowtimeBroPayment(id: string, reason: string) {
+  async rejectPaymentManual(id: string, reason: string) {
     return this.request<any>(`/api/v1/payments/${id}/reject`, {
       method: 'POST',
       body: JSON.stringify({ reason }),

@@ -1,117 +1,25 @@
 import dotenv from 'dotenv';
-dotenv.config({ path: '../../.env.local' });
-
-import express from 'express';
 import path from 'path';
-import { createServer } from 'http';
-import cors from 'cors';
-import helmet from 'helmet';
-import cookieParser from 'cookie-parser';
-import { Server as SocketIOServer } from 'socket.io';
+import { fileURLToPath } from 'url';
 
-import { setupSocketIO } from './config/socket.js';
+// Real entry point. Everything else lives in server.ts and is loaded below
+// via a dynamic import — not a static one.
+//
+// Static `import` statements are hoisted by the ES module spec: every
+// module a file statically imports is fully loaded and executed BEFORE any
+// of that file's own top-level code runs, no matter where the import
+// appears in the source. Several modules in this app read process.env at
+// module load time (services/email.ts's transporter config, the Prisma
+// client's datasource, the Cashfree client, etc.) — under real compiled
+// ESM (what production's `node dist/index.js` actually runs), those all
+// executed before dotenv.config() ever got a chance to run, so they read
+// undefined regardless of what was in the .env file. `tsx` in dev mode
+// transpiles differently and never hit this, which is why it always looked
+// fine locally. A dynamic import() is a runtime expression, not hoisted —
+// it only resolves once actually awaited — so this guarantees dotenv has
+// already populated process.env before server.ts (or anything it imports)
+// is even loaded.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, '../../../.env.local') });
 
-import { logger } from './config/logger.js';
-import { errorHandler } from './middleware/errorHandler.js';
-import { rateLimiter } from './middleware/rateLimiter.js';
-
-import { healthRouter } from './routes/health.js';
-import { authRouter } from './routes/auth.js';
-import { registerRouter } from './routes/register.js';
-import { participantsRouter, publicParticipantsRouter } from './routes/participants.js';
-import { checkinRouter } from './routes/checkin.js';
-import { raceRouter } from './routes/race.js';
-import { trackingRouter } from './routes/tracking.js';
-import { leaderboardRouter } from './routes/leaderboard.js';
-import { greenRouter } from './routes/green.js';
-import { routesRouter } from './routes/routes.js';
-import { announcementsRouter } from './routes/announcements.js';
-import { sponsorsRouter } from './routes/sponsors.js';
-import { treesRouter } from './routes/trees.js';
-import { eventsRouter } from './routes/events.js';
-import { qrcodeRouter } from './routes/qrcode.js';
-import { certificateRouter } from './routes/certificate.js';
-import { analyticsRouter } from './routes/analytics.js';
-import { paymentRouter } from './routes/payment.js';
-import { bulkRegistrationRouter } from './routes/bulk-registration.js';
-import { hrRouter } from './routes/hr.js';
-import { settingsRouter } from './routes/settings.js';
-import { cashfreeRouter } from './routes/cashfree.js';
-
-const PORT = parseInt(process.env.PORT || '4000', 10);
-const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';
-
-const app: ReturnType<typeof express> = express();
-app.set('trust proxy', 1);
-
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(cors({ origin: CORS_ORIGIN.split(','), credentials: true }));
-// Must be registered before the global express.json() below — Cashfree's
-// webhook signature is computed over the exact raw bytes it sent, and a
-// JSON-parsed-then-reserialized body will not match. body-parser skips a
-// path once req.body has already been set, so express.json() leaves this
-// one alone.
-app.use('/api/v1/payments/cashfree/webhook', express.raw({ type: '*/*' }));
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser());
-app.use(rateLimiter);
-
-app.use('/health', healthRouter);
-
-app.use('/api/v1/auth', authRouter);
-app.use('/api/v1/auth/register', registerRouter);
-app.use('/api/v1/participants', publicParticipantsRouter);
-app.use('/api/v1/participants', participantsRouter);
-app.use('/api/v1/checkin', checkinRouter);
-app.use('/api/v1/race', raceRouter);
-app.use('/api/v1/routes', routesRouter);
-app.use('/api/v1/announcements', announcementsRouter);
-app.use('/api/v1/sponsors', sponsorsRouter);
-app.use('/api/v1/tracking', trackingRouter);
-app.use('/api/v1/leaderboard', leaderboardRouter);
-app.use('/api/v1/green', greenRouter);
-app.use('/api/v1/trees', treesRouter);
-app.use('/api/v1/events', eventsRouter);
-app.use('/api/v1/payments', paymentRouter);
-app.use('/api/v1/payments/cashfree', cashfreeRouter);
-app.use('/api/v1/qrcode', qrcodeRouter);
-app.use('/api/v1/certificates', certificateRouter);
-app.use('/api/v1/analytics', analyticsRouter);
-app.use('/api/v1/bulk-registration', bulkRegistrationRouter);
-app.use('/api/v1/hr', hrRouter);
-app.use('/api/v1/settings', settingsRouter);
-
-app.use('/certificates', express.static(path.join(process.cwd(), 'certificates')));
-app.use('/uploads', (req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type');
-  next();
-}, express.static(path.join(process.cwd(), 'uploads')));
-
-app.use(errorHandler);
-
-const httpServer = createServer(app);
-const io = new SocketIOServer(httpServer, {
-  cors: { origin: CORS_ORIGIN.split(','), methods: ['GET', 'POST'], credentials: true },
-  pingInterval: 25000,
-  pingTimeout: 20000,
-});
-
-setupSocketIO(io);
-
-async function start() {
-  httpServer.listen({ port: PORT, host: '0.0.0.0' }, () => {
-    logger.info(`ISA Marathon API on port ${PORT}`);
-    logger.info(`Socket.IO ready`);
-    logger.info(`CORS: ${CORS_ORIGIN}`);
-  });
-}
-
-start().catch((err) => {
-  logger.error('Failed to start:', err);
-  process.exit(1);
-});
-
-export { app, io, httpServer };
+await import('./server.js');

@@ -1,20 +1,37 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 
-interface PendingPayment {
+interface PaymentRow {
   id: string;
   reference: string | null;
+  provider: 'RAZORPAY' | 'SHOWTIMEBRO' | 'CASHFREE';
   amount: number;
-  status: 'PENDING' | 'CLAIMED';
+  currency: string;
+  status: 'PENDING' | 'PROCESSING' | 'CLAIMED' | 'COMPLETED' | 'FAILED' | 'REFUNDED';
+  failureReason: string | null;
+  paidAt: string | null;
   createdAt: string;
-  updatedAt: string;
-  returnParams: Record<string, string> | null;
   participant: {
     bibNumber: string;
     category: string;
     user: { name: string; email: string; phone: string };
   };
 }
+
+const STATUS_STYLES: Record<string, string> = {
+  COMPLETED: 'bg-emerald-100 text-emerald-700',
+  FAILED: 'bg-red-100 text-red-700',
+  REFUNDED: 'bg-slate-200 text-slate-600',
+  PENDING: 'bg-amber-100 text-amber-700',
+  PROCESSING: 'bg-amber-100 text-amber-700',
+  CLAIMED: 'bg-blue-100 text-blue-700',
+};
+
+const PROVIDER_STYLES: Record<string, string> = {
+  CASHFREE: 'bg-violet-100 text-violet-700',
+  RAZORPAY: 'bg-indigo-100 text-indigo-700',
+  SHOWTIMEBRO: 'bg-slate-200 text-slate-600',
+};
 
 function timeAgo(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime();
@@ -27,23 +44,29 @@ function timeAgo(iso: string): string {
 }
 
 export default function PaymentsPage() {
-  const [payments, setPayments] = useState<PendingPayment[]>([]);
+  const [payments, setPayments] = useState<PaymentRow[]>([]);
+  const [summary, setSummary] = useState<{ total: number; completed: number; failed: number; pending: number } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [providerFilter, setProviderFilter] = useState('ALL');
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [reason, setReason] = useState('');
-  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [statusFilter, providerFilter]);
 
   async function load() {
+    setLoading(true);
     try {
-      const res = await api.getShowtimeBroPending();
-      if (res.success) setPayments(res.data || []);
+      const res = await api.getPayments({ status: statusFilter, provider: providerFilter, limit: 200 });
+      if (res.success) {
+        setPayments(res.data || []);
+        if (res.summary) setSummary(res.summary);
+      }
     } catch (e) {
-      console.error('Failed to load pending payments:', e);
+      console.error('Failed to load payments:', e);
     }
     setLoading(false);
   }
@@ -51,8 +74,8 @@ export default function PaymentsPage() {
   async function handleVerify(id: string) {
     setBusyId(id);
     try {
-      await api.verifyShowtimeBroPayment(id);
-      setPayments((prev) => prev.filter((p) => p.id !== id));
+      await api.verifyPaymentManual(id);
+      await load();
     } catch (e) {
       console.error('Verify failed:', e);
     }
@@ -62,8 +85,8 @@ export default function PaymentsPage() {
   async function handleReject(id: string) {
     setBusyId(id);
     try {
-      await api.rejectShowtimeBroPayment(id, reason);
-      setPayments((prev) => prev.filter((p) => p.id !== id));
+      await api.rejectPaymentManual(id, reason);
+      await load();
     } catch (e) {
       console.error('Reject failed:', e);
     }
@@ -72,114 +95,112 @@ export default function PaymentsPage() {
     setReason('');
   }
 
-  const claimedCount = payments.filter((p) => p.status === 'CLAIMED').length;
-  const pendingCount = payments.filter((p) => p.status === 'PENDING').length;
-
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-slate-950">Payments</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          ShowtimeBro gives us a redirect back, not a signed webhook — a query param claiming
-          success can be forged by anyone who types the URL. Nothing here is registered until you
-          compare it against ShowtimeBro's own sales report and verify it below.
-        </p>
+        <p className="text-sm text-slate-500 mt-1">Every payment attempt, across every provider — Cashfree is the live one.</p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="glass rounded-[2rem] p-5 border border-white/20 text-center shadow-sm">
-          <p className="text-2xl font-bold text-amber-700">{claimedCount}</p>
-          <p className="text-xs text-slate-500 mt-1">Returned from checkout — needs review</p>
-        </div>
-        <div className="glass rounded-[2rem] p-5 border border-white/20 text-center shadow-sm">
-          <p className="text-2xl font-bold text-slate-950">{pendingCount}</p>
-          <p className="text-xs text-slate-500 mt-1">Still at checkout, not yet returned</p>
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Payments', value: summary?.total ?? '—', color: 'text-slate-700', bg: 'bg-slate-50' },
+          { label: 'Completed', value: summary?.completed ?? '—', color: 'text-emerald-600', bg: 'bg-emerald-50' },
+          { label: 'Failed', value: summary?.failed ?? '—', color: 'text-red-600', bg: 'bg-red-50' },
+          { label: 'Pending', value: summary?.pending ?? '—', color: 'text-amber-600', bg: 'bg-amber-50' },
+        ].map((c) => (
+          <div key={c.label} className={`glass rounded-[2rem] p-5 border border-white/20 shadow-sm ${c.bg}`}>
+            <p className="text-xs text-slate-500">{c.label}</p>
+            <p className={`text-2xl font-bold mt-1 ${c.color}`}>{c.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-4 py-2 bg-white border border-slate-200 rounded-2xl text-sm"
+        >
+          {['ALL', 'FAILED', 'COMPLETED', 'PENDING', 'PROCESSING', 'CLAIMED', 'REFUNDED'].map((s) => (
+            <option key={s} value={s}>{s === 'ALL' ? 'All statuses' : s}</option>
+          ))}
+        </select>
+        <select
+          value={providerFilter}
+          onChange={(e) => setProviderFilter(e.target.value)}
+          className="px-4 py-2 bg-white border border-slate-200 rounded-2xl text-sm"
+        >
+          {['ALL', 'CASHFREE', 'RAZORPAY', 'SHOWTIMEBRO'].map((p) => (
+            <option key={p} value={p}>{p === 'ALL' ? 'All providers' : p}</option>
+          ))}
+        </select>
       </div>
 
       <div className="glass rounded-[2rem] border border-white/20 shadow-sm overflow-hidden">
         {loading ? (
-          <div className="p-10 text-center text-slate-500 text-sm">Loading&hellip;</div>
+          <div className="p-12 text-center text-slate-500 text-sm">Loading...</div>
         ) : payments.length === 0 ? (
-          <div className="p-10 text-center text-slate-500 text-sm">
-            Nothing waiting on reconciliation right now.
-          </div>
+          <div className="p-12 text-center text-slate-500 text-sm">No payments match these filters.</div>
         ) : (
-          <div className="divide-y divide-white/40">
+          <div className="divide-y divide-slate-100">
             {payments.map((p) => (
-              <div key={p.id} className="p-5">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                        p.status === 'CLAIMED' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600'
-                      }`}>
-                        {p.status === 'CLAIMED' ? 'Returned from checkout' : 'Awaiting checkout'}
-                      </span>
-                      <span className="text-xs text-slate-400">{timeAgo(p.updatedAt)}</span>
-                    </div>
-                    <p className="text-lg font-semibold text-slate-950">{p.participant.user.name}</p>
-                    <div className="mt-1 grid gap-x-6 gap-y-0.5 sm:grid-cols-2 text-sm text-slate-600">
-                      <div><span className="text-slate-400">Email:</span> {p.participant.user.email}</div>
-                      <div><span className="text-slate-400">Phone:</span> {p.participant.user.phone}</div>
-                      <div><span className="text-slate-400">BIB:</span> <span className="font-mono">{p.participant.bibNumber}</span></div>
-                      <div><span className="text-slate-400">Category:</span> {p.participant.category === 'RUN_5K' ? '5K' : '3K'}</div>
-                    </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-slate-400">
-                      <span className="font-mono">{p.reference}</span>
-                      {p.returnParams && Object.keys(p.returnParams).length > 0 && (
-                        <button
-                          onClick={() => setExpandedId(expandedId === p.id ? null : p.id)}
-                          className="underline hover:text-slate-600"
-                        >
-                          {expandedId === p.id ? 'Hide' : 'Show'} return params
-                        </button>
-                      )}
-                    </div>
-                    {expandedId === p.id && p.returnParams && (
-                      <pre className="mt-2 p-3 bg-slate-900 text-slate-100 text-xs rounded-xl overflow-x-auto">
-                        {JSON.stringify(p.returnParams, null, 2)}
-                      </pre>
-                    )}
+              <div key={p.id} className="px-6 py-4 flex items-center gap-4 hover:bg-white/40 transition-colors">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="text-sm font-semibold text-slate-900 truncate">{p.participant?.user?.name || 'Unknown'}</p>
+                    <span className="text-xs text-slate-500">#{p.participant?.bibNumber}</span>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${PROVIDER_STYLES[p.provider] || 'bg-slate-100 text-slate-600'}`}>
+                      {p.provider}
+                    </span>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${STATUS_STYLES[p.status] || 'bg-slate-100 text-slate-600'}`}>
+                      {p.status}
+                    </span>
                   </div>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {p.participant?.user?.email} &middot; {timeAgo(p.createdAt)}
+                    {p.paidAt ? ` · paid ${timeAgo(p.paidAt)}` : ''}
+                  </p>
+                  {p.status === 'FAILED' && p.failureReason && (
+                    <p className="text-xs text-red-600 mt-1">Reason: {p.failureReason}</p>
+                  )}
+                </div>
+                <p className="text-sm font-bold text-slate-900 shrink-0">₹{p.amount}</p>
 
-                  <div className="flex flex-col items-end gap-2 shrink-0">
-                    <p className="text-xl font-bold text-slate-950">&#8377;{p.amount}</p>
-                    <div className="flex gap-2">
+                {(p.status === 'PENDING' || p.status === 'CLAIMED' || p.status === 'PROCESSING') && (
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      onClick={() => handleVerify(p.id)}
+                      disabled={busyId === p.id}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full text-xs font-semibold disabled:opacity-50"
+                    >
+                      Mark Paid
+                    </button>
+                    {rejectingId === p.id ? (
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          autoFocus
+                          value={reason}
+                          onChange={(e) => setReason(e.target.value)}
+                          placeholder="Reason"
+                          className="px-2 py-1.5 border border-slate-200 rounded-full text-xs w-28"
+                        />
+                        <button
+                          onClick={() => handleReject(p.id)}
+                          disabled={busyId === p.id}
+                          className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full text-xs font-semibold disabled:opacity-50"
+                        >
+                          Confirm
+                        </button>
+                      </div>
+                    ) : (
                       <button
-                        onClick={() => handleVerify(p.id)}
-                        disabled={busyId === p.id}
-                        className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white rounded-full text-sm font-semibold transition-colors"
-                      >
-                        {busyId === p.id ? 'Verifying…' : 'Verify & Register'}
-                      </button>
-                      <button
-                        onClick={() => setRejectingId(rejectingId === p.id ? null : p.id)}
-                        disabled={busyId === p.id}
-                        className="px-4 py-2 bg-white/80 hover:bg-red-50 border border-slate-200 disabled:opacity-50 text-red-600 rounded-full text-sm font-semibold transition-colors"
+                        onClick={() => setRejectingId(p.id)}
+                        className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-full text-xs font-semibold"
                       >
                         Reject
                       </button>
-                    </div>
-                  </div>
-                </div>
-
-                {rejectingId === p.id && (
-                  <div className="mt-4 flex flex-col sm:flex-row gap-2">
-                    <input
-                      type="text"
-                      value={reason}
-                      onChange={(e) => setReason(e.target.value)}
-                      placeholder="Reason (e.g. not found in ShowtimeBro sales report)"
-                      className="flex-1 px-4 py-2 bg-white/80 border border-white/70 rounded-full text-sm text-slate-950 focus:ring-2 focus:ring-violet-200 outline-none"
-                    />
-                    <button
-                      onClick={() => handleReject(p.id)}
-                      disabled={busyId === p.id}
-                      className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-full text-sm font-semibold transition-colors"
-                    >
-                      Confirm Reject
-                    </button>
+                    )}
                   </div>
                 )}
               </div>

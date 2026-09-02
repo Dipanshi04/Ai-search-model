@@ -10,17 +10,18 @@ const MAX_POLLS = 90; // ~7.5 minutes, then stop and let email do the rest
 export default function PaymentDetailsPage() {
   const [view, setView] = useState<ViewState>('checking');
   const [bibNumber, setBibNumber] = useState<string | null>(null);
+  const [pin, setPin] = useState<string | null>(null);
   const pollCount = useRef(0);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const returnParams: Record<string, string> = Object.fromEntries(params.entries());
+    const cashfreeOrderId = params.get('cf_order_id');
 
     function handlePollResult(res: { success: boolean; data?: { status?: string; bibNumber?: string } }) {
       // A 404 body still comes back as a resolved response here, not a
       // thrown error — check `success` explicitly, or an unrecognized
-      // reference would sit in "Confirming..." forever instead of ever
+      // order id would sit in "Confirming..." forever instead of ever
       // telling the runner something's wrong.
       if (!res.success) {
         setView('no-reference');
@@ -29,6 +30,8 @@ export default function PaymentDetailsPage() {
       const status = res.data?.status;
       if (status === 'COMPLETED') {
         setBibNumber(res.data?.bibNumber || null);
+        setPin(sessionStorage.getItem('isa_runner_pin'));
+        sessionStorage.removeItem('isa_runner_pin');
         setView('verified');
         return true;
       }
@@ -40,72 +43,32 @@ export default function PaymentDetailsPage() {
       return false;
     }
 
-    // Cashfree carries our own order id straight through on its return_url —
-    // a real webhook already drives the status, so this is a plain poll,
-    // no claim/reconcile step needed. See routes/cashfree.ts.
-    const cashfreeOrderId = returnParams.cf_order_id;
-    if (cashfreeOrderId) {
-      function pollCashfree() {
-        api.getCashfreePaymentStatus(cashfreeOrderId!).then((res) => {
-          const done = handlePollResult(res);
-          if (!done) {
-            pollCount.current += 1;
-            if (pollCount.current < MAX_POLLS) {
-              pollTimer.current = setTimeout(pollCashfree, POLL_INTERVAL_MS);
-            }
-          }
-        }).catch(() => {
-          setView('waiting');
-          pollCount.current += 1;
-          if (pollCount.current < MAX_POLLS) {
-            pollTimer.current = setTimeout(pollCashfree, POLL_INTERVAL_MS);
-          }
-        });
-      }
-      pollCashfree();
-      return () => {
-        if (pollTimer.current) clearTimeout(pollTimer.current);
-      };
-    }
-
-    // Our own reference (set right before we sent the runner to ShowtimeBro)
-    // is the reliable correlator. A `ref` query param is a best-effort
-    // fallback only — we never know for certain ShowtimeBro preserves it.
-    const reference = sessionStorage.getItem('isa_payment_reference') || returnParams.ref || '';
-
-    if (!reference) {
+    if (!cashfreeOrderId) {
       setView('no-reference');
       return;
     }
 
-    async function claimThenPoll(ref: string) {
-      // Records that the redirect came back and what it carried. This never
-      // marks anyone paid by itself — see routes/payment.ts.
-      await api.claimShowtimeBroPayment(ref, returnParams).catch(() => {});
-      poll(ref);
-    }
-
-    function poll(ref: string) {
-      api.getShowtimeBroPaymentStatus(ref).then((res) => {
+    // Cashfree carries our own order id straight through on its return_url —
+    // a real webhook already drives the status, so this is a plain poll,
+    // no claim/reconcile step needed. See routes/cashfree.ts.
+    function pollCashfree() {
+      api.getCashfreePaymentStatus(cashfreeOrderId!).then((res) => {
         const done = handlePollResult(res);
         if (!done) {
           pollCount.current += 1;
           if (pollCount.current < MAX_POLLS) {
-            pollTimer.current = setTimeout(() => poll(ref), POLL_INTERVAL_MS);
+            pollTimer.current = setTimeout(pollCashfree, POLL_INTERVAL_MS);
           }
         }
       }).catch(() => {
-        // A network hiccup, not a definitive answer — keep retrying rather
-        // than giving up on the runner's confirmation.
         setView('waiting');
         pollCount.current += 1;
         if (pollCount.current < MAX_POLLS) {
-          pollTimer.current = setTimeout(() => poll(ref), POLL_INTERVAL_MS);
+          pollTimer.current = setTimeout(pollCashfree, POLL_INTERVAL_MS);
         }
       });
     }
-
-    claimThenPoll(reference);
+    pollCashfree();
 
     return () => {
       if (pollTimer.current) clearTimeout(pollTimer.current);
@@ -152,10 +115,22 @@ export default function PaymentDetailsPage() {
                 <p className="hero-tabular text-3xl sm:text-4xl font-black text-white tracking-wider">{bibNumber}</p>
               </div>
             )}
-            <p className="hero-body text-xs text-brand-navy/50 mb-6">
-              Your login PIN was emailed to you when you registered. Use it with your email to log
-              into the Runner App.
-            </p>
+            {pin ? (
+              <div className="rounded-2xl p-5 sm:p-6 mb-6 border-2 border-dashed" style={{ borderColor: '#F5821F' }}>
+                <p className="hero-body text-xs uppercase tracking-wide font-bold mb-2 text-brand-navy/60">
+                  Your Login PIN
+                </p>
+                <p className="hero-tabular text-3xl sm:text-4xl font-black tracking-wider" style={{ color: '#1B2A5B' }}>{pin}</p>
+                <p className="hero-body text-xs text-brand-navy/50 mt-3">
+                  Also emailed to you. Use it with your email to log into the Runner App.
+                </p>
+              </div>
+            ) : (
+              <p className="hero-body text-xs text-brand-navy/50 mb-6">
+                Your login PIN was emailed to you when you registered. Use it with your email to log
+                into the Runner App.
+              </p>
+            )}
             <a href="/" className="inline-block bg-brand-orange text-white hover:opacity-90 transition px-6 sm:px-8 py-3 rounded-xl text-base font-bold">
               Back to Home
             </a>

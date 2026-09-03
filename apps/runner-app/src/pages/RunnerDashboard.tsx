@@ -62,7 +62,14 @@ interface RunnerState {
   pointCount: number;
   queuedCount: number;
   resumedGapSec: number | null;
+  offRoute: boolean;
 }
+
+// How far (meters) a runner can stray from the nearest point of their
+// drawn route before we flag it — loose enough that normal GPS jitter and
+// running on either side of a road don't trigger it, tight enough to catch
+// a genuine wrong turn.
+const OFF_ROUTE_METERS = 100;
 
 interface Props {
   participantId: string;
@@ -76,7 +83,7 @@ interface Props {
 export default function RunnerDashboard({ participantId, token, category, eventId, onHome }: Props) {
   const [state, setState] = useState<RunnerState>({
     isTracking: false, distance: 0, pace: null, rank: null,
-    status: 'REGISTERED', accuracy: null, speed: null, pointCount: 0, queuedCount: 0, resumedGapSec: null,
+    status: 'REGISTERED', accuracy: null, speed: null, pointCount: 0, queuedCount: 0, resumedGapSec: null, offRoute: false,
   });
   const [elapsedTime, setElapsedTime] = useState(0);
   const [mapReady, setMapReady] = useState(false);
@@ -93,6 +100,7 @@ export default function RunnerDashboard({ participantId, token, category, eventI
   const wakeLockRef = useRef<any>(null);
   const hiddenAtRef = useRef<number | null>(null);
   const lastSentRef = useRef<{ lat: number; lng: number; t: number } | null>(null);
+  const routeCoordsRef = useRef<{ lat: number; lng: number }[]>([]);
 
   const flushGpsQueue = () => {
     const socket = socketRef.current;
@@ -162,8 +170,19 @@ export default function RunnerDashboard({ participantId, token, category, eventI
       .then((res) => {
         const p = res?.data;
         if (!res.success || !p?.startedAt) return;
+        const realElapsedSec = Math.max(0, Math.floor((Date.now() - new Date(p.startedAt).getTime()) / 1000));
         if (p.status === 'RUNNING' || p.status === 'PAUSED') {
-          setElapsedTime(Math.max(0, Math.floor((Date.now() - new Date(p.startedAt).getTime()) / 1000)));
+          setElapsedTime(realElapsedSec);
+        }
+        // Server already has this runner RUNNING — a reload shouldn't force
+        // them to tap Start again and re-grant nothing (geolocation
+        // permission is already granted from their first tap, so this can
+        // reacquire watchPosition silently). PAUSED is left alone — that
+        // was an explicit choice, not something to override automatically.
+        // Pass the real elapsed time explicitly — see startTracking's note
+        // on why reading the elapsedTime state here would be stale.
+        if (p.status === 'RUNNING') {
+          startTracking(realElapsedSec);
         }
       })
       .catch(() => {});
@@ -269,6 +288,7 @@ export default function RunnerDashboard({ participantId, token, category, eventI
             const routeData = await routeRes.json();
             if (routeData.success && routeData.data?.routePoints?.length > 0) {
               const sorted = [...routeData.data.routePoints].sort((a: any, b: any) => a.sequence - b.sequence);
+              routeCoordsRef.current = sorted.map((p: any) => ({ lat: p.lat, lng: p.lng }));
               drawRoute(sorted.map((p: any) => [p.lng, p.lat] as [number, number]));
             }
           } catch {}
@@ -311,7 +331,20 @@ export default function RunnerDashboard({ participantId, token, category, eventI
 
   const capturePoint = (pos: GeolocationPosition, force = false) => {
     const g = { participantId, lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy, speed: pos.coords.speed, altitude: pos.coords.altitude, timestamp: new Date().toISOString() };
-    setState((s) => ({ ...s, isTracking: true, accuracy: pos.coords.accuracy, speed: pos.coords.speed, pointCount: s.pointCount + 1 }));
+
+    // Nearest-point-on-route check, run on every fix (not just the
+    // throttled ones sent to the server) so the warning reacts quickly.
+    let offRoute = false;
+    if (routeCoordsRef.current.length > 0) {
+      let minDist = Infinity;
+      for (const rp of routeCoordsRef.current) {
+        const d = haversineMeters(g.lat, g.lng, rp.lat, rp.lng);
+        if (d < minDist) minDist = d;
+      }
+      offRoute = minDist > OFF_ROUTE_METERS;
+    }
+
+    setState((s) => ({ ...s, isTracking: true, accuracy: pos.coords.accuracy, speed: pos.coords.speed, pointCount: s.pointCount + 1, offRoute }));
     const map = mapRef.current;
     if (map) {
       if (positionMarkerRef.current) { positionMarkerRef.current.setLngLat([g.lng, g.lat]); }
@@ -337,7 +370,7 @@ export default function RunnerDashboard({ participantId, token, category, eventI
     flushGpsQueue();
   };
 
-  const startTracking = async () => {
+  const startTracking = async (initialElapsedSec?: number) => {
     if (!navigator.geolocation) return;
     setState((s) => ({ ...s, isTracking: true }));
     requestWakeLock();
@@ -348,7 +381,11 @@ export default function RunnerDashboard({ participantId, token, category, eventI
       document.head.appendChild(s);
     }
 
-    startTicking(elapsedTime);
+    // A caller resuming after a reload passes the real elapsed time
+    // explicitly — reading the elapsedTime state here would see whatever
+    // it was before this same tick's setElapsedTime call finishes
+    // (React batches state updates, so it isn't visible yet via closure).
+    startTicking(initialElapsedSec ?? elapsedTime);
 
     const watchId = navigator.geolocation.watchPosition(
       capturePoint,
@@ -522,6 +559,17 @@ export default function RunnerDashboard({ participantId, token, category, eventI
           )}
         </div>
 
+        {state.isTracking && state.offRoute && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', padding: '10px 14px', borderRadius: '12px', background: 'rgba(248,113,113,0.15)', border: '1px solid rgba(248,113,113,0.4)' }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fca5a5" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <path d="M12 9v4M12 17h.01" /><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z" />
+            </svg>
+            <span style={{ fontSize: '13px', fontWeight: 600, color: '#fca5a5', lineHeight: 1.4 }}>
+              You appear to be off the race route — head back toward the marked path.
+            </span>
+          </div>
+        )}
+
         {state.isTracking && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', padding: '10px 14px', borderRadius: '12px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.55)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
@@ -566,7 +614,7 @@ export default function RunnerDashboard({ participantId, token, category, eventI
 
         <div style={{ flex: '0 0 auto', display: 'flex', gap: '12px', padding: '16px 24px', paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}>
           <button
-            onClick={state.isTracking ? pauseTracking : startTracking}
+            onClick={() => (state.isTracking ? pauseTracking() : startTracking())}
             disabled={isButtonDisabled}
             style={{
               flex: 1, padding: '15px', borderRadius: '12px', border: 'none',

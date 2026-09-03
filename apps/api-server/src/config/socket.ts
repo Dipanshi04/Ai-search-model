@@ -102,7 +102,16 @@ export function setupSocketIO(io: SocketIOServer): void {
         await updateParticipantTrees(data.participantId);
 
         let effectiveStatus = participant.status;
-        if (participant.status !== 'FINISHED') {
+        // Minimum 10 minutes since start before the finish-proximity check
+        // even runs — without this, a runner is auto-finished the instant
+        // they leave the start line whenever a course loops back near
+        // itself (start and finish are close together on plenty of routes).
+        // Nobody legitimately finishes a 3K/5K in under 10 minutes.
+        const minMsSinceStart = 10 * 60 * 1000;
+        const pastMinimumTime = participant.startedAt
+          ? Date.now() - new Date(participant.startedAt).getTime() >= minMsSinceStart
+          : false;
+        if (participant.status !== 'FINISHED' && pastMinimumTime) {
           const settings = await getTrackingSettings(participant.eventId);
           const finishDistance = await distanceToFinishMeters(participant.eventId, participant.category, data.lat, data.lng);
           if (finishDistance !== null && finishDistance <= settings.finishThresholdMeters) {

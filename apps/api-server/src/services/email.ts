@@ -99,6 +99,17 @@ const BRAND_ORANGE = '#F5821F';
 const BRAND_CREAM = '#F5F1EA';
 const SITE_URL = process.env.PUBLIC_WEB_URL || 'https://marathon.theisa.in';
 
+// Race day: 6:30 AM IST, 27 Sep 2026 — 6:30-10:00 IST is 01:00-04:30 UTC.
+// A Google Calendar link needs no server-generated file and opens in every
+// mail client that renders a plain <a>, unlike an .ics attachment which
+// several clients strip or refuse to render inline.
+const CALENDAR_URL =
+  'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+  '&text=' + encodeURIComponent('ISA Tech Marathon 2026') +
+  '&dates=20260927T010000Z/20260927T043000Z' +
+  '&details=' + encodeURIComponent('Race day! Check-in opens early — bring your BIB number and login PIN.') +
+  '&location=' + encodeURIComponent('Indore, Madhya Pradesh, India');
+
 function wrapEmailTemplate(bodyHtml: string): string {
   return `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; background: ${BRAND_CREAM};">
@@ -196,6 +207,12 @@ export async function sendWelcomeEmail(
     </div>
     <p style="margin: 18px 0 0; font-size: 14px; color: rgba(27,42,91,0.65); text-align: center;">Category: <strong style="color: ${BRAND_NAVY};">${category}</strong></p>
     <p style="margin: 20px 0 0; font-size: 12px; color: rgba(27,42,91,0.45); text-align: center;">Your PIN was sent in a separate email — use it to log into the Runner App.</p>
+    <div style="text-align: center; margin-top: 24px; padding-top: 20px; border-top: 1px solid rgba(27,42,91,0.08);">
+      <p style="margin: 0 0 12px; font-size: 13px; color: ${BRAND_NAVY};">Race starts <strong>6:30 AM, 27th September 2026</strong></p>
+      <a href="${CALENDAR_URL}" target="_blank" style="display: inline-block; background: ${BRAND_ORANGE}; color: #fff; text-decoration: none; font-weight: 700; font-size: 13px; padding: 10px 22px; border-radius: 10px;">
+        Add to Calendar
+      </a>
+    </div>
   `);
 
   const tp = getTransporter();

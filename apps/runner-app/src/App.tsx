@@ -11,6 +11,7 @@ interface ParticipantInfo {
   bibNumber: string;
   category: string;
   eventId: string;
+  status: string;
 }
 
 export default function App() {
@@ -38,7 +39,14 @@ export default function App() {
           bibNumber: p.bibNumber,
           category: p.category,
           eventId: p.eventId,
+          status: p.status,
         });
+        // Already RUNNING or PAUSED server-side (tracking started before
+        // this page loaded) — skip the "START RACE" gate entirely instead
+        // of making them tap Start again after every refresh/reload.
+        if (p.status === 'RUNNING' || p.status === 'PAUSED') {
+          setRaceStarted(true);
+        }
       } else {
         api.clearToken();
       }

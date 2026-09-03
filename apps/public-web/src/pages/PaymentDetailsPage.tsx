@@ -131,6 +131,20 @@ export default function PaymentDetailsPage() {
                 into the Runner App.
               </p>
             )}
+            <div className="mb-6">
+              <p className="hero-body text-xs text-brand-navy/50 mb-2">Race starts <strong>6:30 AM, 27th September 2026</strong></p>
+              <a
+                href="https://calendar.google.com/calendar/render?action=TEMPLATE&text=ISA%20Tech%20Marathon%202026&dates=20260927T010000Z/20260927T043000Z&details=Race%20day!%20Check-in%20opens%20early%20%E2%80%94%20bring%20your%20BIB%20number%20and%20login%20PIN.&location=Indore%2C%20Madhya%20Pradesh%2C%20India"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 border border-brand-navy/20 text-brand-navy hover:bg-brand-navy/5 transition px-5 py-2.5 rounded-xl text-sm font-bold"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" />
+                </svg>
+                Add to Calendar
+              </a>
+            </div>
             <a href="/" className="inline-block bg-brand-orange text-white hover:opacity-90 transition px-6 sm:px-8 py-3 rounded-xl text-base font-bold">
               Back to Home
             </a>

@@ -79,11 +79,15 @@ bulkRegistrationRouter.post('/', async (req: Request, res: Response) => {
     const pin = String(Math.floor(1000 + Math.random() * 9000));
     const pinHash = await bcrypt.hash(pin, 12);
 
+    // Same pattern as public registration: a real companyId picked from the
+    // list needs no name-matching. A brand new name gets uppercased so
+    // "Tata"/"TATA"/"tata" from different admins all land on one row.
     let linkedCompanyId = companyId || null;
     if (!linkedCompanyId && companyName) {
-      let company = await prisma.company.findUnique({ where: { name: companyName } });
+      const normalizedName = companyName.trim().toUpperCase();
+      let company = await prisma.company.findUnique({ where: { name: normalizedName } });
       if (!company) {
-        company = await prisma.company.create({ data: { name: companyName } });
+        company = await prisma.company.create({ data: { name: normalizedName } });
       }
       linkedCompanyId = company.id;
     }
@@ -147,8 +151,9 @@ bulkRegistrationRouter.post('/', async (req: Request, res: Response) => {
 bulkRegistrationRouter.put('/:id', async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    const { companyName, hrName, hrEmail, numberOfRegistrations, paymentCompleted, notes } = req.body as {
+    const { companyName, companyId, hrName, hrEmail, numberOfRegistrations, paymentCompleted, notes } = req.body as {
       companyName?: string;
+      companyId?: string;
       hrName?: string;
       hrEmail?: string;
       numberOfRegistrations?: number;
@@ -178,7 +183,21 @@ bulkRegistrationRouter.put('/:id', async (req: Request, res: Response) => {
     }
 
     const updateData: Record<string, any> = {};
-    if (companyName !== undefined) updateData.companyName = companyName;
+    if (companyId !== undefined) {
+      const company = await prisma.company.findUnique({ where: { id: companyId } });
+      if (company) {
+        updateData.companyId = company.id;
+        updateData.companyName = company.name;
+      }
+    } else if (companyName !== undefined) {
+      const normalizedName = companyName.trim().toUpperCase();
+      let company = await prisma.company.findUnique({ where: { name: normalizedName } });
+      if (!company) {
+        company = await prisma.company.create({ data: { name: normalizedName } });
+      }
+      updateData.companyId = company.id;
+      updateData.companyName = company.name;
+    }
     if (hrName !== undefined) updateData.hrName = hrName;
     if (hrEmail !== undefined) updateData.hrEmail = hrEmail;
     if (numberOfRegistrations !== undefined) updateData.numberOfRegistrations = numberOfRegistrations;

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { api } from '../lib/api';
 
 interface BulkRegistration {
@@ -30,8 +30,33 @@ export default function BulkRegistrationPage() {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
+  const [companyId, setCompanyId] = useState('');
+  const [companyDropdownOpen, setCompanyDropdownOpen] = useState(false);
+  const companyFieldRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { fetchRegistrations(); }, []);
+
+  useEffect(() => {
+    api.getCompanies().then((res) => {
+      if (res.success && res.data) setCompanies(res.data);
+    }).catch(() => {});
+  }, []);
+
+  // Client-side filter of the already-fetched list — no per-keystroke API calls.
+  const filteredCompanies = form.companyName.trim()
+    ? companies.filter((c) => c.name.toLowerCase().includes(form.companyName.trim().toLowerCase()))
+    : companies;
+
+  useEffect(() => {
+    const onClickOutside = (e: MouseEvent) => {
+      if (companyFieldRef.current && !companyFieldRef.current.contains(e.target as Node)) {
+        setCompanyDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, []);
 
   async function fetchRegistrations() {
     try {
@@ -45,10 +70,17 @@ export default function BulkRegistrationPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
+    // companyId is only trusted if the visible text still exactly matches
+    // the company it was picked from — editing the text after picking (or
+    // never picking at all) means a new company name instead.
+    const pickedCompany = companies.find((c) => c.id === companyId);
+    const companyFields = pickedCompany && pickedCompany.name === form.companyName.trim()
+      ? { companyId }
+      : { companyName: form.companyName.trim() };
     try {
       if (editingId) {
         await api.updateBulkRegistration(editingId, {
-          companyName: form.companyName,
+          ...companyFields,
           hrName: form.hrName,
           hrEmail: form.hrEmail,
           numberOfRegistrations: form.numberOfRegistrations,
@@ -57,7 +89,8 @@ export default function BulkRegistrationPage() {
         });
       } else {
         await api.createBulkRegistration({
-          companyName: form.companyName,
+          companyName: form.companyName.trim(),
+          ...companyFields,
           hrName: form.hrName,
           hrEmail: form.hrEmail,
           hrPassword: form.hrPassword,
@@ -67,6 +100,7 @@ export default function BulkRegistrationPage() {
       }
       setShowModal(false);
       setForm(emptyForm);
+      setCompanyId('');
       setEditingId(null);
       fetchRegistrations();
     } catch (e: any) {
@@ -105,12 +139,14 @@ export default function BulkRegistrationPage() {
       notes: reg.notes || '',
       paymentCompleted: reg.paymentCompleted,
     });
+    setCompanyId(reg.companyId || '');
     setEditingId(reg.id);
     setShowModal(true);
   }
 
   function openCreate() {
     setForm(emptyForm);
+    setCompanyId('');
     setEditingId(null);
     setShowModal(true);
   }
@@ -212,15 +248,43 @@ export default function BulkRegistrationPage() {
 
             <form onSubmit={handleSubmit} className="px-8 pb-8 pt-4">
               <div className="space-y-4">
-                <div>
+                <div className="relative" ref={companyFieldRef}>
                   <label className="block text-xs font-medium text-slate-500 mb-1.5">Company Name *</label>
                   <input
                     value={form.companyName}
-                    onChange={(e) => setForm({ ...form, companyName: e.target.value })}
+                    onChange={(e) => {
+                      setForm({ ...form, companyName: e.target.value });
+                      setCompanyId('');
+                      setCompanyDropdownOpen(true);
+                    }}
+                    onFocus={() => setCompanyDropdownOpen(true)}
                     required
+                    autoComplete="off"
                     className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-950 text-sm focus:ring-2 focus:ring-violet-200 focus:border-violet-400 outline-none transition"
-                    placeholder="Acme Corp"
+                    placeholder="Search or type a company"
                   />
+                  {companyDropdownOpen && (
+                    <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-lg">
+                      {filteredCompanies.length > 0 ? (
+                        filteredCompanies.slice(0, 50).map((c) => (
+                          <button
+                            type="button"
+                            key={c.id}
+                            onClick={() => {
+                              setForm({ ...form, companyName: c.name });
+                              setCompanyId(c.id);
+                              setCompanyDropdownOpen(false);
+                            }}
+                            className="w-full text-left px-4 py-2 text-sm text-slate-800 hover:bg-violet-50 transition"
+                          >
+                            {c.name}
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-4 py-2 text-xs text-slate-400">No match — this will be added as a new company.</div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">

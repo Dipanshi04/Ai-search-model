@@ -10,10 +10,16 @@
  * an admin already set.
  *
  * Usage (run from apps/api-server):
- *   npx tsx scripts/import-companies.ts /path/to/companies.csv
+ *   npx tsx scripts/import-companies.ts                    # uses scripts/companies.csv
+ *   npx tsx scripts/import-companies.ts /path/to/other.csv  # or point at a different file
  */
 import { prisma } from '../src/config/database.js';
 import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const DEFAULT_CSV = path.join(__dirname, 'companies.csv');
 
 function parseCsvColumn(content: string): string[] {
   const lines = content.split(/\r?\n/);

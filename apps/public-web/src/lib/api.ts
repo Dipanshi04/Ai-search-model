@@ -48,6 +48,17 @@ class ApiClient {
     });
   }
 
+  async getCompanies() {
+    return this.request<{ id: string; name: string }[]>('/api/v1/participants/companies');
+  }
+
+  async submitSponsorInquiry(data: { name: string; email: string; phone?: string; companyName: string; message?: string }) {
+    return this.request<any>('/api/v1/sponsors/inquiries', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   async startCashfreePayment(participantId: string) {
     return this.request<{ paymentSessionId: string; orderId: string; amount: number; environment: 'sandbox' | 'production' }>(
       '/api/v1/payments/cashfree/start',

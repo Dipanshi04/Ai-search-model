@@ -9,6 +9,7 @@ import TermsPage from './pages/TermsPage';
 import TreeCounterPage from './pages/TreeCounterPage';
 import PaymentDetailsPage from './pages/PaymentDetailsPage';
 import Footer from './components/Footer';
+import SponsorInquiryModal from './components/SponsorInquiryModal';
 import logoDark from './components/logo-dark.png';
 import heroRunner from './components/hero-runner.webp';
 import nrcGroupLogo from './components/nrc-group-logo.png';
@@ -83,24 +84,28 @@ function CountdownTimer() {
   );
 }
 function HomePage() {
+  const [showSponsorModal, setShowSponsorModal] = useState(false);
   return (
     <div className="hero-root min-h-screen overflow-hidden flex flex-col">
       {/* Decorative background layers */}
       <div className="hero-grain" />
 
-      {/* Top bar: logo lockups, matching the poster's two-corner layout */}
-      <div className="hero-anim flex items-center justify-between px-4 sm:px-8 pt-4 sm:pt-6 relative z-10 shrink-0" style={{ animationDelay: '0ms' }}>
+      {/* Top bar: logo lockups, matching the poster's two-corner layout.
+          Stacked and centered on narrow phones — side-by-side at full size
+          plus the wordmark text left no room and clipped off-screen; from
+          sm: up it's the original two-corner row. */}
+      <div className="hero-anim flex flex-col-reverse sm:flex-row items-center sm:items-center justify-center sm:justify-between gap-2 sm:gap-0 px-4 sm:px-8 pt-4 sm:pt-6 relative z-10 shrink-0" style={{ animationDelay: '0ms' }}>
         <div className="flex items-center gap-3 sm:gap-5 shrink-0">
-          <div className="bg-white rounded-2xl shadow-sm px-3 py-2 sm:px-4 sm:py-3 border shrink-0" style={{ borderColor: 'rgba(27,42,91,0.08)' }}>
-            <img src={nrcGroupLogo} alt="NRC Group" className="h-20 sm:h-24 xl:h-32 w-auto object-contain shrink-0" />
+          <div className="bg-white rounded-2xl shadow-sm px-2.5 py-1.5 sm:px-4 sm:py-3 border shrink-0" style={{ borderColor: 'rgba(27,42,91,0.08)' }}>
+            <img src={nrcGroupLogo} alt="NRC Group" className="h-14 sm:h-24 xl:h-32 w-auto object-contain shrink-0" />
           </div>
-          <div className="bg-white rounded-2xl shadow-sm px-3 py-2 sm:px-4 sm:py-3 border shrink-0" style={{ borderColor: 'rgba(27,42,91,0.08)' }}>
-            <Logo size="h-20 sm:h-24 xl:h-32" />
+          <div className="bg-white rounded-2xl shadow-sm px-2.5 py-1.5 sm:px-4 sm:py-3 border shrink-0" style={{ borderColor: 'rgba(27,42,91,0.08)' }}>
+            <Logo size="h-14 sm:h-24 xl:h-32" />
           </div>
         </div>
-        <div className="hero-kicker text-right leading-tight shrink-0">
-          <div className="text-lg sm:text-2xl xl:text-3xl font-extrabold tracking-[0.1em] uppercase" style={{ color: '#1B2A5B' }}>Indore Software</div>
-          <div className="text-lg sm:text-2xl xl:text-3xl font-extrabold tracking-[0.1em] uppercase" style={{ color: '#1B2A5B' }}>Association</div>
+        <div className="hero-kicker text-center sm:text-right leading-tight shrink-0">
+          <div className="text-sm sm:text-2xl xl:text-3xl font-extrabold tracking-[0.1em] uppercase" style={{ color: '#1B2A5B' }}>Indore Software</div>
+          <div className="text-sm sm:text-2xl xl:text-3xl font-extrabold tracking-[0.1em] uppercase" style={{ color: '#1B2A5B' }}>Association</div>
         </div>
       </div>
 
@@ -136,14 +141,20 @@ function HomePage() {
           </div>
 
           <div className="hero-anim mt-6 sm:mt-7" style={{ animationDelay: '480ms' }}>
-            <span className="hero-body inline-block px-4 py-1.5 rounded-full border text-[11px] sm:text-xs font-semibold" style={{ borderColor: 'rgba(27,42,91,0.2)', color: '#1B2A5B', opacity: 0.7 }}>
+            <button
+              onClick={() => setShowSponsorModal(true)}
+              className="hero-body inline-block px-4 py-1.5 rounded-full border text-[11px] sm:text-xs font-semibold hover:opacity-100 transition cursor-pointer"
+              style={{ borderColor: 'rgba(27,42,91,0.2)', color: '#1B2A5B', opacity: 0.7 }}
+            >
               Open For Sponsors
-            </span>
+            </button>
           </div>
         </div>
 
         <img src={heroRunner} alt="" aria-hidden="true" className="hero-runner" />
       </div>
+
+      {showSponsorModal && <SponsorInquiryModal onClose={() => setShowSponsorModal(false)} />}
 
       <Footer />
     </div>

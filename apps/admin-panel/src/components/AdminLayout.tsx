@@ -16,6 +16,7 @@ const navItems = [
   { to: '/participants', label: 'Participants' },
   { to: '/companies', label: 'Companies' },
   { to: '/sponsors', label: 'Sponsors' },
+  { to: '/sponsor-inquiries', label: 'Sponsor Inquiries' },
   { to: '/bulk-registration', label: 'Bulk Registration' },
   { to: '/payments', label: 'Payments' },
   { to: '/checkin', label: 'Check-in' },

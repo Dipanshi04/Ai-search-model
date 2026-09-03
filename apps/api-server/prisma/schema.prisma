@@ -208,6 +208,23 @@ model Sponsor {
   @@map("sponsors")
 }
 
+// Inbound leads from the homepage "Open For Sponsors" button — not tied to
+// one event since a prospective sponsor is reaching out generally, before
+// any specific event assignment makes sense.
+model SponsorInquiry {
+  id          String   @id @default(cuid())
+  name        String
+  email       String
+  phone       String?
+  companyName String   @map("company_name")
+  message     String?
+  status      String   @default("NEW") // NEW | CONTACTED | CLOSED — admin-set, not a fixed enum since the triage flow may evolve
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("sponsor_inquiries")
+}
+
 model Announcement {
   id        String    @id @default(cuid())
   eventId   String    @map("event_id")

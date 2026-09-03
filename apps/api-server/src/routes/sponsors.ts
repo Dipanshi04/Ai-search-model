@@ -142,3 +142,67 @@ sponsorsRouter.delete('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MAN
     res.status(500).json({ success: false, message: 'Failed to delete sponsor' });
   }
 });
+
+// ---- Sponsor inquiries — leads from the homepage "Open For Sponsors" button ----
+
+sponsorsRouter.post('/inquiries', async (req: Request, res: Response) => {
+  try {
+    const { name, email, phone, companyName, message } = req.body;
+    if (!name || !email || !companyName) {
+      res.status(400).json({ success: false, message: 'Name, email, and company are required' });
+      return;
+    }
+
+    const inquiry = await prisma.sponsorInquiry.create({
+      data: { name, email, phone: phone || null, companyName, message: message || null },
+    });
+
+    res.status(201).json({ success: true, data: inquiry });
+  } catch (error) {
+    console.error('Create sponsor inquiry error:', error);
+    res.status(500).json({ success: false, message: 'Failed to submit inquiry' });
+  }
+});
+
+sponsorsRouter.get(
+  '/inquiries',
+  authenticate,
+  requireRole('SUPER_ADMIN', 'RACE_MANAGER'),
+  async (req: Request, res: Response) => {
+    try {
+      const { status } = req.query;
+      const where = status && status !== 'ALL' ? { status: String(status) } : {};
+      const inquiries = await prisma.sponsorInquiry.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+      });
+      res.json({ success: true, data: inquiries });
+    } catch (error) {
+      console.error('List sponsor inquiries error:', error);
+      res.status(500).json({ success: false, message: 'Failed to load inquiries' });
+    }
+  }
+);
+
+sponsorsRouter.put(
+  '/inquiries/:id',
+  authenticate,
+  requireRole('SUPER_ADMIN', 'RACE_MANAGER'),
+  async (req: Request, res: Response) => {
+    try {
+      const { status } = req.body;
+      if (!['NEW', 'CONTACTED', 'CLOSED'].includes(status)) {
+        res.status(400).json({ success: false, message: 'Invalid status' });
+        return;
+      }
+      const inquiry = await prisma.sponsorInquiry.update({
+        where: { id: req.params.id as string },
+        data: { status },
+      });
+      res.json({ success: true, data: inquiry });
+    } catch (error) {
+      console.error('Update sponsor inquiry error:', error);
+      res.status(500).json({ success: false, message: 'Failed to update inquiry' });
+    }
+  }
+);

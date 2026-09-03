@@ -196,7 +196,7 @@ authRouter.post(
 
       const user = await prisma.user.findUnique({
         where: { id: req.user!.userId },
-        select: { id: true, pinHash: true },
+        select: { id: true, email: true, name: true, pinHash: true },
       });
 
       if (!user?.pinHash) {
@@ -212,6 +212,11 @@ authRouter.post(
 
       const pinHash = await bcrypt.hash(newPin, 12);
       await prisma.user.update({ where: { id: user.id }, data: { pinHash } });
+
+      // A PIN change is a credential change — email it the same way a reset
+      // does, so the account owner has a record of it (and a heads-up if
+      // they didn't make the change themselves).
+      sendPinEmail(user.email, user.name, newPin).catch((e) => logger.error('PIN change email failed:', e));
 
       logger.info(`PIN changed for user: ${req.user!.email}`);
 

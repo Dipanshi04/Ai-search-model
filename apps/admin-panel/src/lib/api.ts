@@ -320,6 +320,18 @@ class ApiClient {
     return this.request<void>(`/api/v1/sponsors/${id}`, { method: 'DELETE' });
   }
 
+  async getSponsorInquiries(status?: string) {
+    const query = status && status !== 'ALL' ? `?status=${status}` : '';
+    return this.request<any[]>(`/api/v1/sponsors/inquiries${query}`);
+  }
+
+  async updateSponsorInquiryStatus(id: string, status: string) {
+    return this.request<any>(`/api/v1/sponsors/inquiries/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    });
+  }
+
   async getPayments(filters?: { status?: string; provider?: string; limit?: number }) {
     const params = new URLSearchParams();
     if (filters?.status && filters.status !== 'ALL') params.set('status', filters.status);

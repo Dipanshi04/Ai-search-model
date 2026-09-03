@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { api } from '../lib/api';
 import Footer from '../components/Footer';
+import PageHeader from '../components/PageHeader';
 
 declare global {
   interface Window {
@@ -25,6 +26,7 @@ export default function RegisterPage() {
     phone: '',
     category: 'RUN_3K',
     gender: 'MALE',
+    companyId: '',
     companyName: '',
     emergencyContact: '',
     emergencyPhone: '',
@@ -40,6 +42,13 @@ export default function RegisterPage() {
   const [tacAccepted, setTacAccepted] = useState(false);
   const [tacScrolledToBottom, setTacScrolledToBottom] = useState(false);
   const tacContentRef = useRef<HTMLDivElement>(null);
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
+
+  useEffect(() => {
+    api.getCompanies().then((res) => {
+      if (res.success && res.data) setCompanies(res.data);
+    }).catch(() => {});
+  }, []);
 
   const handleTacScroll = () => {
     const el = tacContentRef.current;
@@ -79,7 +88,15 @@ export default function RegisterPage() {
     setLoading(true);
     setError('');
 
-    const res = await api.register(form);
+    // companyId holds either a real company's id, or the 'OTHER' sentinel
+    // when they typed a new one into the free-text field instead — never
+    // send 'OTHER' itself to the server.
+    const { companyId, companyName, ...rest } = form;
+    const payload = companyId && companyId !== 'OTHER'
+      ? { ...rest, companyId }
+      : { ...rest, companyName: companyName.trim() };
+
+    const res = await api.register(payload);
     if (res.success) {
       setResult(res.data);
       // Only ever available in this one response — the PIN is bcrypt-hashed
@@ -130,7 +147,9 @@ export default function RegisterPage() {
 
   if (step === 'success') {
     return (
-      <div className="min-h-screen bg-brand-cream flex flex-col">
+      <div className="min-h-screen bg-brand-cream flex flex-col relative">
+      <div className="hero-grain" />
+      <PageHeader />
       <div className="flex-1 flex items-center justify-center px-4 py-8">
         <div className="bg-white border border-brand-navy/10 shadow-sm p-8 sm:p-10 rounded-3xl max-w-md w-full text-center relative z-10">
           <h2 className="hero-title text-2xl sm:text-3xl font-bold text-brand-navy mb-4">
@@ -174,7 +193,9 @@ export default function RegisterPage() {
     const payCategory: CategoryKey = result?.participant?.category === 'RUN_5K' ? 'RUN_5K' : 'RUN_3K';
     const categoryFee = CATEGORY_FEES[payCategory];
     return (
-      <div className="min-h-screen bg-brand-cream flex flex-col">
+      <div className="min-h-screen bg-brand-cream flex flex-col relative">
+      <div className="hero-grain" />
+      <PageHeader />
       <div className="flex-1 flex items-center justify-center px-4 py-8">
         <div className="bg-white border border-brand-navy/10 shadow-sm p-8 sm:p-10 rounded-3xl max-w-md w-full relative z-10">
           <div className="text-center mb-6 sm:mb-8">
@@ -234,7 +255,9 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-brand-cream flex flex-col">
+    <div className="min-h-screen bg-brand-cream flex flex-col relative">
+    <div className="hero-grain" />
+    <PageHeader />
     <div className="flex-1 flex items-center justify-center px-4 py-8">
       <div className="relative z-10 w-full max-w-3xl">
         <form onSubmit={handleSubmitForm} className="bg-white border border-brand-navy/10 shadow-sm rounded-3xl p-5 sm:p-6 sm:p-8">
@@ -299,13 +322,27 @@ export default function RegisterPage() {
             </div>
             <div>
               <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1">Company</label>
-              <input
-                type="text"
-                value={form.companyName}
-                onChange={(e) => setForm({ ...form, companyName: e.target.value })}
-                className="w-full px-3 py-2 bg-brand-cream border border-brand-navy/15 rounded-lg text-brand-navy placeholder-brand-navy/30 focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition"
-                placeholder="company"
-              />
+              <select
+                value={form.companyId}
+                onChange={(e) => setForm({ ...form, companyId: e.target.value, companyName: e.target.value === 'OTHER' ? form.companyName : '' })}
+                className="w-full px-3 py-2 bg-brand-cream border border-brand-navy/15 rounded-lg text-brand-navy focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition"
+              >
+                <option value="">Select company</option>
+                {companies.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+                <option value="OTHER">Other (not listed)</option>
+              </select>
+              {form.companyId === 'OTHER' && (
+                <input
+                  type="text"
+                  required
+                  value={form.companyName}
+                  onChange={(e) => setForm({ ...form, companyName: e.target.value })}
+                  className="w-full mt-2 px-3 py-2 bg-brand-cream border border-brand-navy/15 rounded-lg text-brand-navy placeholder-brand-navy/30 focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition"
+                  placeholder="Type your company name"
+                />
+              )}
             </div>
             <div>
               <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1">Emergency Contact</label>

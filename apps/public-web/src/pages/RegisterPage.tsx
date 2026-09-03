@@ -33,6 +33,8 @@ export default function RegisterPage() {
     bloodDonation: false,
     tshirtSize: 'M',
   });
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState('');
@@ -124,6 +126,12 @@ export default function RegisterPage() {
       // Stashed here so the post-payment confirmation page can show it.
       if (res.data?.pin) {
         sessionStorage.setItem('isa_runner_pin', res.data.pin);
+      }
+      // Best-effort — a failed photo upload shouldn't block registration
+      // itself, since a photo can always be added later from the Runner App.
+      const userId = res.data?.participant?.userId;
+      if (photo && userId) {
+        api.uploadRegistrationPhoto(userId, form.email, photo).catch(() => {});
       }
       setStep('payment');
     } else {
@@ -338,6 +346,33 @@ export default function RegisterPage() {
                 <option value="MALE">Male</option>
                 <option value="FEMALE">Female</option>
               </select>
+            </div>
+            <div>
+              <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1">Your Photo (optional)</label>
+              <div className="flex items-center gap-3">
+                {photoPreview ? (
+                  <img src={photoPreview} alt="" className="w-12 h-12 rounded-full object-cover border border-brand-navy/15 shrink-0" />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-brand-cream border border-brand-navy/15 flex items-center justify-center shrink-0 text-brand-navy/30">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8" /></svg>
+                  </div>
+                )}
+                <label className="cursor-pointer px-3 py-2 rounded-lg border border-brand-navy/15 text-xs font-semibold text-brand-navy hover:bg-brand-cream transition">
+                  {photo ? 'Change photo' : 'Add photo'}
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    capture="user"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      setPhoto(file);
+                      setPhotoPreview(file ? URL.createObjectURL(file) : null);
+                    }}
+                  />
+                </label>
+              </div>
+              <p className="hero-body text-[11px] text-brand-navy/40 mt-1">You can also add or change this later from the Runner App.</p>
             </div>
             <div className="relative" ref={companyFieldRef}>
               <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1">Company</label>

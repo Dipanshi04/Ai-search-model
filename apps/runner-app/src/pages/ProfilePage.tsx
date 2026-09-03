@@ -12,7 +12,10 @@ interface ProfileDetails {
   phone: string;
   bibNumber: string;
   category: string;
+  avatarUrl: string | null;
 }
+
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 type GpsStatus = 'unknown' | 'checking' | 'active' | 'denied' | 'unavailable' | 'timeout' | 'unsupported';
 
@@ -34,6 +37,8 @@ const GPS_META: Record<GpsStatus, { color: string; label: string; hint: (accurac
 export default function ProfilePage({ onBack }: Props) {
   const [mounted, setMounted] = useState(false);
   const [details, setDetails] = useState<ProfileDetails | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
+  const [photoError, setPhotoError] = useState('');
 
   const [gpsStatus, setGpsStatus] = useState<GpsStatus>('unknown');
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
@@ -56,6 +61,7 @@ export default function ProfilePage({ onBack }: Props) {
           phone: res.data.phone,
           bibNumber: p?.bibNumber || '—',
           category: p?.category || '',
+          avatarUrl: res.data.avatarUrl || null,
         });
       }
     });
@@ -111,6 +117,25 @@ export default function ProfilePage({ onBack }: Props) {
   };
 
   const g = GPS_META[gpsStatus];
+
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setPhotoError('');
+    setPhotoUploading(true);
+    try {
+      const res = await api.uploadMyPhoto(file);
+      if (res.success && res.data?.avatarUrl) {
+        setDetails((d) => (d ? { ...d, avatarUrl: res.data.avatarUrl } : d));
+      } else {
+        setPhotoError(res.message || 'Failed to upload photo');
+      }
+    } catch {
+      setPhotoError('Network error. Please try again.');
+    }
+    setPhotoUploading(false);
+  };
 
   const togglePinForm = () => {
     setShowPinForm((s) => {
@@ -204,21 +229,45 @@ export default function ProfilePage({ onBack }: Props) {
           textAlign: 'center',
           boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
         }}>
-          <div style={{
-            width: '64px',
-            height: '64px',
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, #10b981, #059669)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            margin: '0 auto 12px',
-            fontSize: '24px',
-            fontWeight: 800,
-            color: '#fff',
-          }}>
-            {(details?.name || '?').charAt(0).toUpperCase()}
-          </div>
+          <label style={{ position: 'relative', display: 'inline-block', margin: '0 auto 12px', cursor: 'pointer' }}>
+            <input type="file" accept="image/png,image/jpeg,image/webp" capture="user" style={{ display: 'none' }} onChange={handlePhotoChange} />
+            {details?.avatarUrl ? (
+              <img
+                src={`${API_URL}${details.avatarUrl}`}
+                alt=""
+                style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover', display: 'block', opacity: photoUploading ? 0.5 : 1 }}
+              />
+            ) : (
+              <div style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #10b981, #059669)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '24px',
+                fontWeight: 800,
+                color: '#fff',
+                opacity: photoUploading ? 0.5 : 1,
+              }}>
+                {(details?.name || '?').charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div style={{
+              position: 'absolute', bottom: '-2px', right: '-2px',
+              width: '22px', height: '22px', borderRadius: '50%',
+              background: '#fff', border: '1.5px solid #e2e8f0',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+              </svg>
+            </div>
+          </label>
+          {photoError && (
+            <p style={{ fontSize: '11px', color: '#dc2626', margin: '0 0 8px' }}>{photoError}</p>
+          )}
           <p style={{ fontSize: '17px', fontWeight: 700, color: '#1e293b', margin: 0 }}>{details?.name || 'Runner'}</p>
           <p style={{ fontSize: '13px', color: '#64748b', margin: '2px 0 0' }}>{details?.email || ''}</p>
           <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginTop: '14px' }}>
@@ -364,7 +413,27 @@ export default function ProfilePage({ onBack }: Props) {
           )}
         </div>
 
-        <p style={{ textAlign: 'center', fontSize: '11px', color: '#94a3b8', marginTop: '28px' }}>
+        <button
+          onClick={() => { api.clearToken(); window.location.href = '/'; }}
+          style={{
+            display: 'block',
+            width: '100%',
+            marginTop: '24px',
+            padding: '14px',
+            borderRadius: '14px',
+            border: '1.5px solid #fecaca',
+            background: '#fff',
+            color: '#dc2626',
+            fontSize: '14px',
+            fontWeight: 700,
+            cursor: 'pointer',
+            touchAction: 'manipulation',
+          }}
+        >
+          Log Out
+        </button>
+
+        <p style={{ textAlign: 'center', fontSize: '11px', color: '#94a3b8', marginTop: '20px' }}>
           ISA Tech Marathon 2026
         </p>
       </div>

@@ -8,7 +8,15 @@ interface Company {
   contactEmail?: string;
   contactPhone?: string;
   status?: 'PREMIUM' | 'NON_PREMIUM';
+  membershipStartDate?: string | null;
+  membershipEndDate?: string | null;
+  renewalPending?: boolean;
   _count?: { participants: number };
+}
+
+function fmtDate(d?: string | null) {
+  if (!d) return '-';
+  return new Date(d).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 export default function CompaniesPage() {
@@ -18,7 +26,7 @@ export default function CompaniesPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState<{ name: string; contactEmail: string; contactPhone: string; status: 'PREMIUM' | 'NON_PREMIUM' }>({ name: '', contactEmail: '', contactPhone: '', status: 'NON_PREMIUM' });
+  const [form, setForm] = useState<{ name: string; contactEmail: string; contactPhone: string; status: 'PREMIUM' | 'NON_PREMIUM'; membershipStartDate: string; membershipEndDate: string; renewalPending: boolean }>({ name: '', contactEmail: '', contactPhone: '', status: 'NON_PREMIUM', membershipStartDate: '', membershipEndDate: '', renewalPending: false });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [toggleBusyId, setToggleBusyId] = useState<string | null>(null);
@@ -55,7 +63,7 @@ export default function CompaniesPage() {
         return;
       }
       setShowModal(false);
-      setForm({ name: '', contactEmail: '', contactPhone: '', status: 'NON_PREMIUM' });
+      setForm({ name: '', contactEmail: '', contactPhone: '', status: 'NON_PREMIUM', membershipStartDate: '', membershipEndDate: '', renewalPending: false });
       setEditingId(null);
       fetchCompanies();
     } catch (e: any) {
@@ -86,7 +94,15 @@ export default function CompaniesPage() {
   }
 
   function openEdit(c: Company) {
-    setForm({ name: c.name, contactEmail: c.contactEmail || '', contactPhone: c.contactPhone || '', status: c.status || 'NON_PREMIUM' });
+    setForm({
+      name: c.name,
+      contactEmail: c.contactEmail || '',
+      contactPhone: c.contactPhone || '',
+      status: c.status || 'NON_PREMIUM',
+      membershipStartDate: c.membershipStartDate ? c.membershipStartDate.slice(0, 10) : '',
+      membershipEndDate: c.membershipEndDate ? c.membershipEndDate.slice(0, 10) : '',
+      renewalPending: c.renewalPending || false,
+    });
     setEditingId(c.id);
     setError('');
     setShowModal(true);
@@ -132,7 +148,7 @@ export default function CompaniesPage() {
             ))}
           </select>
           <button
-            onClick={() => { setForm({ name: '', contactEmail: '', contactPhone: '', status: 'NON_PREMIUM' }); setEditingId(null); setError(''); setShowModal(true); }}
+            onClick={() => { setForm({ name: '', contactEmail: '', contactPhone: '', status: 'NON_PREMIUM', membershipStartDate: '', membershipEndDate: '', renewalPending: false }); setEditingId(null); setError(''); setShowModal(true); }}
             className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-3xl text-sm font-medium shadow-sm"
           >
             Add Company
@@ -146,6 +162,7 @@ export default function CompaniesPage() {
             <tr>
               <th className="text-left px-5 py-4 text-slate-500 font-semibold">Company</th>
               <th className="text-left px-5 py-4 text-slate-500 font-semibold">Status</th>
+              <th className="text-left px-5 py-4 text-slate-500 font-semibold">Membership</th>
               <th className="text-left px-5 py-4 text-slate-500 font-semibold">Contact Email</th>
               <th className="text-left px-5 py-4 text-slate-500 font-semibold">Phone</th>
               <th className="text-left px-5 py-4 text-slate-500 font-semibold">Runners</th>
@@ -168,6 +185,12 @@ export default function CompaniesPage() {
                     {c.status === 'PREMIUM' ? 'Premium' : 'Non-Premium'}
                   </button>
                 </td>
+                <td className="px-5 py-4 text-slate-600 text-xs">
+                  <div>{fmtDate(c.membershipStartDate)} &rarr; {fmtDate(c.membershipEndDate)}</div>
+                  {c.renewalPending && (
+                    <span className="inline-block mt-1 text-xs font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-700">Renewal Pending</span>
+                  )}
+                </td>
                 <td className="px-5 py-4 text-slate-600">{c.contactEmail || '-'}</td>
                 <td className="px-5 py-4 text-slate-600">{c.contactPhone || '-'}</td>
                 <td className="px-5 py-4 text-violet-700 font-semibold">{c._count?.participants || 0}</td>
@@ -178,7 +201,7 @@ export default function CompaniesPage() {
               </tr>
             ))}
             {visibleCompanies.length === 0 && (
-              <tr><td colSpan={6} className="px-5 py-8 text-center text-slate-500">No companies match</td></tr>
+              <tr><td colSpan={7} className="px-5 py-8 text-center text-slate-500">No companies match</td></tr>
             )}
           </tbody>
         </table>
@@ -229,6 +252,35 @@ export default function CompaniesPage() {
                   <option value="PREMIUM">Premium</option>
                 </select>
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-slate-600 text-sm mb-1">Membership Start</label>
+                  <input
+                    type="date"
+                    value={form.membershipStartDate}
+                    onChange={(e) => setForm({ ...form, membershipStartDate: e.target.value })}
+                    className="w-full px-3 py-2 bg-white/80 border border-white/70 rounded-3xl text-slate-950 text-sm focus:ring-2 focus:ring-violet-200 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-slate-600 text-sm mb-1">Membership End</label>
+                  <input
+                    type="date"
+                    value={form.membershipEndDate}
+                    onChange={(e) => setForm({ ...form, membershipEndDate: e.target.value })}
+                    className="w-full px-3 py-2 bg-white/80 border border-white/70 rounded-3xl text-slate-950 text-sm focus:ring-2 focus:ring-violet-200 outline-none"
+                  />
+                </div>
+              </div>
+              <label className="flex items-center gap-2 text-sm text-slate-600">
+                <input
+                  type="checkbox"
+                  checked={form.renewalPending}
+                  onChange={(e) => setForm({ ...form, renewalPending: e.target.checked })}
+                  className="rounded border-white/70"
+                />
+                Renewal Pending
+              </label>
               <div className="flex gap-3 pt-2">
                 <button type="submit" className="flex-1 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-3xl text-sm">
                   {editingId ? 'Update' : 'Create'}

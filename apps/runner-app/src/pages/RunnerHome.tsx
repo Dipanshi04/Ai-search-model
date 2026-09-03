@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import logoDark from '../components/logo-dark.png';
+import BrandHeader from '../components/BrandHeader';
 import ProfilePage from './ProfilePage';
 import MessagesPage from './MessagesPage';
 
@@ -92,17 +93,21 @@ export default function RunnerHome({ bibNumber, category, onStart }: Props) {
 
   return (
     <div style={{
-      minHeight: '100dvh',
+      height: '100dvh',
+      overflowY: 'auto',
+      WebkitOverflowScrolling: 'touch',
       background: '#f0f4f8',
       display: 'flex',
       flexDirection: 'column',
     }}>
+      <BrandHeader />
+
       <button
         onClick={() => setShowMessages(true)}
         aria-label="Messages"
         style={{
           position: 'fixed',
-          top: 'calc(16px + env(safe-area-inset-top))',
+          top: 'calc(64px + env(safe-area-inset-top))',
           right: '64px',
           zIndex: 20,
           width: '40px',
@@ -140,7 +145,7 @@ export default function RunnerHome({ bibNumber, category, onStart }: Props) {
         aria-label="Profile"
         style={{
           position: 'fixed',
-          top: 'calc(16px + env(safe-area-inset-top))',
+          top: 'calc(64px + env(safe-area-inset-top))',
           right: '16px',
           zIndex: 20,
           width: '40px',

@@ -182,14 +182,14 @@ class ApiClient {
     return this.request<any[]>(`/api/v1/participants/companies${query}`);
   }
 
-  async createCompany(data: { name: string; contactEmail?: string; contactPhone?: string; status?: 'PREMIUM' | 'NON_PREMIUM' }) {
+  async createCompany(data: { name: string; contactEmail?: string; contactPhone?: string; status?: 'PREMIUM' | 'NON_PREMIUM'; membershipStartDate?: string; membershipEndDate?: string; renewalPending?: boolean }) {
     return this.request<any>('/api/v1/participants/companies', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
-  async updateCompany(id: string, data: { name?: string; contactEmail?: string; contactPhone?: string; status?: 'PREMIUM' | 'NON_PREMIUM' }) {
+  async updateCompany(id: string, data: { name?: string; contactEmail?: string; contactPhone?: string; status?: 'PREMIUM' | 'NON_PREMIUM'; membershipStartDate?: string; membershipEndDate?: string; renewalPending?: boolean }) {
     return this.request<any>(`/api/v1/participants/companies/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),

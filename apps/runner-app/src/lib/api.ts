@@ -113,6 +113,25 @@ class ApiClient {
   async getAnnouncements(eventId: string) {
     return this.request<any[]>(`/api/v1/announcements?eventId=${eventId}`);
   }
+
+  async getSponsors() {
+    return this.request<any[]>('/api/v1/sponsors');
+  }
+
+  // Bypasses request() — a file upload needs multipart/form-data, not the
+  // JSON body + Content-Type header request() always sends.
+  async uploadMyPhoto(file: File) {
+    const formData = new FormData();
+    formData.append('photo', file);
+    const headers: Record<string, string> = {};
+    if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
+    const response = await fetch(`${API_URL}/api/v1/auth/me/photo`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    return response.json();
+  }
 }
 
 export const api = new ApiClient();

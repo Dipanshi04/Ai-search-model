@@ -48,6 +48,20 @@ class ApiClient {
     });
   }
 
+  // Separate from register() since it needs multipart/form-data, not JSON —
+  // called right after a successful registration, before the runner has
+  // ever logged in, so it's not behind an auth token either.
+  async uploadRegistrationPhoto(userId: string, email: string, photo: File) {
+    const formData = new FormData();
+    formData.append('email', email);
+    formData.append('photo', photo);
+    const response = await fetch(`${API_URL}/api/v1/auth/register/${userId}/photo`, {
+      method: 'POST',
+      body: formData,
+    });
+    return response.json();
+  }
+
   async getCompanies() {
     return this.request<{ id: string; name: string }[]>('/api/v1/participants/companies');
   }

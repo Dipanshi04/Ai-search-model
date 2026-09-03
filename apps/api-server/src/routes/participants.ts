@@ -193,13 +193,19 @@ participantsRouter.get('/companies', async (req, res) => {
 
 participantsRouter.post('/companies', authenticate, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
-    const { name, industry, employeeCount, contactEmail, contactPhone, status } = req.body;
+    const { name, industry, employeeCount, contactEmail, contactPhone, status, membershipStartDate, membershipEndDate, renewalPending } = req.body;
     if (!name) {
       res.status(400).json({ success: false, message: 'name is required' });
       return;
     }
     const company = await prisma.company.create({
-      data: { name, industry, employeeCount, contactEmail, contactPhone, status: status === 'PREMIUM' ? 'PREMIUM' : 'NON_PREMIUM' },
+      data: {
+        name, industry, employeeCount, contactEmail, contactPhone,
+        status: status === 'PREMIUM' ? 'PREMIUM' : 'NON_PREMIUM',
+        membershipStartDate: membershipStartDate ? new Date(membershipStartDate) : null,
+        membershipEndDate: membershipEndDate ? new Date(membershipEndDate) : null,
+        renewalPending: renewalPending === true,
+      },
     });
     res.status(201).json({ success: true, data: company });
   } catch (error: any) {
@@ -213,7 +219,7 @@ participantsRouter.post('/companies', authenticate, requireRole('SUPER_ADMIN'), 
 
 participantsRouter.put('/companies/:id', authenticate, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
-    const { name, industry, employeeCount, contactEmail, contactPhone, status } = req.body;
+    const { name, industry, employeeCount, contactEmail, contactPhone, status, membershipStartDate, membershipEndDate, renewalPending } = req.body;
     const company = await prisma.company.findUnique({ where: { id: req.params.id as string } });
     if (!company) {
       res.status(404).json({ success: false, message: 'Company not found' });
@@ -228,6 +234,9 @@ participantsRouter.put('/companies/:id', authenticate, requireRole('SUPER_ADMIN'
         ...(contactEmail !== undefined && { contactEmail }),
         ...(contactPhone !== undefined && { contactPhone }),
         ...(status !== undefined && { status: status === 'PREMIUM' ? 'PREMIUM' : 'NON_PREMIUM' }),
+        ...(membershipStartDate !== undefined && { membershipStartDate: membershipStartDate ? new Date(membershipStartDate) : null }),
+        ...(membershipEndDate !== undefined && { membershipEndDate: membershipEndDate ? new Date(membershipEndDate) : null }),
+        ...(renewalPending !== undefined && { renewalPending: renewalPending === true }),
       },
     });
     res.json({ success: true, data: updated });

@@ -4,8 +4,22 @@ import { logger } from '../config/logger.js';
 import bcrypt from 'bcryptjs';
 import { generateQRCode } from '../utils/qrcode.js';
 import { sendPinEmail } from '../services/email.js';
+import multer from 'multer';
+import { v4 as uuidv4 } from 'uuid';
+import fs from 'fs';
+import path from 'path';
 
 export const registerRouter: Router = Router();
+
+const uploadPhoto = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 3 * 1024 * 1024 }, // 3MB
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Only PNG, JPG, or WebP allowed'));
+  },
+});
 
 registerRouter.post('/', async (req: Request, res: Response) => {
   try {
@@ -196,5 +210,45 @@ registerRouter.post('/', async (req: Request, res: Response) => {
   } catch (error) {
     logger.error('Registration error:', error);
     res.status(500).json({ success: false, message: 'Registration failed' });
+  }
+});
+
+// Called right after a successful registration response, before the runner
+// has ever logged in (no token exists yet) — so this can't be gated behind
+// `authenticate`. Instead it's gated by knowing both the userId AND the
+// email on that account, the same two pieces of info the register form
+// itself just collected, keeping it no more guessable than registration.
+registerRouter.post('/:userId/photo', uploadPhoto.single('photo'), async (req: Request, res: Response) => {
+  try {
+    const { userId } = req.params;
+    const { email } = req.body;
+    if (!email) {
+      res.status(400).json({ success: false, message: 'email is required' });
+      return;
+    }
+    if (!req.file) {
+      res.status(400).json({ success: false, message: 'No photo uploaded' });
+      return;
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId as string } });
+    if (!user || user.email.toLowerCase() !== String(email).toLowerCase()) {
+      res.status(404).json({ success: false, message: 'User not found' });
+      return;
+    }
+
+    const ext = `.${req.file.mimetype.split('/')[1]}`;
+    const filename = `${uuidv4()}${ext}`;
+    const uploadDir = path.join(process.cwd(), 'uploads', 'avatars');
+    if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+    fs.writeFileSync(path.join(uploadDir, filename), req.file.buffer);
+
+    const avatarUrl = `/uploads/avatars/${filename}`;
+    await prisma.user.update({ where: { id: user.id }, data: { avatarUrl } });
+
+    res.json({ success: true, data: { avatarUrl } });
+  } catch (error) {
+    logger.error('Registration photo upload error:', error);
+    res.status(500).json({ success: false, message: 'Failed to upload photo' });
   }
 });

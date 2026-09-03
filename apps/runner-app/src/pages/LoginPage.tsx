@@ -2,6 +2,8 @@ import { useState, FormEvent } from 'react';
 import { api } from '../lib/api';
 import logoDark from '../components/logo-dark.png';
 import PinInput from '../components/PinInput';
+import BrandHeader from '../components/BrandHeader';
+import SponsorStrip from '../components/SponsorStrip';
 
 interface LoginPageProps {
   onLogin: () => void;
@@ -57,18 +59,21 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
   return (
     <div style={{
-      minHeight: '100dvh',
+      height: '100dvh',
+      overflowY: 'auto',
+      WebkitOverflowScrolling: 'touch',
       background: '#f0f4f8',
       display: 'flex',
       flexDirection: 'column',
     }}>
+      <BrandHeader />
       <div style={{
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '24px 20px',
+        padding: '12px 20px 24px',
       }}>
         <div style={{
           width: '100%',
@@ -212,9 +217,11 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         </div>
       </div>
 
-      <div style={{ paddingBottom: '20px', textAlign: 'center' }}>
+      <div style={{ padding: '4px 0 16px', textAlign: 'center' }}>
         <p style={{ fontSize: '11px', color: '#94a3b8' }}>ISA Tech Marathon 2026</p>
       </div>
+
+      <SponsorStrip />
     </div>
   );
 }

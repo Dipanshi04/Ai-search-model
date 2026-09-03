@@ -86,6 +86,9 @@ model Company {
   contactEmail   String?       @map("contact_email")
   contactPhone   String?       @map("contact_phone")
   status         CompanyStatus @default(NON_PREMIUM)
+  membershipStartDate DateTime? @map("membership_start_date")
+  membershipEndDate   DateTime? @map("membership_end_date")
+  renewalPending      Boolean   @default(false) @map("renewal_pending")
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 

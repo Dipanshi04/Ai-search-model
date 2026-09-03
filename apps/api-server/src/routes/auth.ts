@@ -9,8 +9,22 @@ import { prisma } from '../config/database.js';
 import { logger } from '../config/logger.js';
 import bcrypt from 'bcryptjs';
 import { sendPinEmail } from '../services/email.js';
+import multer from 'multer';
+import { v4 as uuidv4 } from 'uuid';
+import fs from 'fs';
+import path from 'path';
 
 export const authRouter: Router = Router();
+
+const uploadPhoto = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 3 * 1024 * 1024 }, // 3MB
+  fileFilter: (req, file, cb) => {
+    const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (allowed.includes(file.mimetype)) cb(null, true);
+    else cb(new Error('Only PNG, JPG, or WebP allowed'));
+  },
+});
 
 authRouter.post(
   '/login',
@@ -236,7 +250,7 @@ authRouter.get(
       const user = await prisma.user.findUnique({
         where: { id: req.user!.userId },
         select: {
-          id: true, name: true, email: true, phone: true, role: true,
+          id: true, name: true, email: true, phone: true, role: true, avatarUrl: true,
           participants: {
             select: { id: true, bibNumber: true, category: true, eventId: true, status: true, kitDistributed: true, certificateUrl: true },
           },
@@ -252,6 +266,37 @@ authRouter.get(
     } catch (error) {
       logger.error('Get me error:', error);
       res.status(500).json({ success: false, message: 'Failed to fetch user' });
+    }
+  }
+);
+
+authRouter.post(
+  '/me/photo',
+  authenticate,
+  uploadPhoto.single('photo'),
+  async (req: Request, res: Response) => {
+    try {
+      if (!req.file) {
+        res.status(400).json({ success: false, message: 'No photo uploaded' });
+        return;
+      }
+      const ext = `.${req.file.mimetype.split('/')[1]}`;
+      const filename = `${uuidv4()}${ext}`;
+      const uploadDir = path.join(process.cwd(), 'uploads', 'avatars');
+      if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
+      fs.writeFileSync(path.join(uploadDir, filename), req.file.buffer);
+
+      const avatarUrl = `/uploads/avatars/${filename}`;
+      const user = await prisma.user.update({
+        where: { id: req.user!.userId },
+        data: { avatarUrl },
+        select: { id: true, avatarUrl: true },
+      });
+
+      res.json({ success: true, data: user });
+    } catch (error) {
+      logger.error('Photo upload error:', error);
+      res.status(500).json({ success: false, message: 'Failed to upload photo' });
     }
   }
 );

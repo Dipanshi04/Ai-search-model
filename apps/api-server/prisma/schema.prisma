@@ -85,6 +85,7 @@ model Company {
   employeeCount  Int?          @map("employee_count")
   contactEmail   String?       @map("contact_email")
   contactPhone   String?       @map("contact_phone")
+  status         CompanyStatus @default(NON_PREMIUM)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
@@ -308,6 +309,11 @@ enum PaymentProvider {
   RAZORPAY
   SHOWTIMEBRO
   CASHFREE
+}
+
+enum CompanyStatus {
+  PREMIUM
+  NON_PREMIUM
 }
 
 model BulkRegistration {

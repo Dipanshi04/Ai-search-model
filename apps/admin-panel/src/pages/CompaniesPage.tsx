@@ -7,6 +7,7 @@ interface Company {
   logo?: string;
   contactEmail?: string;
   contactPhone?: string;
+  status?: 'PREMIUM' | 'NON_PREMIUM';
   _count?: { participants: number };
 }
 
@@ -14,10 +15,13 @@ export default function CompaniesPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [events, setEvents] = useState<any[]>([]);
   const [eventId, setEventId] = useState('');
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState({ name: '', contactEmail: '', contactPhone: '' });
+  const [form, setForm] = useState<{ name: string; contactEmail: string; contactPhone: string; status: 'PREMIUM' | 'NON_PREMIUM' }>({ name: '', contactEmail: '', contactPhone: '', status: 'NON_PREMIUM' });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [toggleBusyId, setToggleBusyId] = useState<string | null>(null);
 
   useEffect(() => {
     api.getEvents().then((res) => {
@@ -51,7 +55,7 @@ export default function CompaniesPage() {
         return;
       }
       setShowModal(false);
-      setForm({ name: '', contactEmail: '', contactPhone: '' });
+      setForm({ name: '', contactEmail: '', contactPhone: '', status: 'NON_PREMIUM' });
       setEditingId(null);
       fetchCompanies();
     } catch (e: any) {
@@ -69,12 +73,30 @@ export default function CompaniesPage() {
     }
   }
 
+  async function handleToggleStatus(c: Company) {
+    setToggleBusyId(c.id);
+    try {
+      const next = c.status === 'PREMIUM' ? 'NON_PREMIUM' : 'PREMIUM';
+      await api.updateCompany(c.id, { status: next });
+      setCompanies((prev) => prev.map((x) => (x.id === c.id ? { ...x, status: next } : x)));
+    } catch (e) {
+      console.error('Failed to update status:', e);
+    }
+    setToggleBusyId(null);
+  }
+
   function openEdit(c: Company) {
-    setForm({ name: c.name, contactEmail: c.contactEmail || '', contactPhone: c.contactPhone || '' });
+    setForm({ name: c.name, contactEmail: c.contactEmail || '', contactPhone: c.contactPhone || '', status: c.status || 'NON_PREMIUM' });
     setEditingId(c.id);
     setError('');
     setShowModal(true);
   }
+
+  const visibleCompanies = companies.filter((c) => {
+    if (statusFilter !== 'ALL' && (c.status || 'NON_PREMIUM') !== statusFilter) return false;
+    if (search.trim() && !c.name.toLowerCase().includes(search.trim().toLowerCase())) return false;
+    return true;
+  });
 
   return (
     <div className="space-y-6">
@@ -83,7 +105,22 @@ export default function CompaniesPage() {
           <h1 className="text-2xl font-bold text-slate-950">Companies</h1>
           <p className="text-slate-500 text-sm">{companies.length} sponsors and partners</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search companies..."
+            className="px-4 py-2 bg-white/80 border border-white/60 rounded-3xl text-slate-900 text-sm outline-none w-48"
+          />
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-4 py-2 bg-white/80 border border-white/60 rounded-3xl text-slate-900 text-sm outline-none"
+          >
+            <option value="ALL">All statuses</option>
+            <option value="PREMIUM">Premium</option>
+            <option value="NON_PREMIUM">Non-Premium</option>
+          </select>
           <select
             value={eventId}
             onChange={(e) => setEventId(e.target.value)}
@@ -95,7 +132,7 @@ export default function CompaniesPage() {
             ))}
           </select>
           <button
-            onClick={() => { setForm({ name: '', contactEmail: '', contactPhone: '' }); setEditingId(null); setError(''); setShowModal(true); }}
+            onClick={() => { setForm({ name: '', contactEmail: '', contactPhone: '', status: 'NON_PREMIUM' }); setEditingId(null); setError(''); setShowModal(true); }}
             className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-3xl text-sm font-medium shadow-sm"
           >
             Add Company
@@ -108,6 +145,7 @@ export default function CompaniesPage() {
           <thead className="bg-white/80 backdrop-blur-md">
             <tr>
               <th className="text-left px-5 py-4 text-slate-500 font-semibold">Company</th>
+              <th className="text-left px-5 py-4 text-slate-500 font-semibold">Status</th>
               <th className="text-left px-5 py-4 text-slate-500 font-semibold">Contact Email</th>
               <th className="text-left px-5 py-4 text-slate-500 font-semibold">Phone</th>
               <th className="text-left px-5 py-4 text-slate-500 font-semibold">Runners</th>
@@ -115,9 +153,21 @@ export default function CompaniesPage() {
             </tr>
           </thead>
           <tbody>
-            {companies.map((c) => (
+            {visibleCompanies.map((c) => (
               <tr key={c.id} className="border-t border-white/10 hover:bg-slate-50/60 transition-colors">
                 <td className="px-5 py-4 text-slate-950 font-medium">{c.name}</td>
+                <td className="px-5 py-4">
+                  <button
+                    onClick={() => handleToggleStatus(c)}
+                    disabled={toggleBusyId === c.id}
+                    className={`text-xs font-bold px-2.5 py-1 rounded-full transition disabled:opacity-50 ${
+                      c.status === 'PREMIUM' ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                    title="Click to toggle"
+                  >
+                    {c.status === 'PREMIUM' ? 'Premium' : 'Non-Premium'}
+                  </button>
+                </td>
                 <td className="px-5 py-4 text-slate-600">{c.contactEmail || '-'}</td>
                 <td className="px-5 py-4 text-slate-600">{c.contactPhone || '-'}</td>
                 <td className="px-5 py-4 text-violet-700 font-semibold">{c._count?.participants || 0}</td>
@@ -127,8 +177,8 @@ export default function CompaniesPage() {
                 </td>
               </tr>
             ))}
-            {companies.length === 0 && (
-              <tr><td colSpan={5} className="px-5 py-8 text-center text-slate-500">No companies</td></tr>
+            {visibleCompanies.length === 0 && (
+              <tr><td colSpan={6} className="px-5 py-8 text-center text-slate-500">No companies match</td></tr>
             )}
           </tbody>
         </table>
@@ -167,6 +217,17 @@ export default function CompaniesPage() {
                   onChange={(e) => setForm({ ...form, contactPhone: e.target.value })}
                   className="w-full px-3 py-2 bg-white/80 border border-white/70 rounded-3xl text-slate-950 text-sm focus:ring-2 focus:ring-violet-200 outline-none"
                 />
+              </div>
+              <div>
+                <label className="block text-slate-600 text-sm mb-1">Status</label>
+                <select
+                  value={form.status}
+                  onChange={(e) => setForm({ ...form, status: e.target.value as 'PREMIUM' | 'NON_PREMIUM' })}
+                  className="w-full px-3 py-2 bg-white/80 border border-white/70 rounded-3xl text-slate-950 text-sm focus:ring-2 focus:ring-violet-200 outline-none"
+                >
+                  <option value="NON_PREMIUM">Non-Premium</option>
+                  <option value="PREMIUM">Premium</option>
+                </select>
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="submit" className="flex-1 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-3xl text-sm">

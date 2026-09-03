@@ -27,7 +27,6 @@ export default function RegisterPage() {
     category: 'RUN_3K',
     gender: 'MALE',
     companyId: '',
-    companyName: '',
     emergencyContact: '',
     emergencyPhone: '',
     bloodGroup: '',
@@ -43,11 +42,30 @@ export default function RegisterPage() {
   const [tacScrolledToBottom, setTacScrolledToBottom] = useState(false);
   const tacContentRef = useRef<HTMLDivElement>(null);
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
+  const [companySearch, setCompanySearch] = useState('');
+  const [companyDropdownOpen, setCompanyDropdownOpen] = useState(false);
+  const companyFieldRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     api.getCompanies().then((res) => {
       if (res.success && res.data) setCompanies(res.data);
     }).catch(() => {});
+  }, []);
+
+  // Client-side filter only — the full list is already fetched once above,
+  // no per-keystroke API calls.
+  const filteredCompanies = companySearch.trim()
+    ? companies.filter((c) => c.name.toLowerCase().includes(companySearch.trim().toLowerCase()))
+    : companies;
+
+  useEffect(() => {
+    const onClickOutside = (e: MouseEvent) => {
+      if (companyFieldRef.current && !companyFieldRef.current.contains(e.target as Node)) {
+        setCompanyDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
   }, []);
 
   const handleTacScroll = () => {
@@ -88,13 +106,15 @@ export default function RegisterPage() {
     setLoading(true);
     setError('');
 
-    // companyId holds either a real company's id, or the 'OTHER' sentinel
-    // when they typed a new one into the free-text field instead — never
-    // send 'OTHER' itself to the server.
-    const { companyId, companyName, ...rest } = form;
-    const payload = companyId && companyId !== 'OTHER'
+    // companyId is only trusted if the visible search text still exactly
+    // matches the company it was picked from — editing the text after
+    // picking (or never picking at all) means they're naming a new company
+    // instead, sent as companyName.
+    const { companyId, ...rest } = form;
+    const pickedCompany = companies.find((c) => c.id === companyId);
+    const payload = pickedCompany && pickedCompany.name === companySearch.trim()
       ? { ...rest, companyId }
-      : { ...rest, companyName: companyName.trim() };
+      : { ...rest, companyName: companySearch.trim() };
 
     const res = await api.register(payload);
     if (res.success) {
@@ -320,28 +340,42 @@ export default function RegisterPage() {
                 <option value="NON_BINARY">Non-Binary</option>
               </select>
             </div>
-            <div>
+            <div className="relative" ref={companyFieldRef}>
               <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1">Company</label>
-              <select
-                value={form.companyId}
-                onChange={(e) => setForm({ ...form, companyId: e.target.value, companyName: e.target.value === 'OTHER' ? form.companyName : '' })}
-                className="w-full px-3 py-2 bg-brand-cream border border-brand-navy/15 rounded-lg text-brand-navy focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition"
-              >
-                <option value="">Select company</option>
-                {companies.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-                <option value="OTHER">Other (not listed)</option>
-              </select>
-              {form.companyId === 'OTHER' && (
-                <input
-                  type="text"
-                  required
-                  value={form.companyName}
-                  onChange={(e) => setForm({ ...form, companyName: e.target.value })}
-                  className="w-full mt-2 px-3 py-2 bg-brand-cream border border-brand-navy/15 rounded-lg text-brand-navy placeholder-brand-navy/30 focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition"
-                  placeholder="Type your company name"
-                />
+              <input
+                type="text"
+                value={companySearch}
+                onChange={(e) => {
+                  setCompanySearch(e.target.value);
+                  setForm({ ...form, companyId: '' });
+                  setCompanyDropdownOpen(true);
+                }}
+                onFocus={() => setCompanyDropdownOpen(true)}
+                className="w-full px-3 py-2 bg-brand-cream border border-brand-navy/15 rounded-lg text-brand-navy placeholder-brand-navy/30 focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition"
+                placeholder="Search or type your company"
+                autoComplete="off"
+              />
+              {companyDropdownOpen && (
+                <div className="absolute z-20 mt-1 w-full max-h-52 overflow-y-auto bg-white border border-brand-navy/15 rounded-lg shadow-lg">
+                  {filteredCompanies.length > 0 ? (
+                    filteredCompanies.slice(0, 50).map((c) => (
+                      <button
+                        type="button"
+                        key={c.id}
+                        onClick={() => {
+                          setForm({ ...form, companyId: c.id });
+                          setCompanySearch(c.name);
+                          setCompanyDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-3 py-2 text-sm text-brand-navy hover:bg-brand-orange/10 transition"
+                      >
+                        {c.name}
+                      </button>
+                    ))
+                  ) : (
+                    <div className="px-3 py-2 text-xs text-brand-navy/50">No match — your typed name will be added as a new company.</div>
+                  )}
+                </div>
               )}
             </div>
             <div>

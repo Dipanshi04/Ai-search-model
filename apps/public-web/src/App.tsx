@@ -129,7 +129,7 @@ function HomePage() {
           <div className="hero-anim flex flex-wrap items-center gap-3 mb-6 sm:mb-7" style={{ animationDelay: '320ms' }}>
             <span className="hero-body inline-flex items-center gap-2 px-5 py-2 sm:px-6 sm:py-2.5 rounded-full text-sm sm:text-base font-bold text-white" style={{ background: '#F5821F' }}>
               <span className="hero-live-dot w-1.5 h-1.5 rounded-full bg-white" />
-              Coming Soon
+              Registration Open
             </span>
             <span className="hero-kicker text-xs sm:text-sm font-bold" style={{ color: '#1B2A5B' }}>
               280+ IT Companies. One Run.
@@ -140,13 +140,21 @@ function HomePage() {
             <CountdownTimer />
           </div>
 
-          <div className="hero-anim mt-6 sm:mt-7" style={{ animationDelay: '480ms' }}>
+          <div className="hero-anim flex flex-wrap items-center gap-3 mt-6 sm:mt-7" style={{ animationDelay: '480ms' }}>
+            <a
+              href="/register"
+              className="hero-body inline-flex items-center gap-2 px-6 py-2.5 sm:px-7 sm:py-3 rounded-full text-sm sm:text-base font-bold text-white hover:opacity-90 transition"
+              style={{ background: '#1B2A5B' }}
+            >
+              Register Now
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+            </a>
             <button
               onClick={() => setShowSponsorModal(true)}
-              className="hero-body inline-block px-4 py-1.5 rounded-full border text-[11px] sm:text-xs font-semibold hover:opacity-100 transition cursor-pointer"
-              style={{ borderColor: 'rgba(27,42,91,0.2)', color: '#1B2A5B', opacity: 0.7 }}
+              className="hero-body inline-block px-5 py-2.5 sm:px-6 sm:py-3 rounded-full border-2 text-sm sm:text-base font-bold hover:bg-brand-navy/5 transition cursor-pointer"
+              style={{ borderColor: 'rgba(27,42,91,0.25)', color: '#1B2A5B' }}
             >
-              Open For Sponsors
+              Contact for Sponsorship
             </button>
           </div>
         </div>

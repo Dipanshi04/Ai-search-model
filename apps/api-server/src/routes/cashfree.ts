@@ -39,7 +39,10 @@ cashfreeRouter.post('/start', async (req: Request, res: Response) => {
 
     const participant = await prisma.participant.findUnique({
       where: { id: participantId },
-      include: { user: { select: { name: true, email: true, phone: true } } },
+      include: {
+        user: { select: { name: true, email: true, phone: true } },
+        company: { select: { status: true } },
+      },
     });
     if (!participant) {
       res.status(404).json({ success: false, message: 'Participant not found' });
@@ -51,8 +54,14 @@ cashfreeRouter.post('/start', async (req: Request, res: Response) => {
     }
 
     // Fee is derived server-side from the participant's category — the
-    // request body's opinion on the amount is never consulted.
-    const amount = feeForCategory(participant.category);
+    // request body's opinion on the amount is never consulted. Premium
+    // companies get 50% off, applied silently here rather than shown
+    // anywhere before checkout — the registration form and review screen
+    // both display the standard price; only the real Cashfree charge
+    // (and Cashfree's own checkout page) reflects the discount.
+    const baseAmount = feeForCategory(participant.category);
+    const isPremiumCompany = participant.company?.status === 'PREMIUM';
+    const amount = isPremiumCompany ? Math.round(baseAmount * 0.5) : baseAmount;
 
     // A fresh order per attempt, not a reused one — Cashfree order sessions
     // expire, so reusing a stale one just moves the failure to checkout time.

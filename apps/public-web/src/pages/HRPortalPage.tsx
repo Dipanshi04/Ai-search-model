@@ -376,7 +376,6 @@ export default function HRPortalPage() {
                       className="flex-1 px-5 py-4 text-brand-navy text-base outline-none min-w-0 bg-white">
                       <option value="MALE">Male</option>
                       <option value="FEMALE">Female</option>
-                      <option value="NON_BINARY">Non-Binary</option>
                     </select>
                   </div>
                   <div className="flex items-stretch border border-brand-navy/15 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-brand-orange/40 focus-within:border-brand-orange bg-white">

@@ -519,8 +519,8 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
         category = mapped;
       }
 
-      if (!['MALE', 'FEMALE', 'NON_BINARY'].includes(gender)) {
-        results.push({ success: false, name, email, error: `Invalid gender: ${gender}. Must be MALE, FEMALE, or NON_BINARY` });
+      if (!['MALE', 'FEMALE'].includes(gender)) {
+        results.push({ success: false, name, email, error: `Invalid gender: ${gender}. Must be MALE or FEMALE` });
         continue;
       }
 

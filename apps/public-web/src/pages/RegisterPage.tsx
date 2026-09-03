@@ -337,7 +337,6 @@ export default function RegisterPage() {
               >
                 <option value="MALE">Male</option>
                 <option value="FEMALE">Female</option>
-                <option value="NON_BINARY">Non-Binary</option>
               </select>
             </div>
             <div className="relative" ref={companyFieldRef}>

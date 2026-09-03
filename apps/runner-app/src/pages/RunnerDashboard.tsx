@@ -488,17 +488,21 @@ export default function RunnerDashboard({ participantId, token, category, eventI
         Home
       </button>
 
+      {/* Fixed to the viewport, not the content — the Start/Finish row at
+          the bottom is a separate, un-scrollable flex child so it can never
+          get pushed off-screen by however tall the stuff above it grows
+          (banners, offline queue notice, etc.). Only the content above it
+          scrolls if it doesn't fit within maxHeight. */}
       <div style={{
-        position: 'absolute', bottom: 0, left: 0, right: 0,
-        height: '45%',
+        position: 'fixed', bottom: 0, left: 0, right: 0,
+        maxHeight: '60vh',
         background: 'linear-gradient(to bottom, transparent 0%, rgba(50,50,50,0.75) 25%, rgba(40,40,40,0.92) 100%)',
         backdropFilter: 'blur(2px)',
         zIndex: 2,
         display: 'flex',
         flexDirection: 'column',
-        padding: '60px 24px 0',
-        paddingBottom: 'max(20px, env(safe-area-inset-bottom))',
       }}>
+        <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', padding: '60px 24px 0' }}>
 
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -558,8 +562,9 @@ export default function RunnerDashboard({ participantId, token, category, eventI
         <div style={{ height: '3px', background: 'rgba(255,255,255,0.15)', borderRadius: '2px', marginTop: '18px', overflow: 'hidden' }}>
           <div style={{ height: '100%', background: '#f97316', width: `${progressPercent}%`, transition: 'width 1s ease-out', borderRadius: '2px' }} />
         </div>
+        </div>
 
-        <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+        <div style={{ flex: '0 0 auto', display: 'flex', gap: '12px', padding: '16px 24px', paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}>
           <button
             onClick={state.isTracking ? pauseTracking : startTracking}
             disabled={isButtonDisabled}

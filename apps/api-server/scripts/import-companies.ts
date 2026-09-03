@@ -37,9 +37,9 @@ function parseCsvColumn(content: string): string[] {
 }
 
 async function main() {
-  const filePath = process.argv[2];
-  if (!filePath) {
-    console.error('Usage: npx tsx scripts/import-companies.ts /path/to/companies.csv');
+  const filePath = process.argv[2] || DEFAULT_CSV;
+  if (!fs.existsSync(filePath)) {
+    console.error(`CSV not found: ${filePath}`);
     process.exit(1);
   }
 

@@ -18,6 +18,8 @@ import AnnouncementsPage from './pages/AnnouncementsPage';
 import SettingsPage from './pages/SettingsPage';
 import BulkRegistrationPage from './pages/BulkRegistrationPage';
 import PaymentsPage from './pages/PaymentsPage';
+import CouponsPage from './pages/CouponsPage';
+import BulkInquiriesPage from './pages/BulkInquiriesPage';
 import SponsorInquiriesPage from './pages/SponsorInquiriesPage';
 
 function HrPortalRedirect() {
@@ -74,6 +76,8 @@ function AppRoutes() {
         <Route path="sponsor-inquiries" element={<SponsorInquiriesPage />} />
         <Route path="bulk-registration" element={<BulkRegistrationPage />} />
         <Route path="payments" element={<PaymentsPage />} />
+        <Route path="coupons" element={<CouponsPage />} />
+        <Route path="bulk-inquiries" element={<BulkInquiriesPage />} />
         <Route path="checkin" element={<CheckinPage />} />
         <Route path="tracking" element={<RaceControlPage />} />
         <Route path="route-builder" element={<RouteBuilderPage />} />

@@ -4,6 +4,7 @@ import { prisma } from '../config/database.js';
 import { logger } from '../config/logger.js';
 import { sendWelcomeEmail } from '../services/email.js';
 import { feeForCategory } from './payment.js';
+import { findRedeemableCoupon } from './coupons.js';
 
 // ============================================================================
 // Cashfree — the main, active payment gateway. Has a real signed webhook,
@@ -24,7 +25,7 @@ export const cashfreeRouter: Router = Router();
 
 cashfreeRouter.post('/start', async (req: Request, res: Response) => {
   try {
-    const { participantId } = req.body;
+    const { participantId, couponCode } = req.body;
     if (!participantId) {
       res.status(400).json({ success: false, message: 'participantId required' });
       return;
@@ -59,14 +60,36 @@ cashfreeRouter.post('/start', async (req: Request, res: Response) => {
     // anywhere before checkout — the registration form and review screen
     // both display the standard price; only the real Cashfree charge
     // (and Cashfree's own checkout page) reflects the discount.
+    //
+    // A coupon is a separate, independent discount path — anyone can use
+    // one, not just premium companies — entered explicitly by the runner
+    // on the payment screen, so showing its effect there (unlike the
+    // premium discount) is the whole point. Re-validated here regardless
+    // of whatever the client showed, since that's just a preview. Rather
+    // than stacking both discounts, the runner gets whichever is bigger —
+    // stacking would let a premium-company runner combine two discounts
+    // for an effective rate no coupon was actually meant to grant.
     const baseAmount = feeForCategory(participant.category);
     const isPremiumCompany = participant.company?.status === 'PREMIUM';
-    const amount = isPremiumCompany ? Math.round(baseAmount * 0.5) : baseAmount;
+    let discountPercent = isPremiumCompany ? 50 : 0;
+    let appliedCouponCode: string | null = null;
+    if (couponCode) {
+      const coupon = await findRedeemableCoupon(couponCode);
+      if (coupon && coupon.discountPercent > discountPercent) {
+        discountPercent = coupon.discountPercent;
+        appliedCouponCode = coupon.code;
+      } else if (coupon) {
+        // Valid, but not better than the premium discount already applying
+        // — still record it so its usedCount reflects real redemptions.
+        appliedCouponCode = coupon.code;
+      }
+    }
+    const amount = Math.round(baseAmount * (1 - discountPercent / 100));
 
     // A fresh order per attempt, not a reused one — Cashfree order sessions
     // expire, so reusing a stale one just moves the failure to checkout time.
     const payment = await prisma.payment.create({
-      data: { participantId, provider: 'CASHFREE', amount, status: 'PENDING' },
+      data: { participantId, provider: 'CASHFREE', amount, status: 'PENDING', couponCode: appliedCouponCode },
     });
     const orderId = `cf${payment.id}`;
 
@@ -205,6 +228,13 @@ cashfreeRouter.post('/webhook', async (req: Request, res: Response) => {
 
       sendWelcomeEmail(participant.user.email, participant.user.name, participant.bibNumber, participant.category)
         .catch((e) => logger.error('[Payment] Welcome email failed:', e));
+
+      // Credited only once the payment actually completes — not at
+      // checkout start, which can be abandoned or retried.
+      if (payment.couponCode) {
+        prisma.coupon.update({ where: { code: payment.couponCode }, data: { usedCount: { increment: 1 } } })
+          .catch((e) => logger.error('[Payment] Coupon usedCount increment failed:', e));
+      }
 
       logger.info(`[Payment] Cashfree order ${orderId} completed`);
     } else if (isFailed) {

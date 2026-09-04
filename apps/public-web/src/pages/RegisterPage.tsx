@@ -39,6 +39,10 @@ export default function RegisterPage() {
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState('');
   const [paymentLoading, setPaymentLoading] = useState(false);
+  const [couponInput, setCouponInput] = useState('');
+  const [couponApplied, setCouponApplied] = useState<{ code: string; discountPercent: number } | null>(null);
+  const [couponError, setCouponError] = useState('');
+  const [couponChecking, setCouponChecking] = useState(false);
   const [showTACModal, setShowTACModal] = useState(false);
   const [tacAccepted, setTacAccepted] = useState(false);
   const [tacScrolledToBottom, setTacScrolledToBottom] = useState(false);
@@ -140,6 +144,26 @@ export default function RegisterPage() {
     setLoading(false);
   };
 
+  const handleApplyCoupon = async () => {
+    const code = couponInput.trim();
+    if (!code) return;
+    setCouponChecking(true);
+    setCouponError('');
+    try {
+      const res = await api.validateCoupon(code);
+      if (res.success && res.data) {
+        setCouponApplied(res.data);
+      } else {
+        setCouponApplied(null);
+        setCouponError(res.message || 'Invalid or expired coupon code');
+      }
+    } catch {
+      setCouponApplied(null);
+      setCouponError('Network error. Please try again.');
+    }
+    setCouponChecking(false);
+  };
+
   // Active payment path — Cashfree, a real gateway with a signed webhook,
   // so a payment completes automatically once it succeeds instead of
   // waiting on an admin to reconcile a sales report. See routes/cashfree.ts.
@@ -154,7 +178,7 @@ export default function RegisterPage() {
       return;
     }
 
-    const res = await api.startCashfreePayment(participantId);
+    const res = await api.startCashfreePayment(participantId, couponApplied?.code);
     if (!res.success || !res.data?.paymentSessionId) {
       setError(res.message || 'Failed to start payment. Please try again.');
       setPaymentLoading(false);
@@ -249,10 +273,65 @@ export default function RegisterPage() {
               <span className="text-brand-navy/60">Category</span>
               <span className="text-brand-navy">{categoryFee?.label || result.participant?.category}</span>
             </div>
-            <div className="flex justify-between border-t border-brand-navy/10 pt-3 mt-3">
-              <span className="text-brand-navy font-medium">Amount</span>
-              <span className="hero-title text-2xl sm:text-3xl font-bold text-brand-orange">Rs. {categoryFee?.amount || 299}</span>
+            {couponApplied ? (
+              <>
+                <div className="flex justify-between border-t border-brand-navy/10 pt-3 mt-3">
+                  <span className="text-brand-navy/60">Subtotal</span>
+                  <span className="text-brand-navy">Rs. {categoryFee?.amount || 299}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-emerald-600">Coupon {couponApplied.code} ({couponApplied.discountPercent}% off)</span>
+                  <span className="text-emerald-600">
+                    − Rs. {Math.round((categoryFee?.amount || 299) * couponApplied.discountPercent / 100)}
+                  </span>
+                </div>
+                <div className="flex justify-between border-t border-brand-navy/10 pt-3">
+                  <span className="text-brand-navy font-medium">Amount</span>
+                  <span className="hero-title text-2xl sm:text-3xl font-bold text-brand-orange">
+                    Rs. {Math.round((categoryFee?.amount || 299) * (1 - couponApplied.discountPercent / 100))}
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div className="flex justify-between border-t border-brand-navy/10 pt-3 mt-3">
+                <span className="text-brand-navy font-medium">Amount</span>
+                <span className="hero-title text-2xl sm:text-3xl font-bold text-brand-orange">Rs. {categoryFee?.amount || 299}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="mb-6 sm:mb-8">
+            <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1.5">Have a coupon code?</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={couponInput}
+                onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); setCouponError(''); }}
+                disabled={!!couponApplied}
+                placeholder="e.g. IHRC25"
+                className="flex-1 px-3 py-2.5 bg-brand-cream border border-brand-navy/15 rounded-lg text-brand-navy placeholder-brand-navy/30 focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition disabled:opacity-60"
+              />
+              {couponApplied ? (
+                <button
+                  type="button"
+                  onClick={() => { setCouponApplied(null); setCouponInput(''); }}
+                  className="px-4 py-2.5 rounded-lg border border-brand-navy/20 text-brand-navy text-sm font-semibold hover:bg-brand-navy/5 transition"
+                >
+                  Remove
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleApplyCoupon}
+                  disabled={couponChecking || !couponInput.trim()}
+                  className="px-4 py-2.5 rounded-lg bg-brand-navy text-white text-sm font-semibold hover:opacity-90 transition disabled:opacity-50"
+                >
+                  {couponChecking ? 'Checking...' : 'Apply'}
+                </button>
+              )}
             </div>
+            {couponError && <p className="text-xs text-red-600 mt-1.5">{couponError}</p>}
+            {couponApplied && <p className="text-xs text-emerald-600 mt-1.5">Coupon applied — {couponApplied.discountPercent}% off.</p>}
           </div>
 
           <div className="space-y-3 sm:space-y-4">

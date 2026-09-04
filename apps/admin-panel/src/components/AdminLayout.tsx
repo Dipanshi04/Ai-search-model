@@ -19,6 +19,8 @@ const navItems = [
   { to: '/sponsor-inquiries', label: 'Sponsor Inquiries' },
   { to: '/bulk-registration', label: 'Bulk Registration' },
   { to: '/payments', label: 'Payments' },
+  { to: '/coupons', label: 'Coupons' },
+  { to: '/bulk-inquiries', label: 'Bulk Inquiries' },
   { to: '/checkin', label: 'Check-in' },
   { to: '/tracking', label: 'Race Control' },
   { to: '/route-builder', label: 'Route Builder' },

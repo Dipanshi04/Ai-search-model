@@ -10,6 +10,7 @@ import TreeCounterPage from './pages/TreeCounterPage';
 import PaymentDetailsPage from './pages/PaymentDetailsPage';
 import Footer from './components/Footer';
 import SponsorInquiryModal from './components/SponsorInquiryModal';
+import BulkInquiryModal from './components/BulkInquiryModal';
 import logoDark from './components/logo-dark.png';
 import heroRunner from './components/hero-runner.webp';
 import nrcGroupLogo from './components/nrc-group-logo.png';
@@ -85,6 +86,7 @@ function CountdownTimer() {
 }
 function HomePage() {
   const [showSponsorModal, setShowSponsorModal] = useState(false);
+  const [showBulkModal, setShowBulkModal] = useState(false);
   return (
     <div className="hero-root min-h-screen overflow-hidden flex flex-col">
       {/* Decorative background layers */}
@@ -167,7 +169,39 @@ function HomePage() {
         <img src={heroRunner} alt="" aria-hidden="true" className="hero-runner" />
       </div>
 
+      {/* Pricing */}
+      <div className="hero-anim px-4 sm:px-8 pb-6 sm:pb-8 pt-2 relative z-10 max-w-[1400px] mx-auto w-full" style={{ animationDelay: '560ms' }}>
+        <div className="rounded-2xl overflow-hidden" style={{ background: '#1B2A5B' }}>
+          <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x" style={{ borderColor: 'rgba(255,255,255,0.15)' }}>
+            <div className="p-5 sm:p-6 text-center sm:text-left" style={{ borderColor: 'rgba(255,255,255,0.15)' }}>
+              <p className="hero-kicker text-xs sm:text-sm font-bold uppercase tracking-wide text-white mb-2">Retail Price</p>
+              <p className="hero-body text-sm sm:text-base text-white/80">3 KM — <span className="font-bold text-white">₹299</span></p>
+              <p className="hero-body text-sm sm:text-base text-white/80">5 KM — <span className="font-bold text-white">₹499</span></p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowBulkModal(true)}
+              className="p-5 sm:p-6 text-center sm:text-left hover:bg-white/5 transition cursor-pointer"
+              style={{ borderColor: 'rgba(255,255,255,0.15)' }}
+            >
+              <p className="hero-kicker text-xs sm:text-sm font-bold uppercase tracking-wide text-white mb-2">Bulk Offer</p>
+              <p className="hero-body text-sm sm:text-base text-white/80">
+                Buy 25 passes and get <span className="font-bold" style={{ color: '#F5821F' }}>50% OFF</span>
+              </p>
+              <p className="hero-body text-xs font-bold mt-2 underline" style={{ color: '#F5821F' }}>Enquire now →</p>
+            </button>
+            <div className="p-5 sm:p-6 text-center sm:text-left">
+              <p className="hero-kicker text-xs sm:text-sm font-bold uppercase tracking-wide text-white mb-2">ISA Premium Member Companies</p>
+              <p className="hero-body text-sm sm:text-base text-white/80">
+                <span className="font-bold" style={{ color: '#F5821F' }}>50% off</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {showSponsorModal && <SponsorInquiryModal onClose={() => setShowSponsorModal(false)} />}
+      {showBulkModal && <BulkInquiryModal onClose={() => setShowBulkModal(false)} />}
 
       <Footer />
     </div>

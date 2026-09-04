@@ -200,6 +200,22 @@ class ApiClient {
     return this.request<void>(`/api/v1/participants/companies/${id}`, { method: 'DELETE' });
   }
 
+  async getCoupons() {
+    return this.request<any[]>('/api/v1/coupons');
+  }
+
+  async createCoupon(data: { code: string; discountPercent: number; active?: boolean; usageLimit?: number | null; expiresAt?: string | null }) {
+    return this.request<any>('/api/v1/coupons', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateCoupon(id: string, data: { code?: string; discountPercent?: number; active?: boolean; usageLimit?: number | null; expiresAt?: string | null }) {
+    return this.request<any>(`/api/v1/coupons/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async deleteCoupon(id: string) {
+    return this.request<void>(`/api/v1/coupons/${id}`, { method: 'DELETE' });
+  }
+
   async getEvents() {
     return this.request<any[]>('/api/v1/events');
   }
@@ -327,6 +343,18 @@ class ApiClient {
 
   async updateSponsorInquiryStatus(id: string, status: string) {
     return this.request<any>(`/api/v1/sponsors/inquiries/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ status }),
+    });
+  }
+
+  async getBulkInquiries(status?: string) {
+    const query = status && status !== 'ALL' ? `?status=${status}` : '';
+    return this.request<any[]>(`/api/v1/bulk-inquiries${query}`);
+  }
+
+  async updateBulkInquiryStatus(id: string, status: string) {
+    return this.request<any>(`/api/v1/bulk-inquiries/${id}`, {
       method: 'PUT',
       body: JSON.stringify({ status }),
     });

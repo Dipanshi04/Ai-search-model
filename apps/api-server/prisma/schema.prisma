@@ -229,6 +229,23 @@ model SponsorInquiry {
   @@map("sponsor_inquiries")
 }
 
+// Leads from the homepage pricing card's "Buy 25 passes and get 50% OFF"
+// bulk offer — same shape/flow as SponsorInquiry, just for a different CTA.
+model BulkInquiry {
+  id          String   @id @default(cuid())
+  name        String
+  email       String
+  phone       String?
+  companyName String   @map("company_name")
+  passCount   Int?     @map("pass_count")
+  message     String?
+  status      String   @default("NEW") // NEW | CONTACTED | CLOSED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("bulk_inquiries")
+}
+
 model Announcement {
   id        String    @id @default(cuid())
   eventId   String    @map("event_id")
@@ -297,6 +314,10 @@ model Payment {
   description     String?
   failureReason   String?         @map("failure_reason")
   paidAt          DateTime?       @map("paid_at")
+  // Which coupon (if any) discounted this payment's amount — recorded so the
+  // webhook can credit the coupon's usedCount only once the payment actually
+  // completes, not merely when checkout was started.
+  couponCode      String?         @map("coupon_code")
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
 
@@ -306,6 +327,24 @@ model Payment {
   @@index([razorpayOrderId])
   @@index([provider, status])
   @@map("payments")
+}
+
+// Percentage-only discount codes, entered by the runner at checkout —
+// independent of the premium-company discount (any runner can use one, not
+// just those from a premium company). e.g. IHRC25 = 25% off.
+model Coupon {
+  id              String    @id @default(cuid())
+  code            String    @unique
+  discountPercent Int
+  active          Boolean   @default(true)
+  // null = unlimited redemptions
+  usageLimit      Int?      @map("usage_limit")
+  usedCount       Int       @default(0) @map("used_count")
+  expiresAt       DateTime? @map("expires_at")
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("coupons")
 }
 
 enum PaymentProvider {

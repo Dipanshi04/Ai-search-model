@@ -73,11 +73,25 @@ class ApiClient {
     });
   }
 
-  async startCashfreePayment(participantId: string) {
+  async submitBulkInquiry(data: { name: string; email: string; phone?: string; companyName: string; passCount?: string; message?: string }) {
+    return this.request<any>('/api/v1/bulk-inquiries', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async startCashfreePayment(participantId: string, couponCode?: string) {
     return this.request<{ paymentSessionId: string; orderId: string; amount: number; environment: 'sandbox' | 'production' }>(
       '/api/v1/payments/cashfree/start',
-      { method: 'POST', body: JSON.stringify({ participantId }) }
+      { method: 'POST', body: JSON.stringify({ participantId, couponCode }) }
     );
+  }
+
+  async validateCoupon(code: string) {
+    return this.request<{ code: string; discountPercent: number }>('/api/v1/coupons/validate', {
+      method: 'POST',
+      body: JSON.stringify({ code }),
+    });
   }
 
   async getCashfreePaymentStatus(orderId: string) {

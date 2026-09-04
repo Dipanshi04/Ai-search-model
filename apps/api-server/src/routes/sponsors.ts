@@ -5,8 +5,9 @@ import multer from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 import path from 'path';
+import { PACKAGE_ROOT } from '../config/paths.js';
 
-const upload = multer({ 
+const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
   fileFilter: (req, file, cb) => {
@@ -63,7 +64,7 @@ sponsorsRouter.post('/', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'
     if (req.file) {
       const ext = req.file.mimetype === 'image/svg+xml' ? '.svg' : `.${req.file.mimetype.split('/')[1]}`;
       const filename = `${uuidv4()}${ext}`;
-      const uploadDir = path.join(process.cwd(), 'uploads', 'sponsors');
+      const uploadDir = path.join(PACKAGE_ROOT, 'uploads', 'sponsors');
       if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
       fs.writeFileSync(path.join(uploadDir, filename), req.file.buffer);
       logoUrl = `/uploads/sponsors/${filename}`;
@@ -105,7 +106,7 @@ sponsorsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGE
     if (req.file) {
       const ext = req.file.mimetype === 'image/svg+xml' ? '.svg' : `.${req.file.mimetype.split('/')[1]}`;
       const filename = `${uuidv4()}${ext}`;
-      const uploadDir = path.join(process.cwd(), 'uploads', 'sponsors');
+      const uploadDir = path.join(PACKAGE_ROOT, 'uploads', 'sponsors');
       if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
       fs.writeFileSync(path.join(uploadDir, filename), req.file.buffer);
       logoUrl = `/uploads/sponsors/${filename}`;

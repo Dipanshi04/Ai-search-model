@@ -4,13 +4,14 @@ import { logger } from '../config/logger.js';
 import puppeteer from 'puppeteer';
 import path from 'path';
 import fs from 'fs/promises';
+import { PACKAGE_ROOT } from '../config/paths.js';
 
 const connection = {
   host: process.env.REDIS_URL ? new URL(process.env.REDIS_URL).hostname : 'localhost',
   port: process.env.REDIS_URL ? parseInt(new URL(process.env.REDIS_URL).port || '6379') : 6379,
 };
 
-const CERT_DIR = path.join(process.cwd(), 'certificates');
+const CERT_DIR = path.join(PACKAGE_ROOT, 'certificates');
 fs.mkdir(CERT_DIR, { recursive: true }).catch(() => {});
 
 function formatFinishTime(seconds: number): string {

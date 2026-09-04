@@ -7,6 +7,7 @@ import cookieParser from 'cookie-parser';
 import { Server as SocketIOServer } from 'socket.io';
 
 import { setupSocketIO } from './config/socket.js';
+import { PACKAGE_ROOT } from './config/paths.js';
 
 import { logger } from './config/logger.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -83,13 +84,13 @@ app.use('/api/v1/bulk-registration', bulkRegistrationRouter);
 app.use('/api/v1/hr', hrRouter);
 app.use('/api/v1/settings', settingsRouter);
 
-app.use('/certificates', express.static(path.join(process.cwd(), 'certificates')));
+app.use('/certificates', express.static(path.join(PACKAGE_ROOT, 'certificates')));
 app.use('/uploads', (req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.header('Access-Control-Allow-Headers', 'Content-Type');
   next();
-}, express.static(path.join(process.cwd(), 'uploads')));
+}, express.static(path.join(PACKAGE_ROOT, 'uploads')));
 
 app.use(errorHandler);
 

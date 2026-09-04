@@ -8,6 +8,7 @@ import multer from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 import path from 'path';
+import { PACKAGE_ROOT } from '../config/paths.js';
 
 export const registerRouter: Router = Router();
 
@@ -241,7 +242,7 @@ registerRouter.post('/:userId/photo', uploadPhoto.single('photo'), async (req: R
 
     const ext = `.${req.file.mimetype.split('/')[1]}`;
     const filename = `${uuidv4()}${ext}`;
-    const uploadDir = path.join(process.cwd(), 'uploads', 'avatars');
+    const uploadDir = path.join(PACKAGE_ROOT, 'uploads', 'avatars');
     if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
     fs.writeFileSync(path.join(uploadDir, filename), req.file.buffer);
 

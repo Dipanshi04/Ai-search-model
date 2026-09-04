@@ -314,39 +314,45 @@ export default function RegisterPage() {
             )}
           </div>
 
-          <div className="mb-6 sm:mb-8">
-            <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1.5">Have a coupon code?</label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={couponInput}
-                onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); setCouponError(''); }}
-                disabled={!!couponApplied}
-                placeholder="e.g. ISA10"
-                className="flex-1 px-3 py-2.5 bg-brand-cream border border-brand-navy/15 rounded-lg text-brand-navy placeholder-brand-navy/30 focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition disabled:opacity-60"
-              />
-              {couponApplied ? (
-                <button
-                  type="button"
-                  onClick={() => { setCouponApplied(null); setCouponInput(''); }}
-                  className="px-4 py-2.5 rounded-lg border border-brand-navy/20 text-brand-navy text-sm font-semibold hover:bg-brand-navy/5 transition"
-                >
-                  Remove
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleApplyCoupon}
-                  disabled={couponChecking || !couponInput.trim()}
-                  className="px-4 py-2.5 rounded-lg bg-brand-navy text-white text-sm font-semibold hover:opacity-90 transition disabled:opacity-50"
-                >
-                  {couponChecking ? 'Checking...' : 'Apply'}
-                </button>
-              )}
+          {/* Premium companies already get 50% off automatically — a coupon
+              field would just invite them to hunt for a code that (per the
+              max-of-both rule above) can never actually beat what they're
+              already getting, so it's hidden rather than shown as a dead end. */}
+          {!isPremiumCompany && (
+            <div className="mb-6 sm:mb-8">
+              <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1.5">Have a coupon code?</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={couponInput}
+                  onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); setCouponError(''); }}
+                  disabled={!!couponApplied}
+                  placeholder="e.g. ISA10"
+                  className="flex-1 px-3 py-2.5 bg-brand-cream border border-brand-navy/15 rounded-lg text-brand-navy placeholder-brand-navy/30 focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition disabled:opacity-60"
+                />
+                {couponApplied ? (
+                  <button
+                    type="button"
+                    onClick={() => { setCouponApplied(null); setCouponInput(''); }}
+                    className="px-4 py-2.5 rounded-lg border border-brand-navy/20 text-brand-navy text-sm font-semibold hover:bg-brand-navy/5 transition"
+                  >
+                    Remove
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleApplyCoupon}
+                    disabled={couponChecking || !couponInput.trim()}
+                    className="px-4 py-2.5 rounded-lg bg-brand-navy text-white text-sm font-semibold hover:opacity-90 transition disabled:opacity-50"
+                  >
+                    {couponChecking ? 'Checking...' : 'Apply'}
+                  </button>
+                )}
+              </div>
+              {couponError && <p className="text-xs text-red-600 mt-1.5">{couponError}</p>}
+              {couponApplied && <p className="text-xs text-emerald-600 mt-1.5">Coupon applied — {couponApplied.discountPercent}% off.</p>}
             </div>
-            {couponError && <p className="text-xs text-red-600 mt-1.5">{couponError}</p>}
-            {couponApplied && <p className="text-xs text-emerald-600 mt-1.5">Coupon applied — {couponApplied.discountPercent}% off.</p>}
-          </div>
+          )}
 
           <div className="space-y-3 sm:space-y-4">
             <button

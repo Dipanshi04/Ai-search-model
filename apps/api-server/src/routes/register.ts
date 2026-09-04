@@ -43,15 +43,31 @@ registerRouter.post('/', async (req: Request, res: Response) => {
         data: { email, phone, name, passwordHash, pinHash },
       });
       isNewUser = true;
-    } else if (!user.pinHash) {
-      // Existing user without PIN - generate one
-      pin = String(Math.floor(1000 + Math.random() * 9000));
-      const pinHash = await bcrypt.hash(pin, 12);
-      user = await prisma.user.update({
-        where: { id: user.id },
-        data: { pinHash },
-      });
-      isNewUser = true;
+    } else {
+      // A retry or resumed registration submits name/phone again — if they
+      // corrected a typo (this is exactly how one production payment
+      // failed: Cashfree rejected a phone number one digit short of a
+      // valid Indian number), that correction needs to actually land on
+      // the User row, not silently stick with whatever was entered the
+      // very first time.
+      const updateData: { name?: string; phone?: string; pinHash?: string } = {};
+      if (name && name !== user.name) updateData.name = name;
+      if (phone && phone !== user.phone) {
+        const phoneOwner = await prisma.user.findUnique({ where: { phone } });
+        if (phoneOwner && phoneOwner.id !== user.id) {
+          res.status(409).json({ success: false, message: `Phone ${phone} is already registered to a different account.` });
+          return;
+        }
+        updateData.phone = phone;
+      }
+      if (!user.pinHash) {
+        pin = String(Math.floor(1000 + Math.random() * 9000));
+        updateData.pinHash = await bcrypt.hash(pin, 12);
+        isNewUser = true;
+      }
+      if (Object.keys(updateData).length > 0) {
+        user = await prisma.user.update({ where: { id: user.id }, data: updateData });
+      }
     }
 
     // Get event

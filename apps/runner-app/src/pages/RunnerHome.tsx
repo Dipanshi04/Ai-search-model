@@ -1,9 +1,19 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import logoDark from '../components/logo-dark.png';
+import nrcGroupLogo from '../components/nrc-group-logo.png';
 import BrandHeader from '../components/BrandHeader';
 import ProfilePage from './ProfilePage';
 import MessagesPage from './MessagesPage';
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
+}
 
 interface RunnerDetails {
   name: string;
@@ -37,6 +47,7 @@ export default function RunnerHome({ bibNumber, category, onStart }: Props) {
   const [hasMessages, setHasMessages] = useState(false);
   const [certGenerating, setCertGenerating] = useState(false);
   const [certError, setCertError] = useState('');
+  const [sharing, setSharing] = useState(false);
 
   useEffect(() => {
     api.getMe().then((res) => {
@@ -89,6 +100,158 @@ export default function RunnerHome({ bibNumber, category, onStart }: Props) {
       setCertError('Network error. Please try again.');
     }
     setCertGenerating(false);
+  };
+
+  // A shareable "I'm Running" card, sized for Instagram/WhatsApp stories —
+  // available to any registered runner, not just finishers, since its point
+  // is pre-race hype rather than a record of completion (that's what the
+  // certificate is for).
+  const handleShareCard = async () => {
+    setSharing(true);
+    try {
+      const W = 1080, H = 1920;
+      const NAVY = '#1B2A5B';
+      const NAVY_DARK = '#111c40';
+      const ORANGE = '#F5821F';
+
+      const canvas = document.createElement('canvas');
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext('2d')!;
+      ctx.textAlign = 'center';
+
+      const bg = ctx.createLinearGradient(0, 0, 0, H);
+      bg.addColorStop(0, NAVY);
+      bg.addColorStop(1, NAVY_DARK);
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, W, H);
+
+      // Soft orange glow accents, top-right and bottom-left
+      const glow1 = ctx.createRadialGradient(W - 100, 200, 0, W - 100, 200, 420);
+      glow1.addColorStop(0, 'rgba(245,130,31,0.25)');
+      glow1.addColorStop(1, 'rgba(245,130,31,0)');
+      ctx.fillStyle = glow1;
+      ctx.fillRect(0, 0, W, H);
+      const glow2 = ctx.createRadialGradient(80, H - 200, 0, 80, H - 200, 420);
+      glow2.addColorStop(0, 'rgba(16,185,129,0.18)');
+      glow2.addColorStop(1, 'rgba(16,185,129,0)');
+      ctx.fillStyle = glow2;
+      ctx.fillRect(0, 0, W, H);
+
+      // Logo lockup
+      try {
+        const [isaLogo, nrcLogo] = await Promise.all([loadImage(logoDark), loadImage(nrcGroupLogo)]);
+        const logoH = 84;
+        const isaW = (isaLogo.width / isaLogo.height) * logoH;
+        const nrcW = (nrcLogo.width / nrcLogo.height) * logoH;
+        const gap = 32;
+        const totalW = nrcW + isaW + gap;
+        const startX = W / 2 - totalW / 2;
+        const logoY = 100;
+        const pad = 16;
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.roundRect(startX - pad, logoY - pad, nrcW + pad * 2, logoH + pad * 2, 16);
+        ctx.fill();
+        ctx.drawImage(nrcLogo, startX, logoY, nrcW, logoH);
+        ctx.beginPath();
+        ctx.roundRect(startX + nrcW + gap - pad, logoY - pad, isaW + pad * 2, logoH + pad * 2, 16);
+        ctx.fill();
+        ctx.drawImage(isaLogo, startX + nrcW + gap, logoY, isaW, logoH);
+      } catch {
+        // Logos are a nice-to-have — a failed image load shouldn't block
+        // the share card itself from generating.
+      }
+
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.font = '700 26px Inter, sans-serif';
+      ctx.fillText('INDORE SOFTWARE ASSOCIATION', W / 2, 300);
+
+      // Big statement
+      ctx.fillStyle = '#fff';
+      ctx.font = '800 88px Georgia, serif';
+      ctx.fillText("I'M RUNNING", W / 2, 470);
+
+      ctx.fillStyle = ORANGE;
+      ctx.font = '800 52px Georgia, serif';
+      ctx.fillText('ISA TECH MARATHON 2026', W / 2, 550);
+
+      // Runner name card
+      const name = details?.name || 'Runner';
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.beginPath();
+      ctx.roundRect(120, 660, W - 240, 260, 28);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(245,130,31,0.4)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(120, 660, W - 240, 260, 28);
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = '700 22px Inter, sans-serif';
+      ctx.fillText('RUNNER', W / 2, 730);
+
+      ctx.fillStyle = '#fff';
+      ctx.font = '800 56px Georgia, serif';
+      ctx.fillText(name, W / 2, 800);
+
+      const catLabel = (details?.category || category) === 'RUN_5K' ? '5K Challenge' : '3K Fun Run';
+      ctx.fillStyle = ORANGE;
+      ctx.font = '700 30px Inter, sans-serif';
+      ctx.fillText(`BIB #${details?.bibNumber || bibNumber}  ·  ${catLabel}`, W / 2, 870);
+
+      // Race day details
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.font = '600 32px Inter, sans-serif';
+      ctx.fillText('27th September 2026 · 6:30 AM', W / 2, 1010);
+      ctx.fillText('Indore, Madhya Pradesh', W / 2, 1054);
+
+      // Runner icon (simple)
+      ctx.save();
+      ctx.translate(W / 2, 1230);
+      ctx.strokeStyle = ORANGE;
+      ctx.lineWidth = 10;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(-6, -110, 26, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(0, -70); ctx.lineTo(-10, 20); ctx.lineTo(-60, 70);
+      ctx.moveTo(-10, 20); ctx.lineTo(40, 60);
+      ctx.moveTo(0, -70); ctx.lineTo(50, -50); ctx.lineTo(30, -100);
+      ctx.moveTo(-10, -55); ctx.lineTo(-60, -40);
+      ctx.stroke();
+      ctx.restore();
+
+      // Green mission tagline
+      ctx.fillStyle = 'rgba(16,185,129,0.9)';
+      ctx.font = '700 30px Inter, sans-serif';
+      ctx.fillText('Run for a Greener Tomorrow 🌱', W / 2, 1420);
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.font = '22px Inter, sans-serif';
+      ctx.fillText('Every 5km plants a tree', W / 2, 1462);
+
+      // Footer
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(W / 2 - 260, 1780);
+      ctx.lineTo(W / 2 + 260, 1780);
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.4)';
+      ctx.font = '600 26px Inter, sans-serif';
+      ctx.fillText('marathon.theisa.in', W / 2, 1830);
+
+      const link = document.createElement('a');
+      link.download = `im-running-${details?.bibNumber || bibNumber}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch {
+      // Best-effort — nothing to show the runner if canvas generation
+      // itself fails, so just don't leave them stuck on a spinner.
+    }
+    setSharing(false);
   };
 
   return (
@@ -290,6 +453,35 @@ export default function RunnerHome({ bibNumber, category, onStart }: Props) {
               {details?.name || 'Runner'}
             </p>
           </div>
+
+          <button
+            type="button"
+            onClick={handleShareCard}
+            disabled={sharing}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              padding: '13px',
+              borderRadius: '14px',
+              border: '1.5px solid #1B2A5B',
+              background: '#fff',
+              color: '#1B2A5B',
+              fontSize: '14px',
+              fontWeight: 700,
+              cursor: sharing ? 'not-allowed' : 'pointer',
+              opacity: sharing ? 0.6 : 1,
+              marginBottom: '20px',
+            }}
+          >
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#1B2A5B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7" />
+              <path d="M12 3v13M7 8l5-5 5 5" />
+            </svg>
+            {sharing ? 'Preparing your card…' : "Download \"I'm Running\" Card"}
+          </button>
 
           {/* Details Grid */}
           <div style={{

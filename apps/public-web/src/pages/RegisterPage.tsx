@@ -413,17 +413,17 @@ export default function RegisterPage() {
               )}
             </div>
             <div>
-              <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1">Emergency Contact</label>
+              <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1">Emergency Contact Name</label>
               <input
                 type="text"
                 value={form.emergencyContact}
                 onChange={(e) => setForm({ ...form, emergencyContact: e.target.value })}
                 className="w-full px-3 py-2 bg-brand-cream border border-brand-navy/15 rounded-lg text-brand-navy placeholder-brand-navy/30 focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition"
-                placeholder="Optional"
+                placeholder="Optional — e.g. spouse, parent, friend"
               />
             </div>
             <div>
-              <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1">Emergency Phone</label>
+              <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1">Emergency Contact Phone</label>
               <input
                 type="tel"
                 value={form.emergencyPhone}

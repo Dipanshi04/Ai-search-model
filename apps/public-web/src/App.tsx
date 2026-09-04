@@ -16,6 +16,11 @@ import heroRunner from './components/hero-runner.webp';
 import nrcGroupLogo from './components/nrc-group-logo.png';
 import { useEffect, useState } from "react";
 
+// The runner app is a separate SPA (apps/runner-app) served under the same
+// domain in production (marathon.theisa.in/runner) but a different local
+// dev port — VITE_RUNNER_APP_URL overrides the relative default for dev.
+const RUNNER_APP_URL = import.meta.env.VITE_RUNNER_APP_URL || '/runner/';
+
 
 const Logo = ({ size = 'h-16' }: { size?: string }) => (
   <img src={logoDark} alt="ISA Marathon" className={`${size} w-auto max-w-full object-contain shrink-0`} />
@@ -163,6 +168,14 @@ function HomePage() {
             >
               Contact for Sponsorship
             </button>
+            <a
+              href={RUNNER_APP_URL}
+              className="hero-body inline-flex items-center gap-1.5 px-5 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base font-bold hover:opacity-70 transition"
+              style={{ color: '#1B2A5B' }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><path d="M10 17l5-5-5-5" /><path d="M15 12H3" /></svg>
+              Already Registered? Login
+            </a>
           </div>
         </div>
 

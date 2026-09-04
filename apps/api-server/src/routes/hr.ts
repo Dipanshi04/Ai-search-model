@@ -338,17 +338,15 @@ hrRouter.post('/participants', hrAuth, async (req: Request, res: Response) => {
       isNewUser = true;
     }
 
-    let bibNumber = '';
-    for (let attempt = 0; attempt < 10; attempt++) {
-      const lastParticipant = await prisma.participant.findFirst({
-        where: { eventId: event.id },
-        orderBy: { bibNumber: 'desc' },
-      });
-      const lastNum = lastParticipant ? parseInt(lastParticipant.bibNumber.replace('ISA', '')) : 0;
-      bibNumber = `ISA${(lastNum + 1 + attempt).toString().padStart(4, '0')}`;
-      const existing = await prisma.participant.findUnique({ where: { bibNumber } });
-      if (!existing) break;
-    }
+    // See routes/register.ts for why this is a single atomic counter
+    // increment rather than read-max-and-retry — the latter can still
+    // collide under a burst of concurrent requests.
+    const { bibCounter } = await prisma.event.update({
+      where: { id: event.id },
+      data: { bibCounter: { increment: 1 } },
+      select: { bibCounter: true },
+    });
+    const bibNumber = `ISA${bibCounter.toString().padStart(4, '0')}`;
 
     const participant = await prisma.participant.create({
       data: {
@@ -469,12 +467,6 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
       return;
     }
 
-    const lastParticipant = await prisma.participant.findFirst({
-      where: { eventId: event.id },
-      orderBy: { bibNumber: 'desc' },
-    });
-    let lastNum = lastParticipant ? parseInt(lastParticipant.bibNumber.replace('ISA', '')) : 0;
-
     const results: { success: boolean; name: string; email: string; bibNumber?: string; pin?: string; error?: string }[] = [];
     let created = 0;
 
@@ -550,15 +542,16 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
           isNewUser = true;
         }
 
-        lastNum++;
-        let bibNumber = `ISA${lastNum.toString().padStart(4, '0')}`;
-        // Ensure bib is unique (retry if collision)
-        for (let attempt = 0; attempt < 5; attempt++) {
-          const exists = await prisma.participant.findUnique({ where: { bibNumber } });
-          if (!exists) break;
-          lastNum++;
-          bibNumber = `ISA${lastNum.toString().padStart(4, '0')}`;
-        }
+        // One atomic increment per row — see routes/register.ts for why
+        // this replaced a read-max-and-retry approach (it could still
+        // collide with a concurrent registration elsewhere, e.g. the
+        // public register endpoint, under real traffic).
+        const { bibCounter } = await prisma.event.update({
+          where: { id: event.id },
+          data: { bibCounter: { increment: 1 } },
+          select: { bibCounter: true },
+        });
+        const bibNumber = `ISA${bibCounter.toString().padStart(4, '0')}`;
 
         const participant = await prisma.participant.create({
           data: {

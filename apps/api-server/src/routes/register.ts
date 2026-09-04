@@ -139,20 +139,22 @@ registerRouter.post('/', async (req: Request, res: Response) => {
       return;
     }
 
-    // Generate BIB number with retry for race conditions
-    let bibNumber = '';
-    for (let attempt = 0; attempt < 10; attempt++) {
-      const lastParticipant = await prisma.participant.findFirst({
-        where: { eventId: event.id },
-        orderBy: { bibNumber: 'desc' },
-      });
-      const lastNum = lastParticipant ? parseInt(lastParticipant.bibNumber.replace('ISA', '')) : 0;
-      bibNumber = `ISA${(lastNum + 1 + attempt).toString().padStart(4, '0')}`;
-      const existing = await prisma.participant.findUnique({ where: { bibNumber } });
-      if (!existing) break;
-    }
+    // BIB numbers come from Event.bibCounter, allocated with a single
+    // atomic UPDATE ... SET bib_counter = bib_counter + 1 — Postgres
+    // serializes concurrent updates to the same row at the storage layer,
+    // so every caller gets a distinct value with no read-then-write race
+    // window at all. (A previous version read the current max bib and
+    // retried on conflict, which still collided under bursts of
+    // simultaneous registrations — e.g. PM2 running multiple cluster
+    // instances — because competing requests could exhaust their retry
+    // budget colliding with each other rather than converging.)
+    const { bibCounter } = await prisma.event.update({
+      where: { id: event.id },
+      data: { bibCounter: { increment: 1 } },
+      select: { bibCounter: true },
+    });
+    const bibNumber = `ISA${bibCounter.toString().padStart(4, '0')}`;
 
-    // Create participant
     const participant = await prisma.participant.create({
       data: {
         eventId: event.id,

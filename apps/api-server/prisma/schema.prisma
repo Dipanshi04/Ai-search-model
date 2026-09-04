@@ -27,6 +27,12 @@ model Event {
   maxParticipants Int?
   accumulatedElapsedMs Int         @default(0) @map("accumulated_elapsed_ms")
   startedAt       DateTime?        @map("started_at")
+  // Atomically incremented to allocate the next BIB number — a single
+  // `UPDATE ... SET bib_counter = bib_counter + 1` is race-free under any
+  // level of concurrency, unlike reading the current max bib and retrying
+  // on conflict (which can still collide under a burst of simultaneous
+  // registrations). See routes/register.ts and routes/hr.ts.
+  bibCounter      Int              @default(0) @map("bib_counter")
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 

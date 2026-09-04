@@ -113,10 +113,15 @@ function HomePage() {
       <div className="flex-1 flex items-center xl:justify-between gap-6 px-4 sm:px-8 min-h-0 relative z-10 max-w-[1400px] mx-auto w-full">
         <div className="relative z-10 w-full max-w-2xl mx-auto xl:mx-0 xl:shrink-0">
           <h1 className="hero-anim hero-title hero-h1 text-5xl sm:text-6xl md:text-7xl font-extrabold mb-3 sm:mb-4 xl:mb-6 leading-[0.9]" style={{ animationDelay: '80ms', color: '#1B2A5B' }}>
+            {/* Visually hidden — search engines and screen readers get the
+                actual event name/date here, while the styled line below
+                stays purely the brand tagline. */}
+            <span className="sr-only">ISA Tech Marathon 2026 — </span>
             CODE.<br />
             CONNECT.<br />
             CONSERVE.<br />
             <span style={{ color: '#F5821F' }}>RUN FOR<br />INDORE.</span>
+            <span className="sr-only"> — 3K &amp; 5K run, 27th September 2026, Indore</span>
           </h1>
 
           <p className="hero-anim hero-body text-sm sm:text-base xl:text-lg mb-1.5" style={{ animationDelay: '200ms', color: '#1B2A5B', opacity: 0.75, maxWidth: '32rem' }}>

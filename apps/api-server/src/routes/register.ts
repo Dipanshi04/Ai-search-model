@@ -95,7 +95,7 @@ registerRouter.post('/', async (req: Request, res: Response) => {
       where: { userId: user.id, eventId: event.id },
       include: {
         user: { select: { name: true, email: true } },
-        company: { select: { name: true } },
+        company: { select: { name: true, status: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -123,7 +123,7 @@ registerRouter.post('/', async (req: Request, res: Response) => {
         },
         include: {
           user: { select: { name: true, email: true } },
-          company: { select: { name: true } },
+          company: { select: { name: true, status: true } },
         },
       });
 
@@ -174,7 +174,7 @@ registerRouter.post('/', async (req: Request, res: Response) => {
       },
       include: {
         user: { select: { name: true, email: true } },
-        company: { select: { name: true } },
+        company: { select: { name: true, status: true } },
       },
     });
 

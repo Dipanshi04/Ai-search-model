@@ -206,7 +206,7 @@ export default function CouponsPage() {
                   value={form.code}
                   onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })}
                   required
-                  placeholder="e.g. IHRC25"
+                  placeholder="e.g. ISA10"
                   className="w-full px-3 py-2 bg-white/80 border border-white/70 rounded-3xl text-slate-950 text-sm font-mono focus:ring-2 focus:ring-violet-200 outline-none"
                 />
               </div>

@@ -244,6 +244,20 @@ export default function RegisterPage() {
   if (step === 'payment') {
     const payCategory: CategoryKey = result?.participant?.category === 'RUN_5K' ? 'RUN_5K' : 'RUN_3K';
     const categoryFee = CATEGORY_FEES[payCategory];
+    const baseAmount = categoryFee?.amount || 299;
+    // Premium-company discount shows here, on the payment step itself —
+    // not on the registration form — matching what cashfree.ts actually
+    // charges. If a coupon is also entered, the runner gets whichever
+    // discount is bigger (never both stacked), same rule the server
+    // re-enforces independently at checkout.
+    const isPremiumCompany = result?.participant?.company?.status === 'PREMIUM';
+    const premiumPercent = isPremiumCompany ? 50 : 0;
+    const effectivePercent = couponApplied ? Math.max(couponApplied.discountPercent, premiumPercent) : premiumPercent;
+    const discountLabel = couponApplied && couponApplied.discountPercent >= premiumPercent
+      ? `Coupon ${couponApplied.code} (${couponApplied.discountPercent}% off)`
+      : isPremiumCompany
+        ? 'Premium Member Discount (50% off)'
+        : null;
     return (
       <div className="min-h-screen bg-brand-cream flex flex-col relative">
       <div className="hero-grain" />
@@ -273,29 +287,29 @@ export default function RegisterPage() {
               <span className="text-brand-navy/60">Category</span>
               <span className="text-brand-navy">{categoryFee?.label || result.participant?.category}</span>
             </div>
-            {couponApplied ? (
+            {effectivePercent > 0 ? (
               <>
                 <div className="flex justify-between border-t border-brand-navy/10 pt-3 mt-3">
                   <span className="text-brand-navy/60">Subtotal</span>
-                  <span className="text-brand-navy">Rs. {categoryFee?.amount || 299}</span>
+                  <span className="text-brand-navy">Rs. {baseAmount}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-emerald-600">Coupon {couponApplied.code} ({couponApplied.discountPercent}% off)</span>
+                  <span className="text-emerald-600">{discountLabel}</span>
                   <span className="text-emerald-600">
-                    − Rs. {Math.round((categoryFee?.amount || 299) * couponApplied.discountPercent / 100)}
+                    − Rs. {Math.round(baseAmount * effectivePercent / 100)}
                   </span>
                 </div>
                 <div className="flex justify-between border-t border-brand-navy/10 pt-3">
                   <span className="text-brand-navy font-medium">Amount</span>
                   <span className="hero-title text-2xl sm:text-3xl font-bold text-brand-orange">
-                    Rs. {Math.round((categoryFee?.amount || 299) * (1 - couponApplied.discountPercent / 100))}
+                    Rs. {Math.round(baseAmount * (1 - effectivePercent / 100))}
                   </span>
                 </div>
               </>
             ) : (
               <div className="flex justify-between border-t border-brand-navy/10 pt-3 mt-3">
                 <span className="text-brand-navy font-medium">Amount</span>
-                <span className="hero-title text-2xl sm:text-3xl font-bold text-brand-orange">Rs. {categoryFee?.amount || 299}</span>
+                <span className="hero-title text-2xl sm:text-3xl font-bold text-brand-orange">Rs. {baseAmount}</span>
               </div>
             )}
           </div>
@@ -308,7 +322,7 @@ export default function RegisterPage() {
                 value={couponInput}
                 onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); setCouponError(''); }}
                 disabled={!!couponApplied}
-                placeholder="e.g. IHRC25"
+                placeholder="e.g. ISA10"
                 className="flex-1 px-3 py-2.5 bg-brand-cream border border-brand-navy/15 rounded-lg text-brand-navy placeholder-brand-navy/30 focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition disabled:opacity-60"
               />
               {couponApplied ? (

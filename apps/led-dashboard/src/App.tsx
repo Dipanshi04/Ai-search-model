@@ -23,10 +23,18 @@ function getImageUrl(url: string | undefined): string {
   return `${API_URL}/${url}`;
 }
 
-const RUNNER_COLORS = [
-  '#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6',
-  '#ec4899', '#06b6d4', '#f97316', '#14b8a6', '#a855f7',
-];
+// Runner dots on the map are colored by gender — blue for male, pink for
+// female — rather than an arbitrary per-runner palette, so the map itself
+// communicates the male/female split at a glance.
+const MALE_COLOR = '#3b82f6';
+const FEMALE_COLOR = '#ec4899';
+const UNKNOWN_COLOR = '#94a3b8';
+
+function colorForGender(gender: string | undefined): string {
+  if (gender === 'MALE') return MALE_COLOR;
+  if (gender === 'FEMALE') return FEMALE_COLOR;
+  return UNKNOWN_COLOR;
+}
 
 interface LeaderboardEntry {
   rank: number;
@@ -38,6 +46,7 @@ interface LeaderboardEntry {
   category?: string;
   participantId?: string;
   status?: string;
+  gender?: string;
 }
 
 function SponsorTicker({ sponsors }: { sponsors: { id: string; name: string; logoUrl?: string; tier?: string }[] }) {
@@ -49,9 +58,9 @@ function SponsorTicker({ sponsors }: { sponsors: { id: string; name: string; log
     return (
       <div key={`${s.id}-${i}`} className="flex items-center shrink-0">
         {imgUrl ? (
-          <img src={imgUrl} alt={label} className="h-14 w-auto max-w-[160px] object-contain" />
+          <img src={imgUrl} alt={label} className="h-9 w-auto max-w-[140px] object-contain" />
         ) : (
-          <div className="h-12 px-6 rounded-lg flex items-center justify-center text-white font-bold text-lg tracking-wide" style={{ background: s.tier === 'Platinum' ? '#E5E7EB' : s.tier === 'Gold' ? '#FDE047' : s.tier === 'Silver' ? '#94A3B8' : s.tier === 'Bronze' ? '#CD7F32' : '#6B7280' }}>
+          <div className="h-9 px-5 rounded-lg flex items-center justify-center text-white font-bold text-base tracking-wide" style={{ background: s.tier === 'Platinum' ? '#E5E7EB' : s.tier === 'Gold' ? '#FDE047' : s.tier === 'Silver' ? '#94A3B8' : s.tier === 'Bronze' ? '#CD7F32' : '#6B7280' }}>
             {label}
           </div>
         )}
@@ -120,7 +129,11 @@ export default function LEDScreen() {
   const [announcement, setAnnouncement] = useState<{ title: string; message: string } | null>(null);
   const [sponsors, setSponsors] = useState<{ id: string; name: string; logoUrl?: string; tier?: string }[]>([]);
   const [sidebarView, setSidebarView] = useState<'leaderboard' | 'sponsors'>('leaderboard');
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  // 3K and 5K shown side by side at the same time, rather than one merged
+  // ranking or cycling between them — a runner in one race shouldn't have
+  // to wait through the other category's turn to see where they stand.
+  const [leaderboard3k, setLeaderboard3k] = useState<LeaderboardEntry[]>([]);
+  const [leaderboard5k, setLeaderboard5k] = useState<LeaderboardEntry[]>([]);
   const [fadeSidebar, setFadeSidebar] = useState(false);
   const [mapLoaded, setMapLoaded] = useState(false);
   const [socketReady, setSocketReady] = useState(false);
@@ -142,14 +155,15 @@ export default function LEDScreen() {
   const lastSeenRef = useRef<Map<string, number>>(new Map());
   const [nowTick, setNowTick] = useState(Date.now());
 
-  const getColorForRunner = (participantId: string): string => {
-    if (markerColorsRef.current.has(participantId)) {
-      return markerColorsRef.current.get(participantId)!;
+  // Cached per runner so a marker's color doesn't flicker between blue and
+  // pink if a later update ever arrives without a gender field.
+  const getColorForRunner = (participantId: string, gender?: string): string => {
+    if (gender) {
+      const color = colorForGender(gender);
+      markerColorsRef.current.set(participantId, color);
+      return color;
     }
-    const colorIndex = markerColorsRef.current.size % RUNNER_COLORS.length;
-    const color = RUNNER_COLORS[colorIndex] || '#3b82f6';
-    markerColorsRef.current.set(participantId, color);
-    return color;
+    return markerColorsRef.current.get(participantId) || UNKNOWN_COLOR;
   };
 
   const drawRoute = (map: mapboxgl.Map, points: { lat: number; lng: number }[]) => {
@@ -401,7 +415,7 @@ export default function LEDScreen() {
       }
       // Replay queued runner updates
       for (const data of pendingRunnersRef.current) {
-        const color = getColorForRunner(data.participantId);
+        const color = getColorForRunner(data.participantId, data.gender);
         if (!markersRef.current.has(data.participantId)) {
           const el = document.createElement('div');
           el.style.cssText = `
@@ -476,7 +490,7 @@ export default function LEDScreen() {
         if (data.lat && data.lng) pendingRunnersRef.current.push(data);
         return;
       }
-      const color = getColorForRunner(data.participantId);
+      const color = getColorForRunner(data.participantId, data.gender);
       const existing = markersRef.current.get(data.participantId);
       if (existing) {
         existing.setLngLat([data.lng, data.lat]);
@@ -524,7 +538,8 @@ export default function LEDScreen() {
     });
 
     socket.on('leaderboard:update', (data: any) => {
-      if (data.category === 'overall') setLeaderboard(mapLeaderboard(data.top10));
+      if (data.category === 'RUN_3K') setLeaderboard3k(mapLeaderboard(data.top10));
+      else if (data.category === 'RUN_5K') setLeaderboard5k(mapLeaderboard(data.top10));
     });
 
     socket.on('trees:update', (data: any) => {
@@ -611,6 +626,7 @@ export default function LEDScreen() {
       category: p.category,
       participantId: p.participantId || p.id,
       status: p.status,
+      gender: p.gender,
     }));
 
   // Heartbeat status from the last GPS ping actually received for this
@@ -630,49 +646,53 @@ export default function LEDScreen() {
   useEffect(() => {
     const eventId = resolvedEventIdRef.current || EVENT_ID;
     if (!eventId) return;
-    fetch(`${API_URL}/api/v1/participants/leaderboard?eventId=${eventId}&limit=10`)
+    fetch(`${API_URL}/api/v1/participants/leaderboard?eventId=${eventId}&category=RUN_3K&limit=10`)
       .then(r => r.json())
-      .then(res => { if (res.success) setLeaderboard(mapLeaderboard(res.data)); })
+      .then(res => { if (res.success) setLeaderboard3k(mapLeaderboard(res.data)); })
+      .catch(() => {});
+    fetch(`${API_URL}/api/v1/participants/leaderboard?eventId=${eventId}&category=RUN_5K&limit=10`)
+      .then(r => r.json())
+      .then(res => { if (res.success) setLeaderboard5k(mapLeaderboard(res.data)); })
       .catch(() => {});
   }, [sponsors, socketReady]);
 
   return (
     <div className="w-screen h-screen bg-[#0a0f1a] text-white flex flex-col overflow-hidden select-none font-sans">
       {/* Header */}
-      <header className="h-[120px] bg-[#0d1320] border-b border-slate-800/60 flex items-center justify-between px-12 shrink-0 z-30">
-        <div className="flex items-center gap-6">
-          <Logo size="h-18" />
-          <div className="w-px h-14 bg-slate-700/60" />
-          <div className="flex items-center gap-3">
-            <div className="bg-white rounded-lg px-2.5 py-1.5">
-              <img src={nrcGroupLogo} alt="NRC Group" className="h-11 w-auto object-contain" />
+      <header className="h-[92px] bg-[#0d1320] border-b border-slate-800/60 flex items-center justify-between px-10 shrink-0 z-30">
+        <div className="flex items-center gap-5">
+          <Logo size="h-12" />
+          <div className="w-px h-10 bg-slate-700/60" />
+          <div className="flex items-center gap-2.5">
+            <div className="bg-white rounded-lg px-2 py-1">
+              <img src={nrcGroupLogo} alt="NRC Group" className="h-8 w-auto object-contain" />
             </div>
             <div className="leading-tight">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.25em]">Main Sponsor</p>
-              <p className="text-lg font-extrabold text-white uppercase tracking-wide">NRC Group</p>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.25em]">Main Sponsor</p>
+              <p className="text-sm font-extrabold text-white uppercase tracking-wide">NRC Group</p>
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-16">
+        <div className="flex items-center gap-10">
           <div className="text-center">
-            <p className="text-6xl font-mono font-black text-emerald-400 leading-none">{formatDuration(elapsedTime)}</p>
-            <p className="text-base text-slate-400 uppercase tracking-widest mt-2">Elapsed</p>
+            <p className="text-4xl font-mono font-black text-emerald-400 leading-none">{formatDuration(elapsedTime)}</p>
+            <p className="text-[11px] text-slate-400 uppercase tracking-widest mt-1.5">Elapsed</p>
           </div>
           <div className="text-center">
-            <p className="text-6xl font-black text-white leading-none">{totalRunners}</p>
-            <p className="text-base text-slate-400 uppercase tracking-widest mt-2">Runners</p>
+            <p className="text-4xl font-black text-white leading-none">{totalRunners}</p>
+            <p className="text-[11px] text-slate-400 uppercase tracking-widest mt-1.5">Runners</p>
           </div>
           <div className="text-center">
-            <p className="text-6xl font-black text-violet-400 leading-none">{totalFinished}</p>
-            <p className="text-base text-slate-400 uppercase tracking-widest mt-2">Finished</p>
+            <p className="text-4xl font-black text-violet-400 leading-none">{totalFinished}</p>
+            <p className="text-[11px] text-slate-400 uppercase tracking-widest mt-1.5">Finished</p>
           </div>
           <div className="text-center">
-            <p className="text-6xl font-black text-green-400 leading-none">{treeCount}</p>
-            <p className="text-base text-green-400/80 uppercase tracking-widest mt-2">Trees</p>
+            <p className="text-4xl font-black text-green-400 leading-none">{treeCount}</p>
+            <p className="text-[11px] text-green-400/80 uppercase tracking-widest mt-1.5">Trees</p>
           </div>
           <div className="text-center">
-            <p className="text-6xl font-black text-emerald-300 leading-none">{Math.round(co2Offset)}</p>
-            <p className="text-base text-slate-400 uppercase tracking-widest mt-2">kg CO2</p>
+            <p className="text-4xl font-black text-emerald-300 leading-none">{Math.round(co2Offset)}</p>
+            <p className="text-[11px] text-slate-400 uppercase tracking-widest mt-1.5">kg CO2</p>
           </div>
         </div>
       </header>
@@ -704,6 +724,15 @@ export default function LEDScreen() {
                 <span className="text-sm text-slate-400">{routePointsRef.current.length} points mapped</span>
                 <div className="w-px h-6 bg-slate-700" />
                 <span className="text-sm text-emerald-400 font-bold">{markersRef.current.size} runners tracked</span>
+                <div className="w-px h-6 bg-slate-700" />
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full" style={{ background: MALE_COLOR }} />
+                  <span className="text-sm text-slate-400">Male</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="w-3 h-3 rounded-full" style={{ background: FEMALE_COLOR }} />
+                  <span className="text-sm text-slate-400">Female</span>
+                </div>
               </div>
             </div>
           )}
@@ -718,43 +747,52 @@ export default function LEDScreen() {
         </main>
 
         {/* Sidebar */}
-        <aside className="w-[480px] xl:w-[520px] bg-[#0d1320] border-l border-slate-800/60 flex flex-col shrink-0">
+        <aside className="w-[360px] xl:w-[400px] bg-[#0d1320] border-l border-slate-800/60 flex flex-col shrink-0">
           <div className="flex-1 min-h-0 relative">
-            {/* Combined Leaderboard (3K + 5K) */}
+            {/* 3K and 5K leaderboards, both visible at once — stacked rather
+                than merged into one ranking or cycled between, so a runner
+                in either race can see where they stand without waiting. */}
             <div className={`absolute inset-0 transition-all duration-400 ${sidebarView === 'leaderboard' && !fadeSidebar ? 'opacity-100 translate-x-0' : sidebarView === 'leaderboard' ? 'opacity-0 translate-x-4' : 'opacity-0 -translate-x-4 pointer-events-none'}`} style={{ transitionDuration: '400ms' }}>
-              <div className="p-6 h-full flex flex-col">
-                <div className="flex items-center justify-between mb-5 shrink-0">
-                  <h2 className="text-lg font-extrabold text-amber-400 uppercase tracking-widest">Leaderboard</h2>
-                  <span className="text-sm bg-slate-800 text-slate-400 px-4 py-1.5 rounded-full font-semibold uppercase tracking-wider">3K + 5K</span>
-                </div>
-                <div className="space-y-2.5 flex-1 min-h-0 overflow-hidden">
-                  {leaderboard.map((entry) => {
-                    const tStatus = trackingStatus(entry);
-                    return (
-                    <div key={entry.rank} className={`flex items-center gap-4 px-5 py-3.5 rounded-lg ${entry.rank === 1 ? 'bg-amber-500/10 border border-amber-500/30' : entry.rank <= 3 ? 'bg-slate-800/60 border border-slate-700/50' : 'bg-slate-900/40'}`}>
-                      <span className={`text-lg font-bold w-8 text-center shrink-0 ${entry.rank === 1 ? 'text-amber-400' : entry.rank === 2 ? 'text-slate-300' : entry.rank === 3 ? 'text-orange-400' : 'text-slate-400'}`}>{entry.rank}</span>
-                      {tStatus && (
-                        <span
-                          className={`w-2.5 h-2.5 rounded-full shrink-0 ${tStatus === 'live' ? 'bg-emerald-400' : tStatus === 'delayed' ? 'bg-amber-400' : 'bg-red-500'}`}
-                          style={tStatus === 'live' ? { boxShadow: '0 0 6px rgba(52,211,153,0.8)' } : undefined}
-                          title={tStatus === 'live' ? 'Live' : tStatus === 'delayed' ? 'Signal delayed' : 'Tracking stopped'}
-                        />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-lg font-bold truncate leading-tight text-white">{entry.name}</p>
-                        <p className="text-base text-slate-400 truncate">#{entry.bibNumber}{entry.companyName ? ` · ${entry.companyName}` : ''}</p>
-                      </div>
-                      {entry.category && (
-                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full shrink-0 uppercase tracking-wider ${entry.category === 'RUN_5K' ? 'bg-orange-500/15 text-orange-400' : 'bg-sky-500/15 text-sky-400'}`}>
-                          {entry.category === 'RUN_5K' ? '5K' : '3K'}
-                        </span>
-                      )}
-                      <span className="text-lg font-mono font-bold text-emerald-400 shrink-0">{entry.distance.toFixed(2)} km</span>
+              <div className="p-5 h-full flex flex-col gap-4">
+                {([
+                  { label: '3K', color: 'sky', list: leaderboard3k },
+                  { label: '5K', color: 'orange', list: leaderboard5k },
+                ] as const).map(({ label, color, list }) => (
+                  <div key={label} className="flex-1 min-h-0 flex flex-col">
+                    <div className="flex items-center justify-between mb-2.5 shrink-0">
+                      <h2 className={`text-base font-extrabold uppercase tracking-widest ${color === 'sky' ? 'text-sky-400' : 'text-orange-400'}`}>{label} Leaderboard</h2>
+                      <span className={`text-xs px-3 py-1 rounded-full font-semibold uppercase tracking-wider ${color === 'sky' ? 'bg-sky-500/15 text-sky-400' : 'bg-orange-500/15 text-orange-400'}`}>{list.length} shown</span>
                     </div>
-                    );
-                  })}
-                  {leaderboard.length === 0 && <div className="h-32 flex items-center justify-center"><p className="text-slate-500 text-xl">Waiting for race...</p></div>}
-                </div>
+                    <div className="space-y-1.5 flex-1 min-h-0 overflow-hidden">
+                      {list.map((entry) => {
+                        const tStatus = trackingStatus(entry);
+                        return (
+                          <div key={entry.rank} className={`flex items-center gap-3 px-3.5 py-2 rounded-lg ${entry.rank === 1 ? 'bg-amber-500/10 border border-amber-500/30' : 'bg-slate-900/40'}`}>
+                            <span className={`text-sm font-bold w-6 text-center shrink-0 ${entry.rank === 1 ? 'text-amber-400' : entry.rank === 2 ? 'text-slate-300' : entry.rank === 3 ? 'text-orange-400' : 'text-slate-500'}`}>{entry.rank}</span>
+                            <span
+                              className="w-2 h-2 rounded-full shrink-0"
+                              style={{ background: colorForGender(entry.gender) }}
+                              title={entry.gender === 'MALE' ? 'Male' : entry.gender === 'FEMALE' ? 'Female' : undefined}
+                            />
+                            {tStatus && (
+                              <span
+                                className={`w-2 h-2 rounded-full shrink-0 ${tStatus === 'live' ? 'bg-emerald-400' : tStatus === 'delayed' ? 'bg-amber-400' : 'bg-red-500'}`}
+                                style={tStatus === 'live' ? { boxShadow: '0 0 6px rgba(52,211,153,0.8)' } : undefined}
+                                title={tStatus === 'live' ? 'Live' : tStatus === 'delayed' ? 'Signal delayed' : 'Tracking stopped'}
+                              />
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-bold truncate leading-tight text-white">{entry.name}</p>
+                              <p className="text-xs text-slate-400 truncate">#{entry.bibNumber}{entry.companyName ? ` · ${entry.companyName}` : ''}</p>
+                            </div>
+                            <span className="text-sm font-mono font-bold text-emerald-400 shrink-0">{entry.distance.toFixed(2)} km</span>
+                          </div>
+                        );
+                      })}
+                      {list.length === 0 && <div className="h-16 flex items-center justify-center"><p className="text-slate-500 text-sm">Waiting for runners...</p></div>}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -797,7 +835,7 @@ export default function LEDScreen() {
       )}
 
       {/* Sponsors Ticker */}
-      <div className="h-24 bg-[#0d1320] border-t border-slate-800/40 flex items-center px-12 shrink-0">
+      <div className="h-16 bg-[#0d1320] border-t border-slate-800/40 flex items-center px-10 shrink-0">
         {/* <span className="text-sm font-extrabold text-slate-500 uppercase tracking-widest mr-8 shrink-0">Sponsors</span> */}
         <SponsorTicker sponsors={sponsors} />
       </div>

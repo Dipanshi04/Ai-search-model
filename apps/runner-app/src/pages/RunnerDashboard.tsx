@@ -63,6 +63,7 @@ interface RunnerState {
   queuedCount: number;
   resumedGapSec: number | null;
   offRoute: boolean;
+  connected: boolean;
 }
 
 // How far (meters) a runner can stray from the nearest point of their
@@ -83,8 +84,9 @@ interface Props {
 export default function RunnerDashboard({ participantId, token, category, eventId, onHome }: Props) {
   const [state, setState] = useState<RunnerState>({
     isTracking: false, distance: 0, pace: null, rank: null,
-    status: 'REGISTERED', accuracy: null, speed: null, pointCount: 0, queuedCount: 0, resumedGapSec: null, offRoute: false,
+    status: 'REGISTERED', accuracy: null, speed: null, pointCount: 0, queuedCount: 0, resumedGapSec: null, offRoute: false, connected: true,
   });
+  const [confirmAction, setConfirmAction] = useState<'pause' | 'finish' | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [mapReady, setMapReady] = useState(false);
   const [raceStatus, setRaceStatus] = useState<string>('UPCOMING');
@@ -190,11 +192,17 @@ export default function RunnerDashboard({ participantId, token, category, eventI
     const socket = io(API_URL, { auth: { token }, transports: ['websocket'] });
 
     socket.on('connect', () => {
+      setState((s) => ({ ...s, connected: true }));
       socket.emit('join:runner', participantId);
       socket.emit('join:event', eventId);
       socket.emit('runner:start', { participantId });
       flushGpsQueue();
     });
+
+    // Reflects the real socket state immediately — the queued-count badge
+    // alone can lag a few seconds behind an actual disconnect since it only
+    // grows once the next GPS point is captured and throttled through.
+    socket.on('disconnect', () => setState((s) => ({ ...s, connected: false })));
 
     socket.on('runner:update', (data: any) => {
       setState((s) => ({ ...s, distance: data.distance, pace: data.pace, rank: data.rank, status: data.status }));
@@ -552,12 +560,25 @@ export default function RunnerDashboard({ participantId, token, category, eventI
             <span style={{ fontSize: '12px', fontWeight: 700, color: '#fca5a5', background: 'rgba(248,113,113,0.15)', border: '1px solid rgba(248,113,113,0.35)', borderRadius: '999px', padding: '4px 10px' }}>
               Tracking paused {state.resumedGapSec}s — resumed
             </span>
+          ) : state.isTracking && !state.connected ? (
+            <span style={{ fontSize: '12px', fontWeight: 700, color: '#fbbf24', background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.35)', borderRadius: '999px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#fbbf24' }} />
+              Offline{state.queuedCount > 0 ? ` · ${state.queuedCount} pt${state.queuedCount === 1 ? '' : 's'} queued` : ' · reconnecting…'}
+            </span>
           ) : state.queuedCount > 0 && (
             <span style={{ fontSize: '12px', fontWeight: 700, color: '#fbbf24', background: 'rgba(251,191,36,0.15)', border: '1px solid rgba(251,191,36,0.35)', borderRadius: '999px', padding: '4px 10px' }}>
-              Offline · {state.queuedCount} pt{state.queuedCount === 1 ? '' : 's'} queued
+              Sending {state.queuedCount} queued pt{state.queuedCount === 1 ? '' : 's'}…
             </span>
           )}
         </div>
+
+        {state.isTracking && (
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginBottom: '16px', padding: '5px 12px', borderRadius: '999px', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.14)' }}>
+            <span style={{ fontSize: '12px', fontWeight: 700, color: 'rgba(255,255,255,0.8)' }}>
+              {CATEGORY_LABELS[category] || category} Race · {totalDistanceKmRef.current}km route
+            </span>
+          </div>
+        )}
 
         {state.isTracking && state.offRoute && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', padding: '10px 14px', borderRadius: '12px', background: 'rgba(248,113,113,0.15)', border: '1px solid rgba(248,113,113,0.4)' }}>
@@ -614,7 +635,7 @@ export default function RunnerDashboard({ participantId, token, category, eventI
 
         <div style={{ flex: '0 0 auto', display: 'flex', gap: '12px', padding: '16px 24px', paddingBottom: 'max(20px, env(safe-area-inset-bottom))' }}>
           <button
-            onClick={() => (state.isTracking ? pauseTracking() : startTracking())}
+            onClick={() => (state.isTracking ? setConfirmAction('pause') : startTracking())}
             disabled={isButtonDisabled}
             style={{
               flex: 1, padding: '15px', borderRadius: '12px', border: 'none',
@@ -627,12 +648,41 @@ export default function RunnerDashboard({ participantId, token, category, eventI
             {getButtonLabel()}
           </button>
           {state.isTracking && (
-            <button onClick={finishRace} style={{ flex: 1, padding: '15px', borderRadius: '12px', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '15px', background: '#ef4444', color: '#fff', transition: 'all 0.2s' }}>
+            <button onClick={() => setConfirmAction('finish')} style={{ flex: 1, padding: '15px', borderRadius: '12px', border: 'none', cursor: 'pointer', fontWeight: 700, fontSize: '15px', background: '#ef4444', color: '#fff', transition: 'all 0.2s' }}>
               Finish
             </button>
           )}
         </div>
       </div>
+
+      {confirmAction && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 30, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '24px' }}>
+          <div style={{ width: '100%', maxWidth: '320px', background: '#1a2333', borderRadius: '20px', padding: '24px 22px', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <p style={{ fontSize: '17px', fontWeight: 700, color: '#fff', margin: '0 0 8px' }}>
+              {confirmAction === 'finish' ? 'Finish the race?' : 'Pause tracking?'}
+            </p>
+            <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', margin: '0 0 20px', lineHeight: 1.5 }}>
+              {confirmAction === 'finish'
+                ? 'This ends your run for good — your time and distance will be locked in and can\'t be resumed.'
+                : 'GPS tracking will stop until you tap Start again. Your progress so far is saved.'}
+            </p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button
+                onClick={() => setConfirmAction(null)}
+                style={{ flex: 1, padding: '13px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.15)', background: 'transparent', color: '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => { const a = confirmAction; setConfirmAction(null); if (a === 'finish') finishRace(); else pauseTracking(); }}
+                style={{ flex: 1, padding: '13px', borderRadius: '12px', border: 'none', background: confirmAction === 'finish' ? '#ef4444' : '#f97316', color: '#fff', fontWeight: 700, fontSize: '14px', cursor: 'pointer' }}
+              >
+                {confirmAction === 'finish' ? 'Finish' : 'Pause'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

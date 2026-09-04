@@ -77,7 +77,7 @@ export function setupSocketIO(io: SocketIOServer): void {
         // instead of the two this used to take.
         const participant = await prisma.participant.findUnique({
           where: { id: data.participantId },
-          select: { eventId: true, bibNumber: true, category: true, status: true, startedAt: true, user: { select: { name: true } } },
+          select: { eventId: true, bibNumber: true, category: true, gender: true, status: true, startedAt: true, user: { select: { name: true } } },
         });
         if (!participant?.eventId) return;
 
@@ -141,6 +141,7 @@ export function setupSocketIO(io: SocketIOServer): void {
             eventId: participant.eventId,
             bibNumber: participant.bibNumber,
             category: participant.category,
+            gender: participant.gender,
             name: participant.user?.name || participant.bibNumber,
             lat: data.lat,
             lng: data.lng,

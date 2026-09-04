@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { api } from '../lib/api';
+import logoDark from '../components/logo-dark.png';
+import nrcGroupLogo from '../components/nrc-group-logo.png';
 
 interface Participant {
   id: string;
@@ -7,7 +9,24 @@ interface Participant {
   category: string;
   status: string;
   user: { name: string; email: string };
-  raceDistance: { name: string; distanceKm: number };
+  company?: { name: string } | null;
+  raceDistance?: { name: string; distanceKm: number } | null;
+}
+
+// Participants only ever carry a category enum (RUN_3K/RUN_5K), never a
+// raceDistance relation — the field on Participant above is aspirational
+// for a shape the API doesn't actually send. This is the real source of
+// truth for "how many km is this category", and what the km figure on the
+// certificate used to show as "?" before this map existed.
+const CATEGORY_KM: Record<string, number> = { RUN_3K: 3, RUN_5K: 5 };
+
+function loadImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = reject;
+    img.src = src;
+  });
 }
 
 export default function CertificatesPage() {
@@ -29,100 +48,139 @@ export default function CertificatesPage() {
     }
   }
 
-  function generateCertificate(p: Participant) {
+  async function generateCertificate(p: Participant) {
     setGenerating(p.id);
 
+    const W = 1400, H = 990;
+    const NAVY = '#1B2A5B';
+    const ORANGE = '#F5821F';
+    const CREAM = '#F5F1EA';
+
     const canvas = document.createElement('canvas');
-    canvas.width = 1200;
-    canvas.height = 850;
+    canvas.width = W;
+    canvas.height = H;
     const ctx = canvas.getContext('2d')!;
+    ctx.textAlign = 'center';
 
     // Background
-    ctx.fillStyle = '#f8fafc';
-    ctx.fillRect(0, 0, 1200, 850);
+    ctx.fillStyle = CREAM;
+    ctx.fillRect(0, 0, W, H);
 
-    // Border
-    ctx.strokeStyle = '#7c3aed';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(30, 30, 1140, 790);
-
-    ctx.strokeStyle = '#c4b5fd';
+    // Outer + inner frame
+    ctx.strokeStyle = NAVY;
+    ctx.lineWidth = 6;
+    ctx.strokeRect(36, 36, W - 72, H - 72);
+    ctx.strokeStyle = ORANGE;
     ctx.lineWidth = 2;
-    ctx.strokeRect(40, 40, 1120, 770);
+    ctx.strokeRect(52, 52, W - 104, H - 104);
+
+    // Corner accents
+    const cornerSize = 34;
+    ctx.strokeStyle = ORANGE;
+    ctx.lineWidth = 4;
+    [[52, 52, 1, 1], [W - 52, 52, -1, 1], [52, H - 52, 1, -1], [W - 52, H - 52, -1, -1]].forEach(([x, y, dx, dy]) => {
+      ctx.beginPath();
+      ctx.moveTo(x!, y! + cornerSize * dy!);
+      ctx.lineTo(x!, y!);
+      ctx.lineTo(x! + cornerSize * dx!, y!);
+      ctx.stroke();
+    });
+
+    // Logo lockups — ISA + NRC Group, loaded async before drawing the rest
+    try {
+      const [isaLogo, nrcLogo] = await Promise.all([loadImage(logoDark), loadImage(nrcGroupLogo)]);
+      const logoH = 64;
+      const isaW = (isaLogo.width / isaLogo.height) * logoH;
+      const nrcW = (nrcLogo.width / nrcLogo.height) * logoH;
+      const gap = 28;
+      const totalW = isaW + nrcW + gap;
+      const startX = W / 2 - totalW / 2;
+      const logoY = 78;
+      ctx.drawImage(nrcLogo, startX, logoY, nrcW, logoH);
+      ctx.drawImage(isaLogo, startX + nrcW + gap, logoY, isaW, logoH);
+    } catch {
+      // Logos are a nice-to-have — a failed image load shouldn't block the
+      // certificate itself from generating.
+    }
 
     // Title
-    ctx.fillStyle = '#0f172a';
-    ctx.font = 'bold 42px Inter, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('Certificate of Completion', 600, 140);
+    ctx.fillStyle = NAVY;
+    ctx.font = '800 46px Georgia, serif';
+    ctx.fillText('Certificate of Completion', W / 2, 250);
 
-    // Subtitle
-    ctx.fillStyle = '#7c3aed';
-    ctx.font = '600 20px Inter, sans-serif';
-    ctx.fillText('ISA Tech Marathon 2026', 600, 185);
+    ctx.fillStyle = ORANGE;
+    ctx.font = '700 22px Inter, sans-serif';
+    ctx.fillText('ISA TECH MARATHON 2026', W / 2, 288);
 
-    // Line
-    ctx.strokeStyle = '#e2e8f0';
+    // Divider
+    ctx.strokeStyle = 'rgba(27,42,91,0.15)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(300, 210);
-    ctx.lineTo(900, 210);
+    ctx.moveTo(W / 2 - 220, 316);
+    ctx.lineTo(W / 2 + 220, 316);
     ctx.stroke();
 
     // "This is to certify that"
-    ctx.fillStyle = '#64748b';
-    ctx.font = '18px Inter, sans-serif';
-    ctx.fillText('This is to certify that', 600, 265);
+    ctx.fillStyle = 'rgba(27,42,91,0.6)';
+    ctx.font = '20px Inter, sans-serif';
+    ctx.fillText('This is to certify that', W / 2, 366);
 
     // Name
-    ctx.fillStyle = '#0f172a';
-    ctx.font = 'bold 36px Inter, sans-serif';
-    ctx.fillText(p.user?.name || 'Participant', 600, 320);
+    const name = p.user?.name || 'Participant';
+    ctx.fillStyle = NAVY;
+    ctx.font = '800 48px Georgia, serif';
+    ctx.fillText(name, W / 2, 432);
 
-    // Underline under name
-    const nameWidth = ctx.measureText(p.user?.name || 'Participant').width;
-    ctx.strokeStyle = '#7c3aed';
-    ctx.lineWidth = 2;
+    const nameWidth = ctx.measureText(name).width;
+    ctx.strokeStyle = ORANGE;
+    ctx.lineWidth = 2.5;
     ctx.beginPath();
-    ctx.moveTo(600 - nameWidth / 2 - 10, 330);
-    ctx.lineTo(600 + nameWidth / 2 + 10, 330);
+    ctx.moveTo(W / 2 - nameWidth / 2 - 16, 448);
+    ctx.lineTo(W / 2 + nameWidth / 2 + 16, 448);
     ctx.stroke();
+
+    if (p.company?.name) {
+      ctx.fillStyle = 'rgba(27,42,91,0.5)';
+      ctx.font = '16px Inter, sans-serif';
+      ctx.fillText(`Representing ${p.company.name}`, W / 2, 476);
+    }
 
     // "has successfully completed"
-    ctx.fillStyle = '#64748b';
-    ctx.font = '18px Inter, sans-serif';
-    ctx.fillText('has successfully completed the', 600, 375);
-
-    // Race name
-    ctx.fillStyle = '#7c3aed';
-    ctx.font = 'bold 28px Inter, sans-serif';
-    ctx.fillText(`${p.raceDistance?.name || p.category?.replace('RUN_', '') || 'Marathon'}`, 600, 420);
-
-    // Distance
-    ctx.fillStyle = '#475569';
+    ctx.fillStyle = 'rgba(27,42,91,0.6)';
     ctx.font = '20px Inter, sans-serif';
-    ctx.fillText(
-      `${p.raceDistance?.distanceKm || '?'} km — BIB #${p.bibNumber}`,
-      600, 465
-    );
+    ctx.fillText('has successfully completed the', W / 2, 526);
 
-    // Date
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = '16px Inter, sans-serif';
+    const km = p.raceDistance?.distanceKm ?? CATEGORY_KM[p.category] ?? null;
+    const raceLabel = p.raceDistance?.name || `${km ?? ''}K Run`.replace('K Run', 'K').trim() || p.category?.replace('RUN_', '') || 'Marathon';
+
+    ctx.fillStyle = ORANGE;
+    ctx.font = '800 34px Georgia, serif';
+    ctx.fillText(raceLabel, W / 2, 574);
+
+    ctx.fillStyle = 'rgba(27,42,91,0.55)';
+    ctx.font = '22px Inter, sans-serif';
+    ctx.fillText(`${km !== null ? km.toFixed(0) : '—'} km  ·  BIB #${p.bibNumber}`, W / 2, 610);
+
+    // Date pill
     const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-    ctx.fillText(date, 600, 520);
+    ctx.fillStyle = 'rgba(27,42,91,0.45)';
+    ctx.font = '17px Inter, sans-serif';
+    ctx.fillText(date, W / 2, 664);
 
     // Footer
-    ctx.fillStyle = '#e2e8f0';
-    ctx.beginPath();
-    ctx.moveTo(200, 680);
-    ctx.lineTo(1000, 680);
+    ctx.strokeStyle = 'rgba(27,42,91,0.15)';
     ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(W / 2 - 320, 838);
+    ctx.lineTo(W / 2 + 320, 838);
     ctx.stroke();
 
-    ctx.fillStyle = '#64748b';
-    ctx.font = '14px Inter, sans-serif';
-    ctx.fillText('ISA Tech Marathon 2026 — Certificate of Completion', 600, 720);
+    ctx.fillStyle = NAVY;
+    ctx.font = '700 15px Inter, sans-serif';
+    ctx.fillText('INDORE SOFTWARE ASSOCIATION', W / 2, 872);
+    ctx.fillStyle = 'rgba(27,42,91,0.5)';
+    ctx.font = '13px Inter, sans-serif';
+    ctx.fillText('Run for a Greener Tomorrow — 3 km = 1 tree', W / 2, 896);
 
     // Download
     const link = document.createElement('a');
@@ -130,14 +188,15 @@ export default function CertificatesPage() {
     link.href = canvas.toDataURL('image/png');
     link.click();
 
-    setTimeout(() => setGenerating(null), 1000);
+    setGenerating(null);
   }
 
-  function generateBulk() {
+  async function generateBulk() {
     const finished = participants.filter((p) => p.status === 'FINISHED');
-    finished.forEach((p, i) => {
-      setTimeout(() => generateCertificate(p), i * 500);
-    });
+    for (const p of finished) {
+      await generateCertificate(p);
+      await new Promise((r) => setTimeout(r, 400));
+    }
   }
 
   const displayParticipants = filter === 'all' ? participants : participants.filter((p) => p.status === filter);

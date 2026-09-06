@@ -65,7 +65,7 @@ function CountdownTimer() {
         Countdown to Marathon Day
       </p>
 
-      <div className="flex justify-center gap-2 sm:gap-3">
+      <div className="flex justify-center gap-1.5 sm:gap-2">
         {[
           { value: timeLeft.days, label: "Days" },
           { value: timeLeft.hours, label: "Hrs" },
@@ -74,13 +74,13 @@ function CountdownTimer() {
         ].map((item) => (
           <div
             key={item.label}
-            className="relative rounded-xl px-3 py-2.5 sm:px-5 sm:py-3.5 min-w-[62px] sm:min-w-[84px]"
+            className="relative rounded-lg px-2 py-1.5 sm:px-3 sm:py-2 min-w-[46px] sm:min-w-[58px]"
             style={{ background: '#1B2A5B' }}
           >
-            <div className="hero-tabular text-xl sm:text-3xl font-extrabold text-white leading-none">
+            <div className="hero-tabular text-base sm:text-xl font-extrabold text-white leading-none">
               {String(item.value).padStart(2, "0")}
             </div>
-            <div className="hero-kicker text-[8px] sm:text-[10px] font-bold text-[#F5821F] uppercase tracking-[0.2em] mt-1.5">
+            <div className="hero-kicker text-[7px] sm:text-[9px] font-bold text-[#F5821F] uppercase tracking-[0.2em] mt-1">
               {item.label}
             </div>
           </div>
@@ -97,23 +97,21 @@ function HomePage() {
       {/* Decorative background layers */}
       <div className="hero-grain" />
 
-      {/* Top bar: logo lockups, matching the poster's two-corner layout.
-          Stacked and centered on narrow phones — side-by-side at full size
-          plus the wordmark text left no room and clipped off-screen; from
-          sm: up it's the original two-corner row. */}
-      <div className="hero-anim flex flex-col-reverse sm:flex-row items-center sm:items-center justify-center sm:justify-between gap-2 sm:gap-0 px-4 sm:px-8 pt-4 sm:pt-6 relative z-10 shrink-0" style={{ animationDelay: '0ms' }}>
-        <div className="flex items-center gap-3 sm:gap-5 shrink-0">
-          <div className="bg-white rounded-2xl shadow-sm px-2.5 py-1.5 sm:px-4 sm:py-3 border shrink-0" style={{ borderColor: 'rgba(27,42,91,0.08)' }}>
-            <img src={nrcGroupLogo} alt="NRC Group" className="h-14 sm:h-24 xl:h-32 w-auto object-contain shrink-0" />
-          </div>
-          <div className="bg-white rounded-2xl shadow-sm px-2.5 py-1.5 sm:px-4 sm:py-3 border shrink-0" style={{ borderColor: 'rgba(27,42,91,0.08)' }}>
-            <Logo size="h-14 sm:h-24 xl:h-32" />
-          </div>
+      {/* Top bar: "presented by" lockup — sponsor logo, then the marathon's
+          own logo below it, mirroring how it reads on the print poster. */}
+      <div className="hero-anim flex flex-col items-center gap-1 sm:gap-1.5 pt-4 sm:pt-6 px-4 relative z-10 shrink-0 text-center" style={{ animationDelay: '0ms' }}>
+        <div className="bg-white rounded-2xl shadow-sm px-4 py-2 sm:px-5 sm:py-2.5 border inline-flex" style={{ borderColor: 'rgba(27,42,91,0.08)' }}>
+          <img src={nrcGroupLogo} alt="NRC Group" className="h-9 sm:h-12 w-auto object-contain" />
         </div>
-        <div className="hero-kicker text-center sm:text-right leading-tight shrink-0">
-          <div className="text-sm sm:text-2xl xl:text-3xl font-extrabold tracking-[0.1em] uppercase" style={{ color: '#1B2A5B' }}>Indore Software</div>
-          <div className="text-sm sm:text-2xl xl:text-3xl font-extrabold tracking-[0.1em] uppercase" style={{ color: '#1B2A5B' }}>Association</div>
+        <p className="hero-kicker text-[9px] sm:text-[11px] font-bold tracking-[0.35em] uppercase" style={{ color: '#1B2A5B', opacity: 0.45 }}>
+          Presents
+        </p>
+        <div className="bg-white rounded-2xl shadow-sm px-4 py-2 sm:px-5 sm:py-2.5 border inline-flex mb-1" style={{ borderColor: 'rgba(27,42,91,0.08)' }}>
+          <Logo size="h-9 sm:h-12" />
         </div>
+        <p className="hero-kicker text-[10px] sm:text-sm font-extrabold tracking-[0.15em] uppercase" style={{ color: '#1B2A5B', opacity: 0.6 }}>
+          Indore Software Association
+        </p>
       </div>
 
       {/* Hero Section */}
@@ -134,9 +132,24 @@ function HomePage() {
           <p className="hero-anim hero-body text-sm sm:text-base xl:text-lg mb-1.5" style={{ animationDelay: '200ms', color: '#1B2A5B', opacity: 0.75, maxWidth: '32rem' }}>
             Where central India's biggest IT community unites for technology, fitness and responsibility.
           </p>
-          <p className="hero-anim hero-body text-sm sm:text-base xl:text-lg mb-5 sm:mb-6" style={{ animationDelay: '250ms', color: '#1B2A5B', opacity: 0.75 }}>
+          <p className="hero-anim hero-body text-sm sm:text-base xl:text-lg mb-3 sm:mb-4" style={{ animationDelay: '250ms', color: '#1B2A5B', opacity: 0.75 }}>
             Run for a <span className="font-bold" style={{ color: '#10b981' }}>Greener</span> Tomorrow  every 5km plant a tree.
           </p>
+
+          <p className="hero-anim hero-title text-2xl sm:text-3xl xl:text-4xl font-extrabold mb-3 sm:mb-4" style={{ animationDelay: '260ms', color: '#1B2A5B' }}>
+            27<sup>th</sup> September 2026
+          </p>
+
+          <div className="hero-anim flex flex-col gap-1.5 mb-5 sm:mb-6 text-xs sm:text-sm font-semibold" style={{ animationDelay: '280ms', color: '#1B2A5B', opacity: 0.85 }}>
+            <span className="inline-flex items-center gap-1.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" /><circle cx="12" cy="10" r="3" /></svg>
+              Start Point: BBC Basketball Club, Indore
+            </span>
+            <span className="inline-flex items-center gap-1.5">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0"><path d="M20.38 3.46 16 2a4 4 0 0 1-8 0L3.62 3.46a2 2 0 0 0-1.34 2.23l.58 3.47a1 1 0 0 0 .99.84H6v10c0 1.1.9 2 2 2h8a2 2 0 0 0 2-2V10h2.15a1 1 0 0 0 .99-.84l.58-3.47a2 2 0 0 0-1.34-2.23Z" /></svg>
+              Kit Collection: 26th September 2026
+            </span>
+          </div>
 
           <div className="hero-anim flex flex-wrap items-center gap-3 mb-6 sm:mb-7" style={{ animationDelay: '320ms' }}>
             <span className="hero-body inline-flex items-center gap-2 px-5 py-2 sm:px-6 sm:py-2.5 rounded-full text-sm sm:text-base font-bold text-white" style={{ background: '#F5821F' }}>
@@ -208,6 +221,31 @@ function HomePage() {
               <p className="hero-body text-sm sm:text-base text-white/80">
                 <span className="font-bold" style={{ color: '#F5821F' }}>50% off</span>
               </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Sponsor categories — logos to follow; text placeholders hold the
+          layout/sizing until then, swap each <div> below for an <img>. */}
+      <div className="hero-anim px-4 sm:px-8 pb-6 sm:pb-8 relative z-10 max-w-[1400px] mx-auto w-full" style={{ animationDelay: '600ms' }}>
+        <div className="bg-white rounded-2xl border shadow-sm p-5 sm:p-6" style={{ borderColor: 'rgba(27,42,91,0.1)' }}>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 sm:gap-8 items-start justify-items-center">
+            <div className="text-center">
+              <p className="hero-kicker text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#1B2A5B', opacity: 0.5 }}>Event By</p>
+              <img src={logoDark} alt="Indore Software Association" className="h-10 sm:h-12 w-auto object-contain mx-auto" />
+            </div>
+            <div className="text-center">
+              <p className="hero-kicker text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#1B2A5B', opacity: 0.5 }}>Hydration Partner</p>
+              <div className="h-10 sm:h-12 flex items-center justify-center px-4 rounded-lg border border-dashed" style={{ borderColor: 'rgba(27,42,91,0.2)' }}>
+                <span className="text-sm font-bold" style={{ color: '#1B2A5B', opacity: 0.4 }}>Dabur</span>
+              </div>
+            </div>
+            <div className="text-center">
+              <p className="hero-kicker text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#1B2A5B', opacity: 0.5 }}>Real Estate Partner</p>
+              <div className="h-10 sm:h-12 flex items-center justify-center px-4 rounded-lg border border-dashed" style={{ borderColor: 'rgba(27,42,91,0.2)' }}>
+                <span className="text-sm font-bold" style={{ color: '#1B2A5B', opacity: 0.4 }}>AIR</span>
+              </div>
             </div>
           </div>
         </div>

@@ -458,10 +458,12 @@ export default function RegisterPage() {
                 )}
                 <label className="cursor-pointer px-3 py-2 rounded-lg border border-brand-navy/15 text-xs font-semibold text-brand-navy hover:bg-brand-cream transition">
                   {photo ? 'Change photo' : 'Add photo'}
+                  {/* No `capture` attribute — that forces the camera open
+                      directly on Android with no way to pick an existing
+                      photo instead. */}
                   <input
                     type="file"
                     accept="image/png,image/jpeg,image/webp"
-                    capture="user"
                     className="hidden"
                     onChange={(e) => {
                       const file = e.target.files?.[0] || null;

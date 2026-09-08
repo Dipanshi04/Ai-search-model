@@ -3,6 +3,7 @@ import RunnerDashboard from './pages/RunnerDashboard';
 import RunnerHome from './pages/RunnerHome';
 import LoginPage from './pages/LoginPage';
 import { api } from './lib/api';
+import { installBackTrap } from './lib/backStack';
 import logo from './components/logo-dark.png';
 
 interface ParticipantInfo {
@@ -25,6 +26,13 @@ export default function App() {
     checkAuth();
     return () => clearTimeout(timer);
   }, []);
+
+  // Past login, the hardware back button should navigate within the runner
+  // app (closing whatever overlay is open) rather than escaping out to
+  // whatever page linked here — see lib/backStack.ts.
+  useEffect(() => {
+    if (participant) installBackTrap();
+  }, [participant]);
 
   async function checkAuth() {
     const token = localStorage.getItem('runner_token');

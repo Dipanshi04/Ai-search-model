@@ -230,7 +230,9 @@ export default function ProfilePage({ onBack }: Props) {
           boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
         }}>
           <label style={{ position: 'relative', display: 'inline-block', margin: '0 auto 12px', cursor: 'pointer' }}>
-            <input type="file" accept="image/png,image/jpeg,image/webp" capture="user" style={{ display: 'none' }} onChange={handlePhotoChange} />
+            {/* No `capture` attribute — that forces the camera open directly
+                on Android with no way to pick an existing photo instead. */}
+            <input type="file" accept="image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={handlePhotoChange} />
             {details?.avatarUrl ? (
               <img
                 src={`${API_URL}${details.avatarUrl}`}

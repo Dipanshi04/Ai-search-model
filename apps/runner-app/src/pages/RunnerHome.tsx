@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
+import { useBackClose } from '../hooks/useBackClose';
 import logoDark from '../components/logo-dark.png';
 import nrcGroupLogo from '../components/nrc-group-logo.png';
 import BrandHeader from '../components/BrandHeader';
@@ -48,6 +49,11 @@ export default function RunnerHome({ bibNumber, category, onStart }: Props) {
   const [certGenerating, setCertGenerating] = useState(false);
   const [certError, setCertError] = useState('');
   const [sharing, setSharing] = useState(false);
+
+  // Android/browser back closes whichever overlay is open instead of
+  // leaving the runner app.
+  useBackClose(showProfile, () => setShowProfile(false));
+  useBackClose(showMessages, () => { setShowMessages(false); setHasMessages(false); });
 
   useEffect(() => {
     api.getMe().then((res) => {

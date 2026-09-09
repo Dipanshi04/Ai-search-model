@@ -109,15 +109,15 @@ function HomePage() {
           className="absolute top-4 sm:top-6 right-4 flex flex-col items-center gap-1 bg-white rounded-xl shadow-sm px-2.5 py-1.5 sm:px-3 sm:py-2 border"
           style={{ borderColor: 'rgba(27,42,91,0.08)' }}
         >
-          <img src={imcLogo} alt="Indore Municipal Corporation" className="h-6 sm:h-8 w-auto object-contain" />
           <span className="hero-kicker text-[6px] sm:text-[7px] font-bold uppercase tracking-wide text-center leading-tight" style={{ color: '#1B2A5B', opacity: 0.55 }}>
             Green City<br />Partner
           </span>
+          <img src={imcLogo} alt="Indore Municipal Corporation" className="h-6 sm:h-8 w-auto object-contain" />
         </div>
 
         <div className="flex flex-col items-center gap-1 sm:gap-1.5 text-center">
-          <div className="bg-white rounded-2xl shadow-sm px-4 py-2 sm:px-5 sm:py-2.5 border inline-flex" style={{ borderColor: 'rgba(27,42,91,0.08)' }}>
-            <img src={nrcGroupLogo} alt="NRC Group" className="h-9 sm:h-12 w-auto object-contain" />
+          <div className="bg-white rounded-2xl shadow-sm px-5 py-2.5 sm:px-7 sm:py-3.5 border inline-flex" style={{ borderColor: 'rgba(27,42,91,0.08)' }}>
+            <img src={nrcGroupLogo} alt="NRC Group" className="h-14 sm:h-20 w-auto object-contain" />
           </div>
           <p className="hero-kicker text-[9px] sm:text-[11px] font-bold tracking-[0.35em] uppercase" style={{ color: '#1B2A5B', opacity: 0.45 }}>
             Presents

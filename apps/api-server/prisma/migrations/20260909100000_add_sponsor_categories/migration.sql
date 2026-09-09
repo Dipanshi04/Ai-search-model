@@ -24,6 +24,9 @@ INSERT INTO "sponsor_categories" ("id", "name", "display_order", "always_separat
   (gen_random_uuid()::text, 'Title Sponsor', 0, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
   (gen_random_uuid()::text, 'Hydration Partner', 1, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
   (gen_random_uuid()::text, 'Food Partner', 2, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-  (gen_random_uuid()::text, 'Snack Partner', 3, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+  (gen_random_uuid()::text, 'Snacking Partner', 3, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
   (gen_random_uuid()::text, 'Real Estate Partner', 4, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
-  (gen_random_uuid()::text, 'Community Partner', 5, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+  (gen_random_uuid()::text, 'Community Partner', 5, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+  (gen_random_uuid()::text, 'Plantation Partner', 6, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+  (gen_random_uuid()::text, 'Aqua Partner', 7, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+  (gen_random_uuid()::text, 'CSR Partner', 8, false, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);

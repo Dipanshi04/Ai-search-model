@@ -11,6 +11,7 @@ import PaymentDetailsPage from './pages/PaymentDetailsPage';
 import Footer from './components/Footer';
 import SponsorInquiryModal from './components/SponsorInquiryModal';
 import BulkInquiryModal from './components/BulkInquiryModal';
+import SponsorStrip from './components/SponsorStrip';
 import logoDark from './components/logo-dark.png';
 import heroRunner from './components/hero-runner.webp';
 import nrcGroupLogo from './components/nrc-group-logo.png';
@@ -226,30 +227,7 @@ function HomePage() {
         </div>
       </div>
 
-      {/* Sponsor categories — logos to follow; text placeholders hold the
-          layout/sizing until then, swap each <div> below for an <img>. */}
-      <div className="hero-anim px-4 sm:px-8 pb-6 sm:pb-8 relative z-10 max-w-[1400px] mx-auto w-full" style={{ animationDelay: '600ms' }}>
-        <div className="bg-white rounded-2xl border shadow-sm p-5 sm:p-6" style={{ borderColor: 'rgba(27,42,91,0.1)' }}>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-6 sm:gap-8 items-start justify-items-center">
-            <div className="text-center">
-              <p className="hero-kicker text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#1B2A5B', opacity: 0.5 }}>Event By</p>
-              <img src={logoDark} alt="Indore Software Association" className="h-10 sm:h-12 w-auto object-contain mx-auto" />
-            </div>
-            <div className="text-center">
-              <p className="hero-kicker text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#1B2A5B', opacity: 0.5 }}>Hydration Partner</p>
-              <div className="h-10 sm:h-12 flex items-center justify-center px-4 rounded-lg border border-dashed" style={{ borderColor: 'rgba(27,42,91,0.2)' }}>
-                <span className="text-sm font-bold" style={{ color: '#1B2A5B', opacity: 0.4 }}>Dabur</span>
-              </div>
-            </div>
-            <div className="text-center">
-              <p className="hero-kicker text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#1B2A5B', opacity: 0.5 }}>Real Estate Partner</p>
-              <div className="h-10 sm:h-12 flex items-center justify-center px-4 rounded-lg border border-dashed" style={{ borderColor: 'rgba(27,42,91,0.2)' }}>
-                <span className="text-sm font-bold" style={{ color: '#1B2A5B', opacity: 0.4 }}>AIR</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <SponsorStrip />
 
       {showSponsorModal && <SponsorInquiryModal onClose={() => setShowSponsorModal(false)} />}
       {showBulkModal && <BulkInquiryModal onClose={() => setShowBulkModal(false)} />}

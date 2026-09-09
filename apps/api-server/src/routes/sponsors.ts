@@ -26,6 +26,7 @@ sponsorsRouter.get('/', async (req: Request, res: Response) => {
     const sponsors = await prisma.sponsor.findMany({
       where,
       orderBy: { displayOrder: 'asc' },
+      include: { category: { select: { id: true, name: true, displayOrder: true, alwaysSeparate: true } } },
     });
     res.json({ success: true, data: sponsors });
   } catch (error) {
@@ -48,6 +49,7 @@ sponsorsRouter.post('/', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'
     let logoUrl = getString(body.logoUrl);
     const website = getString(body.website);
     const displayOrder = body.displayOrder ? Number(getString(body.displayOrder)) : 0;
+    const categoryId = getString(body.categoryId) || undefined;
 
     if (!eventId) {
       res.status(400).json({ success: false, message: 'eventId is required' });
@@ -71,7 +73,8 @@ sponsorsRouter.post('/', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'
     }
 
     const sponsor = await prisma.sponsor.create({
-      data: { eventId, name: name || '', tier: tier || '', logoUrl, website, displayOrder: displayOrder || 0 },
+      data: { eventId, name: name || '', tier: tier || '', logoUrl, website, displayOrder: displayOrder || 0, categoryId },
+      include: { category: { select: { id: true, name: true, alwaysSeparate: true } } },
     });
 
     res.status(201).json({ success: true, data: sponsor });
@@ -95,6 +98,11 @@ sponsorsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGE
     let logoUrl: string | undefined = getString(body.logoUrl);
     const website: string | undefined = getString(body.website);
     const displayOrder: number | undefined = body.displayOrder ? Number(getString(body.displayOrder)) : undefined;
+    // '' means "uncategorize" — the admin form sends it explicitly to clear
+    // a previously-set category, so it has to be distinguished from
+    // "field not sent at all" (undefined, meaning leave it alone).
+    const categoryIdRaw = getString(body.categoryId);
+    const categoryId: string | null | undefined = categoryIdRaw === undefined ? undefined : (categoryIdRaw || null);
 
     const existing = await prisma.sponsor.findUnique({ where: { id: sponsorId } });
     if (!existing) {
@@ -114,7 +122,8 @@ sponsorsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGE
 
     const sponsor = await prisma.sponsor.update({
       where: { id: sponsorId },
-      data: { name, tier: tier || '', logoUrl, website, displayOrder },
+      data: { name, tier: tier || '', logoUrl, website, displayOrder, categoryId },
+      include: { category: { select: { id: true, name: true, alwaysSeparate: true } } },
     });
 
     res.json({ success: true, data: sponsor });

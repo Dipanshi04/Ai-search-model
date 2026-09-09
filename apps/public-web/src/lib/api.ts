@@ -73,6 +73,10 @@ class ApiClient {
     });
   }
 
+  async getSponsors() {
+    return this.request<any[]>('/api/v1/sponsors');
+  }
+
   async submitBulkInquiry(data: { name: string; email: string; phone?: string; companyName: string; passCount?: string; message?: string }) {
     return this.request<any>('/api/v1/bulk-inquiries', {
       method: 'POST',

@@ -336,6 +336,22 @@ class ApiClient {
     return this.request<void>(`/api/v1/sponsors/${id}`, { method: 'DELETE' });
   }
 
+  async getSponsorCategories() {
+    return this.request<any[]>('/api/v1/sponsor-categories');
+  }
+
+  async createSponsorCategory(data: { name: string; displayOrder?: number; alwaysSeparate?: boolean }) {
+    return this.request<any>('/api/v1/sponsor-categories', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateSponsorCategory(id: string, data: { name?: string; displayOrder?: number; alwaysSeparate?: boolean }) {
+    return this.request<any>(`/api/v1/sponsor-categories/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async deleteSponsorCategory(id: string) {
+    return this.request<void>(`/api/v1/sponsor-categories/${id}`, { method: 'DELETE' });
+  }
+
   async getSponsorInquiries(status?: string) {
     const query = status && status !== 'ALL' ? `?status=${status}` : '';
     return this.request<any[]>(`/api/v1/sponsors/inquiries${query}`);

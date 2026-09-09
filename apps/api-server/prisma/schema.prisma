@@ -210,12 +210,32 @@ model Sponsor {
   logoUrl      String?  @map("logo_url")
   website      String?
   displayOrder Int      @default(0) @map("display_order")
+  categoryId   String?  @map("category_id")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  event        Event    @relation(fields: [eventId], references: [id])
+  event        Event            @relation(fields: [eventId], references: [id])
+  category     SponsorCategory? @relation(fields: [categoryId], references: [id])
 
   @@map("sponsors")
+}
+
+// e.g. Hydration Partner, Food Partner, Community Partner — lets sponsors
+// be grouped and ordered on the public displays instead of one flat list.
+// Categories with few sponsors fold into a shared "Supported By" group
+// unless alwaysSeparate is set (Community Partner should always get its
+// own section even with just one sponsor in it).
+model SponsorCategory {
+  id             String    @id @default(cuid())
+  name           String    @unique
+  displayOrder   Int       @default(0) @map("display_order")
+  alwaysSeparate Boolean   @default(false) @map("always_separate")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  sponsors       Sponsor[]
+
+  @@map("sponsor_categories")
 }
 
 // Inbound leads from the homepage "Open For Sponsors" button — not tied to

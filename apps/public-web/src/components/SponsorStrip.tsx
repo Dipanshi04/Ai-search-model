@@ -66,7 +66,7 @@ function LogoTile({ label, sponsors }: DisplayGroup) {
       </p>
       <div className="flex flex-wrap items-center justify-center gap-2">
         {sponsors.map((s) => (
-          <div key={s.id} className="bg-white rounded-lg border border-slate-200 p-2 h-10 sm:h-12 flex items-center" style={{ borderColor: 'rgba(27,42,91,0.12)' }}>
+          <div key={s.id} title={s.name} className="bg-white rounded-lg border border-slate-200 p-2 h-10 sm:h-12 flex items-center" style={{ borderColor: 'rgba(27,42,91,0.12)' }}>
             {s.logoUrl ? (
               // The bundled ISA logo (imported asset, already a usable src)
               // is passed in as-is; real sponsor logos are server-uploaded

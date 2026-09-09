@@ -12,26 +12,17 @@ interface ApiResponse<T> {
   };
 }
 
+// The public marketing site has no runner login flow of its own — every
+// endpoint it calls is public. Never attach an Authorization header here:
+// this app shares its domain (and localStorage) with the runner app in
+// production, and doing so would leak a runner's token onto plain public
+// requests like the homepage sponsor list.
 class ApiClient {
-  private token: string | null = null;
-
-  constructor() {
-    this.token = localStorage.getItem('runner_token');
-  }
-
-  setToken(token: string) {
-    this.token = token;
-    localStorage.setItem('runner_token', token);
-  }
-
   async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       ...((options.headers as Record<string, string>) || {}),
     };
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
-    }
 
     const response = await fetch(`${API_URL}${endpoint}`, {
       ...options,

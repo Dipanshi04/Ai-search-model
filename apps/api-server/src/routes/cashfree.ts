@@ -25,7 +25,7 @@ export const cashfreeRouter: Router = Router();
 
 cashfreeRouter.post('/start', async (req: Request, res: Response) => {
   try {
-    const { participantId, couponCode } = req.body;
+    const { participantId, couponCode, returnUrl } = req.body;
     if (!participantId) {
       res.status(400).json({ success: false, message: 'participantId required' });
       return;
@@ -94,7 +94,20 @@ cashfreeRouter.post('/start', async (req: Request, res: Response) => {
     const orderId = `cf${payment.id}`;
 
     const publicWebUrl = process.env.PUBLIC_WEB_URL || 'http://localhost:3000';
+    const runnerAppUrl = process.env.RUNNER_APP_URL || 'http://localhost:3001';
     const webhookUrl = process.env.CASHFREE_WEBHOOK_URL;
+
+    // Defaults to the public-web payment-confirmation page — but the runner
+    // app pays through this same endpoint when a runner logs in with
+    // payment still pending, and needs Cashfree to send them back to the
+    // runner app itself, not a different app entirely. Only accepted when
+    // it actually points at one of our own deployed frontends, so this
+    // can't be used as an open redirect.
+    let returnBase = `${publicWebUrl}/details`;
+    if (typeof returnUrl === 'string' && (returnUrl.startsWith(publicWebUrl) || returnUrl.startsWith(runnerAppUrl))) {
+      returnBase = returnUrl;
+    }
+    const returnSeparator = returnBase.includes('?') ? '&' : '?';
 
     const orderResponse = await cashfree.PGCreateOrder({
       order_id: orderId,
@@ -107,7 +120,7 @@ cashfreeRouter.post('/start', async (req: Request, res: Response) => {
         customer_name: participant.user.name,
       },
       order_meta: {
-        return_url: `${publicWebUrl}/details?cf_order_id=${orderId}`,
+        return_url: `${returnBase}${returnSeparator}cf_order_id=${orderId}`,
         // Only set once a production HTTPS URL is configured — Cashfree
         // can't reach a localhost address, and an unreachable notify_url
         // just means the webhook silently never fires, not an order-create

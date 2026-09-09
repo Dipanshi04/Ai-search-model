@@ -42,7 +42,10 @@ class ApiClient {
 
     if (response.status === 401 && !endpoint.includes('/auth/login')) {
       this.clearToken();
-      window.location.href = '/';
+      // Reload within the runner app itself, not the site root — this
+      // app is served under /runner/, and '/' would bounce out to the
+      // marketing homepage instead of back to this app's own login screen.
+      window.location.href = import.meta.env.BASE_URL || '/runner/';
     }
 
     return data;
@@ -116,6 +119,23 @@ class ApiClient {
 
   async getSponsors() {
     return this.request<any[]>('/api/v1/sponsors');
+  }
+
+  async startCashfreePayment(participantId: string) {
+    // window.location.origin + BASE_URL ('/runner/' in prod & dev) so
+    // Cashfree sends the runner back into this app after checkout, not
+    // the public site's own payment-confirmation page.
+    const returnUrl = `${window.location.origin}${import.meta.env.BASE_URL}`;
+    return this.request<{ paymentSessionId: string; orderId: string; amount: number; environment: 'sandbox' | 'production' }>(
+      '/api/v1/payments/cashfree/start',
+      { method: 'POST', body: JSON.stringify({ participantId, returnUrl }) }
+    );
+  }
+
+  async getCashfreePaymentStatus(orderId: string) {
+    return this.request<{ status: string; bibNumber: string }>(
+      `/api/v1/payments/cashfree/status?orderId=${orderId}`
+    );
   }
 
   // Bypasses request() — a file upload needs multipart/form-data, not the

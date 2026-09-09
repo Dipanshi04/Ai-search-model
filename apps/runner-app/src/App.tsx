@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import RunnerDashboard from './pages/RunnerDashboard';
 import RunnerHome from './pages/RunnerHome';
 import LoginPage from './pages/LoginPage';
+import PaymentPendingPage from './pages/PaymentPendingPage';
 import { api } from './lib/api';
 import { installBackTrap } from './lib/backStack';
 import logo from './components/logo-dark.png';
@@ -13,6 +14,8 @@ interface ParticipantInfo {
   category: string;
   eventId: string;
   status: string;
+  paymentStatus: string;
+  isPremiumCompany: boolean;
 }
 
 export default function App() {
@@ -48,6 +51,8 @@ export default function App() {
           category: p.category,
           eventId: p.eventId,
           status: p.status,
+          paymentStatus: p.paymentStatus,
+          isPremiumCompany: p.company?.status === 'PREMIUM',
         });
         // Already RUNNING or PAUSED server-side (tracking started before
         // this page loaded) — skip the "START RACE" gate entirely instead
@@ -93,6 +98,23 @@ export default function App() {
 
   if (!participant) {
     return <LoginPage onLogin={() => checkAuth()} />;
+  }
+
+  // Registered but never completed (or abandoned) checkout — block
+  // everything else until payment actually goes through. Without this, a
+  // runner could log in with their PIN and reach the full app, including
+  // starting live GPS tracking, without ever having paid.
+  if (participant.paymentStatus !== 'COMPLETED') {
+    return (
+      <PaymentPendingPage
+        participantId={participant.participantId}
+        bibNumber={participant.bibNumber}
+        category={participant.category}
+        isPremiumCompany={participant.isPremiumCompany}
+        onPaid={() => checkAuth()}
+        onLogout={() => { api.clearToken(); setParticipant(null); }}
+      />
+    );
   }
 
   if (!raceStarted) {

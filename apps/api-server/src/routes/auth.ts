@@ -253,7 +253,10 @@ authRouter.get(
         select: {
           id: true, name: true, email: true, phone: true, role: true, avatarUrl: true,
           participants: {
-            select: { id: true, bibNumber: true, category: true, eventId: true, status: true, kitDistributed: true, certificateUrl: true },
+            select: {
+              id: true, bibNumber: true, category: true, eventId: true, status: true, paymentStatus: true, kitDistributed: true, certificateUrl: true,
+              company: { select: { status: true } },
+            },
           },
         },
       });

@@ -8,10 +8,12 @@ import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import TermsPage from './pages/TermsPage';
 import TreeCounterPage from './pages/TreeCounterPage';
 import PaymentDetailsPage from './pages/PaymentDetailsPage';
+import HowItWorksPage from './pages/HowItWorksPage';
 import Footer from './components/Footer';
 import SponsorInquiryModal from './components/SponsorInquiryModal';
 import BulkInquiryModal from './components/BulkInquiryModal';
 import SponsorStrip from './components/SponsorStrip';
+import FAQSection from './components/FAQSection';
 import logoDark from './components/logo-dark.png';
 import heroRunner from './components/hero-runner.webp';
 import nrcGroupLogo from './components/nrc-group-logo.png';
@@ -99,20 +101,36 @@ function HomePage() {
       <div className="hero-grain" />
 
       {/* Top bar: "presented by" lockup — sponsor logo, then the marathon's
-          own logo below it, mirroring how it reads on the print poster. */}
-      <div className="hero-anim flex flex-col items-center gap-1 sm:gap-1.5 pt-4 sm:pt-6 px-4 relative z-10 shrink-0 text-center" style={{ animationDelay: '0ms' }}>
-        <div className="bg-white rounded-2xl shadow-sm px-4 py-2 sm:px-5 sm:py-2.5 border inline-flex" style={{ borderColor: 'rgba(27,42,91,0.08)' }}>
-          <img src={nrcGroupLogo} alt="NRC Group" className="h-9 sm:h-12 w-auto object-contain" />
+          own logo below it, mirroring how it reads on the print poster.
+          Green City Partner badge sits top-right, matching the poster. */}
+      <div className="hero-anim relative pt-4 sm:pt-6 px-4 z-10 shrink-0" style={{ animationDelay: '0ms' }}>
+        <div
+          className="absolute top-4 sm:top-6 right-4 flex flex-col items-center gap-1 bg-white rounded-xl shadow-sm px-2.5 py-1.5 sm:px-3 sm:py-2 border"
+          style={{ borderColor: 'rgba(27,42,91,0.08)' }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" />
+            <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
+          </svg>
+          <span className="hero-kicker text-[6px] sm:text-[7px] font-bold uppercase tracking-wide text-center leading-tight" style={{ color: '#1B2A5B', opacity: 0.55 }}>
+            Green City<br />Partner
+          </span>
         </div>
-        <p className="hero-kicker text-[9px] sm:text-[11px] font-bold tracking-[0.35em] uppercase" style={{ color: '#1B2A5B', opacity: 0.45 }}>
-          Presents
-        </p>
-        <div className="bg-white rounded-2xl shadow-sm px-4 py-2 sm:px-5 sm:py-2.5 border inline-flex mb-1" style={{ borderColor: 'rgba(27,42,91,0.08)' }}>
-          <Logo size="h-9 sm:h-12" />
+
+        <div className="flex flex-col items-center gap-1 sm:gap-1.5 text-center">
+          <div className="bg-white rounded-2xl shadow-sm px-4 py-2 sm:px-5 sm:py-2.5 border inline-flex" style={{ borderColor: 'rgba(27,42,91,0.08)' }}>
+            <img src={nrcGroupLogo} alt="NRC Group" className="h-9 sm:h-12 w-auto object-contain" />
+          </div>
+          <p className="hero-kicker text-[9px] sm:text-[11px] font-bold tracking-[0.35em] uppercase" style={{ color: '#1B2A5B', opacity: 0.45 }}>
+            Presents
+          </p>
+          <div className="bg-white rounded-2xl shadow-sm px-4 py-2 sm:px-5 sm:py-2.5 border inline-flex mb-1" style={{ borderColor: 'rgba(27,42,91,0.08)' }}>
+            <Logo size="h-9 sm:h-12" />
+          </div>
+          <p className="hero-kicker text-[10px] sm:text-sm font-extrabold tracking-[0.15em] uppercase" style={{ color: '#1B2A5B', opacity: 0.6 }}>
+            Indore Software Association
+          </p>
         </div>
-        <p className="hero-kicker text-[10px] sm:text-sm font-extrabold tracking-[0.15em] uppercase" style={{ color: '#1B2A5B', opacity: 0.6 }}>
-          Indore Software Association
-        </p>
       </div>
 
       {/* Hero Section */}
@@ -190,6 +208,13 @@ function HomePage() {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" /><path d="M10 17l5-5-5-5" /><path d="M15 12H3" /></svg>
               Already Registered? Login
             </a>
+            <a
+              href="/how-it-works"
+              className="hero-body inline-flex items-center gap-1.5 px-5 py-2.5 sm:px-6 sm:py-3 text-sm sm:text-base font-bold hover:opacity-70 transition"
+              style={{ color: '#1B2A5B' }}
+            >
+              How It Works
+            </a>
           </div>
         </div>
 
@@ -229,6 +254,8 @@ function HomePage() {
 
       <SponsorStrip />
 
+      <FAQSection />
+
       {showSponsorModal && <SponsorInquiryModal onClose={() => setShowSponsorModal(false)} />}
       {showBulkModal && <BulkInquiryModal onClose={() => setShowBulkModal(false)} />}
 
@@ -251,6 +278,7 @@ export default function App() {
       <Route path="/terms" element={<TermsPage />} />
       <Route path="/green" element={<TreeCounterPage />} />
       <Route path="/details" element={<PaymentDetailsPage />} />
+      <Route path="/how-it-works" element={<HowItWorksPage />} />
     </Routes>
   );
 }

@@ -10,6 +10,7 @@ export default function Footer() {
         </div>
         <nav className="flex flex-wrap justify-center gap-3 sm:gap-6 text-xs sm:text-sm" style={{ color: '#1B2A5B' }}>
           <a href="/about" className="opacity-60 hover:opacity-100 transition-opacity">About</a>
+          <a href="/how-it-works" className="opacity-60 hover:opacity-100 transition-opacity">How It Works</a>
           <a href="/contact" className="opacity-60 hover:opacity-100 transition-opacity">Contact</a>
           <a href="/privacy" className="opacity-60 hover:opacity-100 transition-opacity">Privacy</a>
           <a href="/terms" className="opacity-60 hover:opacity-100 transition-opacity">Terms</a>

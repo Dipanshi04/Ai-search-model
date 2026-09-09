@@ -19,7 +19,7 @@ export const authRouter: Router = Router();
 
 const uploadPhoto = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 3 * 1024 * 1024 }, // 3MB
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
   fileFilter: (req, file, cb) => {
     const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
     if (allowed.includes(file.mimetype)) cb(null, true);

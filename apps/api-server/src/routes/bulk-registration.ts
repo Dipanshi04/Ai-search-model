@@ -16,6 +16,7 @@ bulkRegistrationRouter.get('/', async (_req: Request, res: Response) => {
     const bulkRegistrations = await prisma.bulkRegistration.findMany({
       include: {
         company: { select: { id: true, name: true } },
+        _count: { select: { participants: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -26,6 +27,7 @@ bulkRegistrationRouter.get('/', async (_req: Request, res: Response) => {
       hrName: br.hrName,
       hrEmail: br.hrEmail,
       numberOfRegistrations: br.numberOfRegistrations,
+      registeredCount: br._count.participants,
       paymentCompleted: br.paymentCompleted,
       notes: br.notes,
       companyId: br.companyId,

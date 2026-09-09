@@ -7,6 +7,7 @@ interface BulkRegistration {
   hrName: string;
   hrEmail: string;
   numberOfRegistrations: number;
+  registeredCount: number;
   paymentCompleted: boolean;
   notes: string | null;
   companyId: string | null;
@@ -191,7 +192,7 @@ export default function BulkRegistrationPage() {
               <th className="text-left px-5 py-4 text-slate-500 font-semibold">Company</th>
               <th className="text-left px-5 py-4 text-slate-500 font-semibold">HR Name</th>
               <th className="text-left px-5 py-4 text-slate-500 font-semibold">HR Email</th>
-              <th className="text-center px-5 py-4 text-slate-500 font-semibold">Registrations</th>
+              <th className="text-center px-5 py-4 text-slate-500 font-semibold">Progress</th>
               <th className="text-center px-5 py-4 text-slate-500 font-semibold">Payment</th>
               <th className="text-right px-5 py-4 text-slate-500 font-semibold">Actions</th>
             </tr>
@@ -202,7 +203,19 @@ export default function BulkRegistrationPage() {
                 <td className="px-5 py-4 text-slate-950 font-medium">{reg.companyName}</td>
                 <td className="px-5 py-4 text-slate-600">{reg.hrName}</td>
                 <td className="px-5 py-4 text-slate-600">{reg.hrEmail}</td>
-                <td className="px-5 py-4 text-center text-violet-700 font-semibold">{reg.numberOfRegistrations}</td>
+                <td className="px-5 py-4 text-center">
+                  <div className="inline-flex flex-col items-center gap-1 w-24">
+                    <span className="text-violet-700 font-semibold text-xs">
+                      {reg.registeredCount}/{reg.numberOfRegistrations} done
+                    </span>
+                    <div className="w-full h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full ${reg.registeredCount >= reg.numberOfRegistrations ? 'bg-emerald-500' : 'bg-violet-500'}`}
+                        style={{ width: `${Math.min(100, (reg.registeredCount / reg.numberOfRegistrations) * 100)}%` }}
+                      />
+                    </div>
+                  </div>
+                </td>
                 <td className="px-5 py-4 text-center">
                   <button
                     onClick={() => togglePayment(reg)}

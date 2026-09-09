@@ -17,6 +17,7 @@ import FAQSection from './components/FAQSection';
 import logoDark from './components/logo-dark.png';
 import heroRunner from './components/hero-runner.webp';
 import nrcGroupLogo from './components/nrc-group-logo.png';
+import imcLogo from './components/imc-logo.png';
 import { useEffect, useState } from "react";
 
 // The runner app is a separate SPA (apps/runner-app) served under the same
@@ -108,10 +109,7 @@ function HomePage() {
           className="absolute top-4 sm:top-6 right-4 flex flex-col items-center gap-1 bg-white rounded-xl shadow-sm px-2.5 py-1.5 sm:px-3 sm:py-2 border"
           style={{ borderColor: 'rgba(27,42,91,0.08)' }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10Z" />
-            <path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12" />
-          </svg>
+          <img src={imcLogo} alt="Indore Municipal Corporation" className="h-6 sm:h-8 w-auto object-contain" />
           <span className="hero-kicker text-[6px] sm:text-[7px] font-bold uppercase tracking-wide text-center leading-tight" style={{ color: '#1B2A5B', opacity: 0.55 }}>
             Green City<br />Partner
           </span>

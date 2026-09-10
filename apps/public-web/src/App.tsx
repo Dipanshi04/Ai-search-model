@@ -13,6 +13,7 @@ import Footer from './components/Footer';
 import SponsorInquiryModal from './components/SponsorInquiryModal';
 import BulkInquiryModal from './components/BulkInquiryModal';
 import SponsorStrip from './components/SponsorStrip';
+import RaceRouteSection from './components/RaceRouteSection';
 import FAQSection from './components/FAQSection';
 import logoDark from './components/logo-dark.png';
 import heroRunner from './components/hero-runner.webp';
@@ -254,6 +255,8 @@ function HomePage() {
           </div>
         </div>
       </div>
+
+      <RaceRouteSection />
 
       <SponsorStrip />
 

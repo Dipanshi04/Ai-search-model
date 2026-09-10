@@ -456,7 +456,7 @@ export default function RegisterPage() {
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8" /></svg>
                   </div>
                 )}
-                <label className="cursor-pointer px-3 py-2 rounded-lg border border-brand-navy/15 text-xs font-semibold text-brand-navy hover:bg-brand-cream transition">
+                <label className="cursor-pointer px-3 py-2 rounded-lg border border-brand-navy/15 text-xs font-semibold text-brand-navy hover:bg-brand-cream transition focus-within:outline-none focus-within:ring-2 focus-within:ring-brand-orange">
                   {photo ? 'Change photo' : 'Add photo'}
                   {/* No `capture` attribute — that forces the camera open
                       directly on Android with no way to pick an existing

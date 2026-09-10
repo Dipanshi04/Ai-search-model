@@ -14,12 +14,8 @@ export default function PageHeader() {
         </span>
       </div>
       <a href="/" className="flex items-center gap-3 sm:gap-5 shrink-0">
-        <div className="bg-white rounded-2xl shadow-sm px-2.5 py-1.5 sm:px-3 sm:py-2 border shrink-0" style={{ borderColor: 'rgba(27,42,91,0.08)' }}>
-          <img src={nrcGroupLogo} alt="NRC Group" className="h-12 sm:h-14 w-auto object-contain shrink-0" />
-        </div>
-        <div className="bg-white rounded-2xl shadow-sm px-2.5 py-1.5 sm:px-3 sm:py-2 border shrink-0" style={{ borderColor: 'rgba(27,42,91,0.08)' }}>
-          <img src={logoDark} alt="ISA Marathon" className="h-12 sm:h-14 w-auto object-contain shrink-0" />
-        </div>
+        <img src={nrcGroupLogo} alt="NRC Group" className="h-12 sm:h-14 w-auto object-contain shrink-0" />
+        <img src={logoDark} alt="ISA Marathon" className="h-12 sm:h-14 w-auto object-contain shrink-0" />
       </a>
       <div className="flex flex-col items-center gap-1 mt-0.5">
         <span className="hero-kicker text-[8px] sm:text-[9px] font-bold tracking-[0.25em] uppercase" style={{ color: '#1B2A5B', opacity: 0.45 }}>

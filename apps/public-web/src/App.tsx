@@ -117,16 +117,12 @@ function HomePage() {
         </div>
 
         <div className="flex flex-col items-center gap-1 sm:gap-1.5 text-center">
-          <div className="bg-white rounded-2xl shadow-sm px-5 py-2.5 sm:px-7 sm:py-3.5 border inline-flex" style={{ borderColor: 'rgba(27,42,91,0.08)' }}>
-            <img src={nrcGroupLogo} alt="NRC Group" className="h-14 sm:h-20 w-auto object-contain" />
-          </div>
+          <img src={nrcGroupLogo} alt="NRC Group" className="h-14 sm:h-20 w-auto object-contain" />
           <p className="hero-kicker text-[9px] sm:text-[11px] font-bold tracking-[0.35em] uppercase" style={{ color: '#1B2A5B', opacity: 0.45 }}>
             Presents
           </p>
-          <div className="bg-white rounded-2xl shadow-sm px-4 py-2 sm:px-5 sm:py-2.5 border inline-flex mb-1" style={{ borderColor: 'rgba(27,42,91,0.08)' }}>
-            <Logo size="h-9 sm:h-12" />
-          </div>
-          <p className="hero-kicker text-[10px] sm:text-sm font-extrabold tracking-[0.15em] uppercase" style={{ color: '#1B2A5B', opacity: 0.6 }}>
+          <Logo size="h-9 sm:h-12" />
+          <p className="hero-kicker text-[10px] sm:text-sm font-extrabold tracking-[0.15em] uppercase mt-1" style={{ color: '#1B2A5B', opacity: 0.6 }}>
             Indore Software Association
           </p>
           <div className="flex flex-col items-center gap-1 mt-1 mb-2 sm:mb-3">

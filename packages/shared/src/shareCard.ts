@@ -91,10 +91,10 @@ export async function drawShareCard(canvas: HTMLCanvasElement, opts: ShareCardOp
   // 9:16 frame and crop whatever doesn't fit it — so the output canvas is
   // always exactly 1080x1920, never taller. Content is painted once onto
   // an unconstrained "natural" canvas first (its height varies with photo
-  // presence and how many sponsor categories there are), then composited
-  // into the fixed frame at 1:1 if it already fits, or scaled down (never
-  // cropped) if it doesn't — the same "contain" idea as an <img>, just
-  // done by hand since this is a canvas, not an element.
+  // presence and sponsor count), then composited into the fixed frame at
+  // 1:1 if it already fits, or scaled down (never cropped) if it doesn't
+  // — the same "contain" idea as an <img>, just done by hand since this
+  // is a canvas, not an element.
   const STORY_W = 1080, STORY_H = 1920;
 
   const measureCanvas = document.createElement('canvas');
@@ -137,7 +137,7 @@ interface PaintAssets {
 // used both to measure the required canvas height and, on the real pass,
 // to know where the footer belongs.
 function paint(ctx: CanvasRenderingContext2D, W: number, assets: PaintAssets): number {
-  const { nrcLogo, isaLogo, solugenixLogo, imcLogo, avatar, sponsorLogos, usableSponsors, opts } = assets;
+  const { nrcLogo, isaLogo, solugenixLogo, imcLogo, avatar, sponsorLogos, opts } = assets;
 
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, ctx.canvas.height);
@@ -161,52 +161,55 @@ function paint(ctx: CanvasRenderingContext2D, W: number, assets: PaintAssets): n
     drawImageContain(ctx, imcLogo, bx + bw / 2, by + 100, 90, 70);
   }
 
-  // ---- Centered lockup: NRC / Presents / ISA / Co-Sponsored By / Solugenix ----
-  let y = 70;
+  // ---- Compact lockup: "presents" caption / NRC + ISA side by side /
+  // "co-sponsored by" + Solugenix — three simple rows instead of six
+  // stacked elements. ----
+  let y = 100;
+  ctx.fillStyle = 'rgba(27,42,91,0.45)';
+  ctx.font = `700 20px ${FONT_BODY}`;
+  ctx.fillText('INDORE SOFTWARE ASSOCIATION PRESENTS', W / 2, y);
+  y += 50;
+
+  const logoH = 100;
+  const nrcW = nrcLogo ? (nrcLogo.width / nrcLogo.height) * logoH : 0;
+  const isaW = isaLogo ? (isaLogo.width / isaLogo.height) * logoH : 0;
+  const logoGap = 40;
+  const logoRowW = nrcW + (nrcW && isaW ? logoGap : 0) + isaW;
+  let logoX = W / 2 - logoRowW / 2;
   if (nrcLogo) {
-    drawImageContain(ctx, nrcLogo, W / 2, y + 55, 340, 110);
-    y += 130;
+    drawImageContain(ctx, nrcLogo, logoX + nrcW / 2, y + logoH / 2, nrcW, logoH);
+    logoX += nrcW + logoGap;
   }
-  ctx.fillStyle = 'rgba(27,42,91,0.45)';
-  ctx.font = `700 22px ${FONT_BODY}`;
-  y += 20;
-  ctx.fillText('P R E S E N T S', W / 2, y);
-  y += 20;
   if (isaLogo) {
-    drawImageContain(ctx, isaLogo, W / 2, y + 55, 280, 100);
-    y += 130;
+    drawImageContain(ctx, isaLogo, logoX + isaW / 2, y + logoH / 2, isaW, logoH);
   }
-  ctx.fillStyle = 'rgba(27,42,91,0.6)';
-  ctx.font = `800 26px ${FONT_BODY}`;
-  y += 20;
-  ctx.fillText('INDORE SOFTWARE ASSOCIATION', W / 2, y);
-  y += 34;
-  ctx.fillStyle = 'rgba(27,42,91,0.45)';
-  ctx.font = `700 18px ${FONT_BODY}`;
-  ctx.fillText('C O - S P O N S O R E D   B Y', W / 2, y);
-  y += 20;
+  y += logoH + 50;
+
   if (solugenixLogo) {
-    drawImageContain(ctx, solugenixLogo, W / 2, y + 34, 220, 60);
-    y += 70;
+    ctx.fillStyle = 'rgba(27,42,91,0.4)';
+    ctx.font = `700 18px ${FONT_BODY}`;
+    ctx.fillText('CO-SPONSORED BY', W / 2, y);
+    y += 44;
+    drawImageContain(ctx, solugenixLogo, W / 2, y + 24, 200, 48);
+    y += 60;
   }
 
-  // ---- Big statement: "I'M" + diagonal "RUNNING" band ----
-  y += 55;
-  ctx.fillStyle = NAVY;
-  ctx.font = `800 110px ${FONT_DISPLAY}`;
-  ctx.fillText("I'M", W / 2, y);
-
-  y += 150;
+  // ---- "I'M RUNNING" — one diagonal navy band, both lines inside it, so
+  // there's no separate floating text that can collide with whatever's
+  // above (the old two-piece version overlapped the Solugenix logo). ----
+  y += 70;
   ctx.save();
-  ctx.translate(W / 2, y - 30);
+  ctx.translate(W / 2, y + 105);
   ctx.rotate(-0.05);
   ctx.fillStyle = NAVY;
-  ctx.fillRect(-W * 0.65, -95, W * 1.3, 190);
+  ctx.fillRect(-W * 0.65, -145, W * 1.3, 290);
   ctx.fillStyle = '#ffffff';
-  ctx.font = `800 150px ${FONT_DISPLAY}`;
-  ctx.fillText('RUNNING', 0, 55);
+  ctx.font = `700 56px ${FONT_DISPLAY}`;
+  ctx.fillText("I'M", 0, -60);
+  ctx.font = `800 130px ${FONT_DISPLAY}`;
+  ctx.fillText('RUNNING', 0, 90);
   ctx.restore();
-  y += 130;
+  y += 260;
 
   // ---- Photo (skipped, with a bigger name below, if none is available) ----
   // A colorful gradient halo behind the frame — echoing the ribbon on the
@@ -214,7 +217,7 @@ function paint(ctx: CanvasRenderingContext2D, W: number, assets: PaintAssets): n
   // between the banner and the photo.
   const hasPhoto = !!avatar;
   if (hasPhoto) {
-    y += 50;
+    y += 60;
     const size = 380;
     const haloR = size / 2 + 34;
     const haloCx = W / 2, haloCy = y + size / 2;
@@ -312,74 +315,38 @@ function paint(ctx: CanvasRenderingContext2D, W: number, assets: PaintAssets): n
   ctx.font = `700 30px ${FONT_BODY}`;
   ctx.fillText('27 September 2026  ·  6:30 AM Onwards  ·  Basketball Complex', W / 2, y);
 
-  // ---- Sponsors, grouped by category (matches the website's sponsor
-  // strip) — one label per category above a row of its logos, instead of
-  // a flat unlabeled grid. ----
-  const validSponsors = sponsorLogos
-    .map((img, i) => ({ img, sponsor: usableSponsors[i] }))
-    .filter((s): s is { img: HTMLImageElement; sponsor: ShareCardSponsor } => s.img !== null);
+  // ---- Sponsors — a plain, evenly spaced grid. No per-category labels
+  // or tinted card; those made this section busy, not clearer. ----
+  const validLogos = sponsorLogos.filter((img): img is HTMLImageElement => img !== null);
 
-  const groups: { label: string; items: { img: HTMLImageElement }[] }[] = [];
-  const groupIndex = new Map<string, number>();
-  for (const { img, sponsor } of validSponsors) {
-    const label = sponsor.category?.name || 'Supported By';
-    let idx = groupIndex.get(label);
-    if (idx === undefined) {
-      idx = groups.length;
-      groupIndex.set(label, idx);
-      groups.push({ label, items: [] });
-    }
-    groups[idx]!.items.push({ img });
-  }
-
-  if (groups.length > 0) {
-    y += 70;
-
-    const boxSize = 130;
-    const boxGap = 18;
-    const groupGap = 40;
-    const labelHeight = 36;
-
-    const groupHeight = labelHeight + boxSize + groupGap;
-    const totalHeight = groups.length * groupHeight;
-
-    // Tinted card behind the whole section so it reads as one grouped
-    // block instead of logos floating loose on the page.
-    const cardPad = 40;
-    const cardW = W - 160;
-    ctx.fillStyle = 'rgba(27,42,91,0.04)';
-    ctx.beginPath();
-    ctx.roundRect(W / 2 - cardW / 2, y - 8, cardW, totalHeight + 70 + cardPad, 28);
-    ctx.fill();
-
-    y += 40;
-    ctx.fillStyle = 'rgba(27,42,91,0.45)';
+  if (validLogos.length > 0) {
+    y += 80;
+    ctx.fillStyle = 'rgba(27,42,91,0.4)';
     ctx.font = `700 24px ${FONT_BODY}`;
-    ctx.fillText('O U R   P A R T N E R S', W / 2, y);
-    y += 46;
+    ctx.fillText('OUR PARTNERS', W / 2, y);
+    y += 50;
 
-    for (const group of groups) {
-      ctx.fillStyle = 'rgba(27,42,91,0.5)';
-      ctx.font = `700 20px ${FONT_BODY}`;
-      ctx.fillText(group.label.toUpperCase(), W / 2, y);
-      y += 24;
+    const cols = 3;
+    const cellW = 260, cellH = 150;
+    const gridW = cols * cellW;
+    const startX = W / 2 - gridW / 2;
+    const rows = Math.ceil(validLogos.length / cols);
 
-      const rowW = group.items.length * boxSize + (group.items.length - 1) * boxGap;
-      const rowStartX = W / 2 - rowW / 2;
-      group.items.forEach(({ img }, i) => {
-        const cx = rowStartX + i * (boxSize + boxGap) + boxSize / 2;
-        ctx.fillStyle = '#ffffff';
-        ctx.strokeStyle = 'rgba(27,42,91,0.12)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.roundRect(cx - boxSize / 2, y, boxSize, boxSize, 14);
-        ctx.fill();
-        ctx.stroke();
-        drawImageContain(ctx, img, cx, y + boxSize / 2, boxSize - 24, boxSize - 24);
-      });
-      y += boxSize + groupGap;
-    }
-    y += cardPad - groupGap;
+    validLogos.forEach((img, i) => {
+      const col = i % cols, row = Math.floor(i / cols);
+      const cx = startX + col * cellW + cellW / 2;
+      const cyTop = y + row * cellH;
+      const boxW = cellW - 30, boxH = cellH - 30;
+      ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = 'rgba(27,42,91,0.12)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(cx - boxW / 2, cyTop, boxW, boxH, 16);
+      ctx.fill();
+      ctx.stroke();
+      drawImageContain(ctx, img, cx, cyTop + boxH / 2, boxW - 30, boxH - 30);
+    });
+    y += rows * cellH;
   }
 
   // ---- Footer ----

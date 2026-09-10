@@ -283,14 +283,6 @@ export default function RunnerHome({ bibNumber, category, onStart }: Props) {
           padding: '40px 28px 32px',
           boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
         }}>
-          <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-            <img
-              src={logoDark}
-              alt="ISA Marathon"
-              style={{ height: '72px', width: 'auto', maxWidth: '260px', objectFit: 'contain', margin: '0 auto', display: 'block' }}
-            />
-          </div>
-
           <h2 style={{
             fontSize: '22px',
             fontWeight: 700,
@@ -495,6 +487,12 @@ export default function RunnerHome({ bibNumber, category, onStart }: Props) {
 
       <div style={{ paddingBottom: '20px', textAlign: 'center' }}>
         <p style={{ fontSize: '11px', color: '#94a3b8' }}>ISA Tech Marathon 2026</p>
+        <p style={{ fontSize: '10px', color: '#cbd5e1', marginTop: '4px' }}>
+          Developed by{' '}
+          <a href="https://www.liseinfotech.com" target="_blank" rel="noopener noreferrer" style={{ color: '#94a3b8', textDecoration: 'underline' }}>
+            Lise Infotech
+          </a>
+        </p>
       </div>
 
       {showProfile && <ProfilePage onBack={() => setShowProfile(false)} />}

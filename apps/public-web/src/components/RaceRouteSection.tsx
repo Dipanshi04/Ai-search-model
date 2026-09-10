@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import route3km from './route-3km.jpeg';
 
-// The 5K map hasn't been provided yet (the file dropped in for it was an
-// accidental duplicate of the 3K one) — shows a placeholder card instead
-// of a wrong map until the real image is added here.
+// Same map for both distances for now — a distinct 5K route image hasn't
+// been provided yet, so this reuses the 3K one until it is.
 const ROUTES: Record<'3K' | '5K', string | null> = {
   '3K': route3km,
-  '5K': null,
+  '5K': route3km,
 };
 
 export default function RaceRouteSection() {

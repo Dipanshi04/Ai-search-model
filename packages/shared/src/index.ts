@@ -71,3 +71,9 @@ export type RouteFormData = z.infer<typeof routeSchema>;
 // ──────────────────────────────────────────────
 
 export { Logo, type LogoProps, type LogoSize, type LogoTheme } from './components/Logo';
+
+// ──────────────────────────────────────────────
+//  ISA MARATHON - "I'M RUNNING" SHARE CARD
+// ──────────────────────────────────────────────
+
+export { drawShareCard, type ShareCardOptions, type ShareCardSponsor } from './shareCard';

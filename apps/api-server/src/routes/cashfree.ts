@@ -161,7 +161,15 @@ cashfreeRouter.get('/status', async (req: Request, res: Response) => {
 
     const payment = await prisma.payment.findFirst({
       where: { provider: 'CASHFREE', reference: orderId },
-      include: { participant: { select: { bibNumber: true } } },
+      include: {
+        participant: {
+          select: {
+            bibNumber: true,
+            category: true,
+            user: { select: { name: true, avatarUrl: true } },
+          },
+        },
+      },
     });
     if (!payment) {
       res.status(404).json({ success: false, message: 'Payment not found' });
@@ -170,7 +178,13 @@ cashfreeRouter.get('/status', async (req: Request, res: Response) => {
 
     res.json({
       success: true,
-      data: { status: payment.status, bibNumber: payment.participant.bibNumber },
+      data: {
+        status: payment.status,
+        bibNumber: payment.participant.bibNumber,
+        category: payment.participant.category,
+        name: payment.participant.user.name,
+        avatarUrl: payment.participant.user.avatarUrl,
+      },
     });
   } catch (error) {
     logger.error('[Payment] cashfree/status failed:', error);

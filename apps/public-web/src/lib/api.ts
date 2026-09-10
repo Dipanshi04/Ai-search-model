@@ -90,7 +90,7 @@ class ApiClient {
   }
 
   async getCashfreePaymentStatus(orderId: string) {
-    return this.request<{ status: string; bibNumber: string }>(
+    return this.request<{ status: string; bibNumber: string; category: string; name: string; avatarUrl: string | null }>(
       `/api/v1/payments/cashfree/status?orderId=${encodeURIComponent(orderId)}`
     );
   }

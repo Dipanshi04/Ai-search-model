@@ -1,16 +1,26 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import Footer from '../components/Footer';
+import { drawShareCard } from '@isa/shared';
+import nrcGroupLogo from '../components/nrc-group-logo.png';
+import logoDark from '../components/logo-dark.png';
+import solugenixLogo from '../components/solugenix-logo.png';
+import imcLogo from '../components/imc-logo.png';
 
 type ViewState = 'checking' | 'waiting' | 'verified' | 'failed' | 'no-reference';
 
 const POLL_INTERVAL_MS = 5000;
 const MAX_POLLS = 90; // ~7.5 minutes, then stop and let email do the rest
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 export default function PaymentDetailsPage() {
   const [view, setView] = useState<ViewState>('checking');
   const [bibNumber, setBibNumber] = useState<string | null>(null);
   const [pin, setPin] = useState<string | null>(null);
+  const [runnerName, setRunnerName] = useState<string | null>(null);
+  const [category, setCategory] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
   const pollCount = useRef(0);
   const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -18,7 +28,7 @@ export default function PaymentDetailsPage() {
     const params = new URLSearchParams(window.location.search);
     const cashfreeOrderId = params.get('cf_order_id');
 
-    function handlePollResult(res: { success: boolean; data?: { status?: string; bibNumber?: string } }) {
+    function handlePollResult(res: { success: boolean; data?: { status?: string; bibNumber?: string; category?: string; name?: string; avatarUrl?: string | null } }) {
       // A 404 body still comes back as a resolved response here, not a
       // thrown error — check `success` explicitly, or an unrecognized
       // order id would sit in "Confirming..." forever instead of ever
@@ -30,6 +40,9 @@ export default function PaymentDetailsPage() {
       const status = res.data?.status;
       if (status === 'COMPLETED') {
         setBibNumber(res.data?.bibNumber || null);
+        setRunnerName(res.data?.name || null);
+        setCategory(res.data?.category || null);
+        setAvatarUrl(res.data?.avatarUrl || null);
         setPin(sessionStorage.getItem('isa_runner_pin'));
         sessionStorage.removeItem('isa_runner_pin');
         setView('verified');
@@ -74,6 +87,37 @@ export default function PaymentDetailsPage() {
       if (pollTimer.current) clearTimeout(pollTimer.current);
     };
   }, []);
+
+  const handleShareCard = async () => {
+    setSharing(true);
+    try {
+      const toAbsolute = (url: string) => (url.startsWith('http') ? url : `${API_URL}${url}`);
+      const sponsorsRes = await api.getSponsors().catch(() => null);
+      const sponsors = (sponsorsRes?.success && sponsorsRes.data ? sponsorsRes.data : [])
+        .filter((s: any) => s.logoUrl)
+        .map((s: any) => ({ name: s.name, logoUrl: toAbsolute(s.logoUrl) }));
+
+      const canvas = await drawShareCard(document.createElement('canvas'), {
+        name: runnerName || 'Runner',
+        bibNumber: bibNumber || '',
+        category: category || 'RUN_3K',
+        avatarSrc: avatarUrl ? toAbsolute(avatarUrl) : null,
+        sponsors,
+        nrcLogoSrc: nrcGroupLogo,
+        isaLogoSrc: logoDark,
+        solugenixLogoSrc: solugenixLogo,
+        imcLogoSrc: imcLogo,
+      });
+      const link = document.createElement('a');
+      link.download = `im-running-${bibNumber}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    } catch {
+      // Best-effort — nothing to show the runner if canvas generation
+      // itself fails, so just don't leave them stuck on a spinner.
+    }
+    setSharing(false);
+  };
 
   return (
     <div className="min-h-screen bg-brand-cream flex flex-col">
@@ -145,6 +189,18 @@ export default function PaymentDetailsPage() {
                 Add to Calendar
               </a>
             </div>
+            <button
+              type="button"
+              onClick={handleShareCard}
+              disabled={sharing}
+              className="w-full mb-3 inline-flex items-center justify-center gap-2 border-2 text-brand-navy hover:bg-brand-navy/5 transition px-5 py-3 rounded-xl text-sm font-bold disabled:opacity-60"
+              style={{ borderColor: '#1B2A5B' }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12" />
+              </svg>
+              {sharing ? 'Preparing your card…' : 'Download "I\'m Running" Card'}
+            </button>
             <a href="/" className="inline-block bg-brand-orange text-white hover:opacity-90 transition px-6 sm:px-8 py-3 rounded-xl text-base font-bold">
               Back to Home
             </a>

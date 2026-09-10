@@ -27,12 +27,23 @@ interface DisplayGroup {
   sponsors: Sponsor[];
 }
 
+// iSHEros' logo is white text on a solid black background — designed to sit
+// on a dark surface, not a light card. Wrapping it in the same white tile as
+// everything else makes the black background look like a rendering glitch,
+// and flattening it to white would erase the (also white) text entirely, so
+// it gets a dark tile instead of the shared white one.
+const DARK_TILE_SPONSORS = new Set(['iSHEros']);
+
 function SponsorLogo({ sponsor }: { sponsor: Sponsor }) {
+  const isDark = !!sponsor.name && DARK_TILE_SPONSORS.has(sponsor.name);
   return (
     <div
       title={sponsor.name}
-      className="bg-white rounded-lg border border-slate-200 p-2 h-10 sm:h-12 flex items-center justify-center"
-      style={{ borderColor: 'rgba(27,42,91,0.12)' }}
+      className="rounded-lg border p-2 h-12 sm:h-14 flex items-center justify-center"
+      style={{
+        background: isDark ? '#111318' : '#fff',
+        borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(27,42,91,0.12)',
+      }}
     >
       {sponsor.logoUrl ? (
         // The bundled ISA logo (imported asset, already a usable src) is
@@ -41,10 +52,10 @@ function SponsorLogo({ sponsor }: { sponsor: Sponsor }) {
         <img
           src={sponsor.logoUrl.startsWith('/uploads') ? getImageUrl(sponsor.logoUrl) : sponsor.logoUrl}
           alt={sponsor.name || 'Sponsor'}
-          className="h-full w-auto object-contain"
+          className="h-full w-auto object-contain max-w-[100px] sm:max-w-[120px]"
         />
       ) : (
-        <span className="text-sm font-bold px-2" style={{ color: '#1B2A5B', opacity: 0.6 }}>{sponsor.name}</span>
+        <span className="text-sm font-bold px-2" style={{ color: isDark ? '#fff' : '#1B2A5B', opacity: isDark ? 0.9 : 0.6 }}>{sponsor.name}</span>
       )}
     </div>
   );

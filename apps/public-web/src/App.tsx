@@ -159,7 +159,7 @@ function HomePage() {
             Where central India's biggest IT community unites for technology, fitness and responsibility.
           </p>
           <p className="hero-anim hero-body text-sm sm:text-base xl:text-lg mb-3 sm:mb-4" style={{ animationDelay: '250ms', color: '#1B2A5B', opacity: 0.75 }}>
-            Run for a <span className="font-bold" style={{ color: '#10b981' }}>Greener</span> Tomorrow  every 5km plant a tree.
+            Run for a <span className="font-bold" style={{ color: '#10b981' }}>Greener</span> Indore, every 5km plant a tree.
           </p>
 
           <p className="hero-anim hero-title text-2xl sm:text-3xl xl:text-4xl font-extrabold mb-3 sm:mb-4" style={{ animationDelay: '260ms', color: '#1B2A5B' }}>

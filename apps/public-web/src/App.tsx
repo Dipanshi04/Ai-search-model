@@ -18,6 +18,7 @@ import logoDark from './components/logo-dark.png';
 import heroRunner from './components/hero-runner.webp';
 import nrcGroupLogo from './components/nrc-group-logo.png';
 import imcLogo from './components/imc-logo.png';
+import solugenixLogo from './components/solugenix-logo.png';
 import { useEffect, useState } from "react";
 
 // The runner app is a separate SPA (apps/runner-app) served under the same
@@ -128,6 +129,14 @@ function HomePage() {
           <p className="hero-kicker text-[10px] sm:text-sm font-extrabold tracking-[0.15em] uppercase" style={{ color: '#1B2A5B', opacity: 0.6 }}>
             Indore Software Association
           </p>
+          <div className="flex flex-col items-center gap-1 mt-1">
+            <span className="hero-kicker text-[8px] sm:text-[9px] font-bold tracking-[0.25em] uppercase" style={{ color: '#1B2A5B', opacity: 0.45 }}>
+              Co-Sponsored By
+            </span>
+            <div className="bg-white rounded-xl shadow-sm px-3 py-1.5 border" style={{ borderColor: 'rgba(27,42,91,0.08)' }}>
+              <img src={solugenixLogo} alt="Solugenix" className="h-4 sm:h-5 w-auto object-contain" />
+            </div>
+          </div>
         </div>
       </div>
 

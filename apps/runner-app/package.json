@@ -19,7 +19,6 @@
     "@isa/types": "workspace:*",
     "@isa/utils": "workspace:*",
     "@tanstack/react-query": "^5.62.0",
-    "heic2any": "^0.0.4",
     "mapbox-gl": "^3.8.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

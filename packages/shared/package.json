@@ -5,7 +5,7 @@
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "dependencies": {
-    "heic2any": "^0.0.4",
+    "heic-to": "^1.5.2",
     "react": "^18.2.0",
     "zod": "^3.24.0"
   },

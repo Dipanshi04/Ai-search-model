@@ -50,7 +50,14 @@ class ApiClient {
       method: 'POST',
       body: formData,
     });
-    return response.json();
+    // A non-JSON error body (nginx/proxy error pages, a dropped connection
+    // returning empty text, etc.) would otherwise make response.json()
+    // throw a cryptic parser error instead of a message worth logging.
+    try {
+      return await response.json();
+    } catch {
+      return { success: false, message: `Upload failed (HTTP ${response.status})` };
+    }
   }
 
   async getCompanies() {

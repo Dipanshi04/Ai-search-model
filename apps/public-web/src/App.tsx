@@ -129,7 +129,7 @@ function HomePage() {
           <p className="hero-kicker text-[10px] sm:text-sm font-extrabold tracking-[0.15em] uppercase" style={{ color: '#1B2A5B', opacity: 0.6 }}>
             Indore Software Association
           </p>
-          <div className="flex flex-col items-center gap-1 mt-1">
+          <div className="flex flex-col items-center gap-1 mt-1 mb-2 sm:mb-3">
             <span className="hero-kicker text-[8px] sm:text-[9px] font-bold tracking-[0.25em] uppercase" style={{ color: '#1B2A5B', opacity: 0.45 }}>
               Co-Sponsored By
             </span>
@@ -143,7 +143,7 @@ function HomePage() {
       {/* Hero Section */}
       <div className="flex-1 flex items-center xl:justify-between gap-6 px-4 sm:px-8 min-h-0 relative z-10 max-w-[1400px] mx-auto w-full">
         <div className="relative z-10 w-full max-w-2xl mx-auto xl:mx-0 xl:shrink-0">
-          <h1 className="hero-anim hero-title hero-h1 text-5xl sm:text-6xl md:text-7xl font-extrabold mb-3 sm:mb-4 xl:mb-6 leading-[0.9]" style={{ animationDelay: '80ms', color: '#1B2A5B' }}>
+          <h1 className="hero-anim hero-title hero-h1 text-4xl sm:text-5xl md:text-6xl xl:text-7xl font-extrabold mb-3 sm:mb-4 xl:mb-6 leading-[0.9]" style={{ animationDelay: '80ms', color: '#1B2A5B' }}>
             {/* Visually hidden — search engines and screen readers get the
                 actual event name/date here, while the styled line below
                 stays purely the brand tagline. */}

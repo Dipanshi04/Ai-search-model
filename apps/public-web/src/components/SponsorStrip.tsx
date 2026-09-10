@@ -22,35 +22,67 @@ interface Sponsor {
   category?: SponsorCategory | null;
 }
 
-// One tile per sponsor, its category name shown above the logo — matches
-// the print poster, where each partner gets its own labeled column even
-// when two sponsors share a category (e.g. two Community Partner tiles).
-function SponsorTile({ label, sponsor }: { label: string; sponsor: Sponsor }) {
+interface DisplayGroup {
+  label: string;
+  sponsors: Sponsor[];
+}
+
+function SponsorLogo({ sponsor }: { sponsor: Sponsor }) {
+  return (
+    <div
+      title={sponsor.name}
+      className="bg-white rounded-lg border border-slate-200 p-2 h-10 sm:h-12 flex items-center justify-center"
+      style={{ borderColor: 'rgba(27,42,91,0.12)' }}
+    >
+      {sponsor.logoUrl ? (
+        // The bundled ISA logo (imported asset, already a usable src) is
+        // passed in as-is; real sponsor logos are server-uploaded paths
+        // that need the API origin prefixed.
+        <img
+          src={sponsor.logoUrl.startsWith('/uploads') ? getImageUrl(sponsor.logoUrl) : sponsor.logoUrl}
+          alt={sponsor.name || 'Sponsor'}
+          className="h-full w-auto object-contain"
+        />
+      ) : (
+        <span className="text-sm font-bold px-2" style={{ color: '#1B2A5B', opacity: 0.6 }}>{sponsor.name}</span>
+      )}
+    </div>
+  );
+}
+
+// One heading per category — shared by every sponsor in it, so "Community
+// Partner" appears once above all of its logos instead of repeating per
+// sponsor (matches the print poster's single-category-per-column layout,
+// just collapsing duplicate headings when a category has multiple sponsors).
+function SponsorGroup({ label, sponsors }: DisplayGroup) {
   return (
     <div className="text-center">
       <p className="hero-kicker text-[10px] sm:text-xs font-bold uppercase tracking-widest mb-2" style={{ color: '#1B2A5B', opacity: 0.5 }}>
         {label}
       </p>
-      <div
-        title={sponsor.name}
-        className="bg-white rounded-lg border border-slate-200 p-2 h-10 sm:h-12 flex items-center justify-center"
-        style={{ borderColor: 'rgba(27,42,91,0.12)' }}
-      >
-        {sponsor.logoUrl ? (
-          // The bundled ISA logo (imported asset, already a usable src) is
-          // passed in as-is; real sponsor logos are server-uploaded paths
-          // that need the API origin prefixed.
-          <img
-            src={sponsor.logoUrl.startsWith('/uploads') ? getImageUrl(sponsor.logoUrl) : sponsor.logoUrl}
-            alt={sponsor.name || 'Sponsor'}
-            className="h-full w-auto object-contain"
-          />
-        ) : (
-          <span className="text-sm font-bold px-2" style={{ color: '#1B2A5B', opacity: 0.6 }}>{sponsor.name}</span>
-        )}
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        {sponsors.map((s) => <SponsorLogo key={s.id} sponsor={s} />)}
       </div>
     </div>
   );
+}
+
+function groupByCategory(sponsors: Sponsor[]): DisplayGroup[] {
+  const groups: DisplayGroup[] = [];
+  const byLabel = new Map<string, DisplayGroup>();
+
+  for (const s of sponsors) {
+    const label = s.category?.name || 'Supported By';
+    let group = byLabel.get(label);
+    if (!group) {
+      group = { label, sponsors: [] };
+      byLabel.set(label, group);
+      groups.push(group);
+    }
+    group.sponsors.push(s);
+  }
+
+  return groups;
 }
 
 export default function SponsorStrip() {
@@ -65,14 +97,14 @@ export default function SponsorStrip() {
     }).catch(() => {});
   }, []);
 
+  const groups = groupByCategory(sponsors);
+
   return (
     <div className="hero-anim px-4 sm:px-8 pb-6 sm:pb-8 relative z-10 max-w-[1400px] mx-auto w-full" style={{ animationDelay: '600ms' }}>
       <div className="bg-white rounded-2xl border shadow-sm p-5 sm:p-6" style={{ borderColor: 'rgba(27,42,91,0.1)' }}>
         <div className="flex flex-wrap justify-center sm:justify-between gap-6 sm:gap-8">
-          <SponsorTile label="Event By" sponsor={{ id: 'isa', name: 'Indore Software Association', logoUrl: logoDark }} />
-          {sponsors.map((s) => (
-            <SponsorTile key={s.id} label={s.category?.name || 'Supported By'} sponsor={s} />
-          ))}
+          <SponsorGroup label="Event By" sponsors={[{ id: 'isa', name: 'Indore Software Association', logoUrl: logoDark }]} />
+          {groups.map((g) => <SponsorGroup key={g.label} label={g.label} sponsors={g.sponsors} />)}
         </div>
       </div>
     </div>

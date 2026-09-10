@@ -26,8 +26,10 @@
   isolation: isolate;
 }
 
-/* Subject-tight asset: 644x1151, runner fills ~9%-97% of the frame width.
-   Sits behind the copy (z-0) while the text column rides above it (z-10). */
+/* Asset: 1489x1986 (~0.75 width/height). Sits behind the copy (z-0) while
+   the text column rides above it (z-10) — heights below are sized so the
+   rendered width stays narrow enough not to crowd the text on mobile,
+   where the image is absolutely positioned outside normal flow. */
 .hero-runner {
   position: absolute;
   z-index: 0;
@@ -35,7 +37,7 @@
   opacity: 0;
   top: 0;
   right: -3%;
-  height: min(38vh, 320px);
+  height: min(28vh, 239px);
   width: auto;
   filter: drop-shadow(0 18px 34px rgba(27, 42, 91, 0.22));
   animation:
@@ -44,11 +46,11 @@
 }
 
 @media (min-width: 640px) {
-  .hero-runner { right: -1%; height: min(54vh, 470px); }
+  .hero-runner { right: -1%; height: min(40vh, 351px); }
 }
 
 @media (min-width: 1024px) {
-  .hero-runner { right: 1%; height: min(74vh, 640px); }
+  .hero-runner { right: 1%; height: min(55vh, 478px); }
 }
 
 @media (min-width: 1280px) {

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { api } from '../lib/api';
 import Footer from '../components/Footer';
 import PageHeader from '../components/PageHeader';
+import { convertHeicIfNeeded } from '@isa/shared';
 
 declare global {
   interface Window {
@@ -35,6 +36,7 @@ export default function RegisterPage() {
   });
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoConverting, setPhotoConverting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState('');
@@ -457,18 +459,29 @@ export default function RegisterPage() {
                   </div>
                 )}
                 <label className="cursor-pointer px-3 py-2 rounded-lg border border-brand-navy/15 text-xs font-semibold text-brand-navy hover:bg-brand-cream transition focus-within:outline-none focus-within:ring-2 focus-within:ring-brand-orange">
-                  {photo ? 'Change photo' : 'Add photo'}
+                  {photoConverting ? 'Converting…' : photo ? 'Change photo' : 'Add photo'}
                   {/* No `capture` attribute — that forces the camera open
                       directly on Android with no way to pick an existing
-                      photo instead. */}
+                      photo instead. accept includes heic/heif since iPhone
+                      photos are HEIC by default — convertHeicIfNeeded turns
+                      those into a JPEG the server will actually accept. */}
                   <input
                     type="file"
-                    accept="image/png,image/jpeg,image/webp"
+                    accept="image/png,image/jpeg,image/webp,image/heic,image/heif"
                     className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0] || null;
+                    disabled={photoConverting}
+                    onChange={async (e) => {
+                      const rawFile = e.target.files?.[0] || null;
+                      if (!rawFile) {
+                        setPhoto(null);
+                        setPhotoPreview(null);
+                        return;
+                      }
+                      setPhotoConverting(true);
+                      const file = await convertHeicIfNeeded(rawFile);
                       setPhoto(file);
-                      setPhotoPreview(file ? URL.createObjectURL(file) : null);
+                      setPhotoPreview(URL.createObjectURL(file));
+                      setPhotoConverting(false);
                     }}
                   />
                 </label>

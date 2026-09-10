@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 import PinInput from '../components/PinInput';
+import { convertHeicIfNeeded } from '@isa/shared';
 
 interface Props {
   onBack: () => void;
@@ -119,12 +120,15 @@ export default function ProfilePage({ onBack }: Props) {
   const g = GPS_META[gpsStatus];
 
   const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const rawFile = e.target.files?.[0];
     e.target.value = '';
-    if (!file) return;
+    if (!rawFile) return;
     setPhotoError('');
     setPhotoUploading(true);
     try {
+      // iPhone photos are HEIC by default, which the server's upload
+      // filter rejects — convert to JPEG here first.
+      const file = await convertHeicIfNeeded(rawFile);
       const res = await api.uploadMyPhoto(file);
       if (res.success && res.data?.avatarUrl) {
         setDetails((d) => (d ? { ...d, avatarUrl: res.data.avatarUrl } : d));
@@ -232,7 +236,7 @@ export default function ProfilePage({ onBack }: Props) {
           <label style={{ position: 'relative', display: 'inline-block', margin: '0 auto 12px', cursor: 'pointer' }}>
             {/* No `capture` attribute — that forces the camera open directly
                 on Android with no way to pick an existing photo instead. */}
-            <input type="file" accept="image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={handlePhotoChange} />
+            <input type="file" accept="image/png,image/jpeg,image/webp,image/heic,image/heif" style={{ display: 'none' }} onChange={handlePhotoChange} />
             {details?.avatarUrl ? (
               <img
                 src={`${API_URL}${details.avatarUrl}`}

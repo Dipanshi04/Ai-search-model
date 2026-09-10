@@ -95,7 +95,7 @@ export default function PaymentDetailsPage() {
       const sponsorsRes = await api.getSponsors().catch(() => null);
       const sponsors = (sponsorsRes?.success && sponsorsRes.data ? sponsorsRes.data : [])
         .filter((s: any) => s.logoUrl)
-        .map((s: any) => ({ name: s.name, logoUrl: toAbsolute(s.logoUrl) }));
+        .map((s: any) => ({ name: s.name, logoUrl: toAbsolute(s.logoUrl), category: s.category }));
 
       const canvas = await drawShareCard(document.createElement('canvas'), {
         name: runnerName || 'Runner',

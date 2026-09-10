@@ -117,7 +117,7 @@ export default function RunnerHome({ bibNumber, category, onStart }: Props) {
       const sponsorsRes = await api.getSponsors().catch(() => null);
       const sponsors = (sponsorsRes?.success && sponsorsRes.data ? sponsorsRes.data : [])
         .filter((s: any) => s.logoUrl)
-        .map((s: any) => ({ name: s.name, logoUrl: toAbsolute(s.logoUrl) }));
+        .map((s: any) => ({ name: s.name, logoUrl: toAbsolute(s.logoUrl), category: s.category }));
 
       await drawShareCard(document.createElement('canvas'), {
         name: details?.name || 'Runner',

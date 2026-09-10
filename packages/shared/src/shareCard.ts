@@ -7,6 +7,7 @@
 export interface ShareCardSponsor {
   name?: string;
   logoUrl?: string;
+  category?: { name: string } | null;
 }
 
 export interface ShareCardOptions {
@@ -86,22 +87,37 @@ export async function drawShareCard(canvas: HTMLCanvasElement, opts: ShareCardOp
     // Fonts are a nice-to-have for this canvas — fall back silently.
   }
 
-  // The photo block adds ~440px that a fixed canvas height can't account
-  // for, so this is painted twice: once against a throwaway 1x1 canvas
-  // purely to find out how tall the real content ends up being (canvas
-  // draw calls don't throw just because they land outside the visible
-  // area), then for real once the canvas is sized to fit it exactly.
+  // Story-share platforms (Instagram/WhatsApp Status) render into a fixed
+  // 9:16 frame and crop whatever doesn't fit it — so the output canvas is
+  // always exactly 1080x1920, never taller. Content is painted once onto
+  // an unconstrained "natural" canvas first (its height varies with photo
+  // presence and how many sponsor categories there are), then composited
+  // into the fixed frame at 1:1 if it already fits, or scaled down (never
+  // cropped) if it doesn't — the same "contain" idea as an <img>, just
+  // done by hand since this is a canvas, not an element.
+  const STORY_W = 1080, STORY_H = 1920;
+
   const measureCanvas = document.createElement('canvas');
   measureCanvas.width = W;
   measureCanvas.height = 1;
-  const finalY = paint(measureCanvas.getContext('2d')!, W, {
+  const naturalHeight = paint(measureCanvas.getContext('2d')!, W, {
     nrcLogo, isaLogo, solugenixLogo, imcLogo, avatar, sponsorLogos, usableSponsors, opts,
-  });
+  }) + 40;
 
-  canvas.width = W;
-  canvas.height = finalY + 40;
+  const naturalCanvas = document.createElement('canvas');
+  naturalCanvas.width = W;
+  naturalCanvas.height = naturalHeight;
+  paint(naturalCanvas.getContext('2d')!, W, { nrcLogo, isaLogo, solugenixLogo, imcLogo, avatar, sponsorLogos, usableSponsors, opts });
+
+  canvas.width = STORY_W;
+  canvas.height = STORY_H;
   const ctx = canvas.getContext('2d')!;
-  paint(ctx, W, { nrcLogo, isaLogo, solugenixLogo, imcLogo, avatar, sponsorLogos, usableSponsors, opts });
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, STORY_W, STORY_H);
+
+  const scale = Math.min(1, STORY_H / naturalHeight);
+  const drawW = W * scale, drawH = naturalHeight * scale;
+  ctx.drawImage(naturalCanvas, (STORY_W - drawW) / 2, (STORY_H - drawH) / 2, drawW, drawH);
 
   return canvas;
 }
@@ -193,10 +209,27 @@ function paint(ctx: CanvasRenderingContext2D, W: number, assets: PaintAssets): n
   y += 130;
 
   // ---- Photo (skipped, with a bigger name below, if none is available) ----
+  // A colorful gradient halo behind the frame — echoing the ribbon on the
+  // hero runner graphic — fills what would otherwise be a flat, empty gap
+  // between the banner and the photo.
   const hasPhoto = !!avatar;
   if (hasPhoto) {
-    y += 70;
+    y += 50;
     const size = 380;
+    const haloR = size / 2 + 34;
+    const haloCx = W / 2, haloCy = y + size / 2;
+    const halo = ctx.createConicGradient(-Math.PI / 2, haloCx, haloCy);
+    halo.addColorStop(0, '#F5821F');
+    halo.addColorStop(0.35, '#E91E8C');
+    halo.addColorStop(0.65, '#7C3AED');
+    halo.addColorStop(1, '#F5821F');
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(haloCx, haloCy, haloR, 0, Math.PI * 2);
+    ctx.fillStyle = halo;
+    ctx.fill();
+    ctx.restore();
+
     const px = W / 2 - size / 2, py = y;
     ctx.save();
     ctx.beginPath();
@@ -206,25 +239,64 @@ function paint(ctx: CanvasRenderingContext2D, W: number, assets: PaintAssets): n
     ctx.fillRect(px, py, size, size);
     drawImageCover(ctx, avatar!, px, py, size, size);
     ctx.restore();
-    ctx.strokeStyle = NAVY;
-    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 8;
     ctx.beginPath();
     ctx.roundRect(px, py, size, size, 36);
     ctx.stroke();
-    y += size + 60;
+
+    // BIB sticker, overlapping the photo's bottom-right corner.
+    const bibText = `#${opts.bibNumber}`;
+    ctx.font = `800 30px ${FONT_BODY}`;
+    const bibW = ctx.measureText(bibText).width + 44;
+    const bibCx = px + size - 10, bibCy = py + size;
+    ctx.save();
+    ctx.fillStyle = ORANGE;
+    ctx.beginPath();
+    ctx.roundRect(bibCx - bibW / 2, bibCy - 26, bibW, 52, 26);
+    ctx.fill();
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.roundRect(bibCx - bibW / 2, bibCy - 26, bibW, 52, 26);
+    ctx.stroke();
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(bibText, bibCx, bibCy + 10);
+    ctx.restore();
+
+    y += size + 70;
   } else {
     y += 90;
   }
 
-  // ---- Category (left) / BIB (right) ----
+  // ---- Category + BIB pills (only need the BIB pill again here when
+  // there's no photo, since the sticker above already showed it) ----
   const catLabel = opts.category === 'RUN_5K' ? '5K CHALLENGE' : '3K FUN RUN';
-  ctx.fillStyle = ORANGE;
-  ctx.font = `800 30px ${FONT_BODY}`;
-  ctx.textAlign = 'left';
-  ctx.fillText(catLabel, 110, y);
-  ctx.textAlign = 'right';
-  ctx.fillText(`BIB #${opts.bibNumber}`, W - 110, y);
-  ctx.textAlign = 'center';
+  ctx.font = `800 26px ${FONT_BODY}`;
+  const bibPillText = `BIB #${opts.bibNumber}`;
+  const catW = ctx.measureText(catLabel).width + 56;
+  const bibW2 = hasPhoto ? 0 : ctx.measureText(bibPillText).width + 56;
+  const pillGap = 16;
+  const pillH = 52;
+  const totalPillW = catW + (hasPhoto ? 0 : pillGap + bibW2);
+  let pillX = W / 2 - totalPillW / 2;
+
+  ctx.fillStyle = NAVY;
+  ctx.beginPath();
+  ctx.roundRect(pillX, y - pillH / 2 - 8, catW, pillH, pillH / 2);
+  ctx.fill();
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(catLabel, pillX + catW / 2, y + 8);
+
+  if (!hasPhoto) {
+    pillX += catW + pillGap;
+    ctx.fillStyle = ORANGE;
+    ctx.beginPath();
+    ctx.roundRect(pillX, y - pillH / 2 - 8, bibW2, pillH, pillH / 2);
+    ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.fillText(bibPillText, pillX + bibW2 / 2, y + 8);
+  }
 
   // ---- Name (bigger when there's no photo to fill the space) ----
   // The gap has to clear the name font's own height (130px when there's
@@ -240,39 +312,74 @@ function paint(ctx: CanvasRenderingContext2D, W: number, assets: PaintAssets): n
   ctx.font = `700 30px ${FONT_BODY}`;
   ctx.fillText('27 September 2026  ·  6:30 AM Onwards  ·  Basketball Complex', W / 2, y);
 
-  // ---- Sponsors ----
-  const validSponsorLogos = sponsorLogos
-    .map((img, i) => ({ img, name: usableSponsors[i]?.name }))
-    .filter((s): s is { img: HTMLImageElement; name: string | undefined } => s.img !== null);
+  // ---- Sponsors, grouped by category (matches the website's sponsor
+  // strip) — one label per category above a row of its logos, instead of
+  // a flat unlabeled grid. ----
+  const validSponsors = sponsorLogos
+    .map((img, i) => ({ img, sponsor: usableSponsors[i] }))
+    .filter((s): s is { img: HTMLImageElement; sponsor: ShareCardSponsor } => s.img !== null);
 
-  if (validSponsorLogos.length > 0) {
-    y += 90;
+  const groups: { label: string; items: { img: HTMLImageElement }[] }[] = [];
+  const groupIndex = new Map<string, number>();
+  for (const { img, sponsor } of validSponsors) {
+    const label = sponsor.category?.name || 'Supported By';
+    let idx = groupIndex.get(label);
+    if (idx === undefined) {
+      idx = groups.length;
+      groupIndex.set(label, idx);
+      groups.push({ label, items: [] });
+    }
+    groups[idx]!.items.push({ img });
+  }
+
+  if (groups.length > 0) {
+    y += 70;
+
+    const boxSize = 130;
+    const boxGap = 18;
+    const groupGap = 40;
+    const labelHeight = 36;
+
+    const groupHeight = labelHeight + boxSize + groupGap;
+    const totalHeight = groups.length * groupHeight;
+
+    // Tinted card behind the whole section so it reads as one grouped
+    // block instead of logos floating loose on the page.
+    const cardPad = 40;
+    const cardW = W - 160;
+    ctx.fillStyle = 'rgba(27,42,91,0.04)';
+    ctx.beginPath();
+    ctx.roundRect(W / 2 - cardW / 2, y - 8, cardW, totalHeight + 70 + cardPad, 28);
+    ctx.fill();
+
+    y += 40;
     ctx.fillStyle = 'rgba(27,42,91,0.45)';
     ctx.font = `700 24px ${FONT_BODY}`;
     ctx.fillText('O U R   P A R T N E R S', W / 2, y);
-    y += 40;
+    y += 46;
 
-    const cols = 4;
-    const cellW = 220, cellH = 130;
-    const gridW = cols * cellW;
-    const startX = W / 2 - gridW / 2;
-    const rows = Math.ceil(validSponsorLogos.length / cols);
+    for (const group of groups) {
+      ctx.fillStyle = 'rgba(27,42,91,0.5)';
+      ctx.font = `700 20px ${FONT_BODY}`;
+      ctx.fillText(group.label.toUpperCase(), W / 2, y);
+      y += 24;
 
-    validSponsorLogos.forEach(({ img }, i) => {
-      const col = i % cols, row = Math.floor(i / cols);
-      const cx = startX + col * cellW + cellW / 2;
-      const cyTop = y + row * cellH;
-      const boxW = cellW - 30, boxH = cellH - 30;
-      ctx.fillStyle = '#ffffff';
-      ctx.strokeStyle = 'rgba(27,42,91,0.12)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.roundRect(cx - boxW / 2, cyTop, boxW, boxH, 14);
-      ctx.fill();
-      ctx.stroke();
-      drawImageContain(ctx, img, cx, cyTop + boxH / 2, boxW - 24, boxH - 24);
-    });
-    y += rows * cellH;
+      const rowW = group.items.length * boxSize + (group.items.length - 1) * boxGap;
+      const rowStartX = W / 2 - rowW / 2;
+      group.items.forEach(({ img }, i) => {
+        const cx = rowStartX + i * (boxSize + boxGap) + boxSize / 2;
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = 'rgba(27,42,91,0.12)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.roundRect(cx - boxSize / 2, y, boxSize, boxSize, 14);
+        ctx.fill();
+        ctx.stroke();
+        drawImageContain(ctx, img, cx, y + boxSize / 2, boxSize - 24, boxSize - 24);
+      });
+      y += boxSize + groupGap;
+    }
+    y += cardPad - groupGap;
   }
 
   // ---- Footer ----

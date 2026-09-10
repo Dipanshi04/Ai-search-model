@@ -77,3 +77,9 @@ export { Logo, type LogoProps, type LogoSize, type LogoTheme } from './component
 // ──────────────────────────────────────────────
 
 export { drawShareCard, type ShareCardOptions, type ShareCardSponsor } from './shareCard';
+
+// ──────────────────────────────────────────────
+//  ISA MARATHON - HEIC PHOTO CONVERSION
+// ──────────────────────────────────────────────
+
+export { convertHeicIfNeeded } from './heic';

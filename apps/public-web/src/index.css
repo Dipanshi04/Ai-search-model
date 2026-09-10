@@ -5,7 +5,7 @@
 @theme {
   --color-brand-navy: #1B2A5B;
   --color-brand-orange: #F5821F;
-  --color-brand-cream: #F5F1EA;
+  --color-brand-cream: #FFFFFF;
 }
 
 :root {
@@ -21,7 +21,7 @@
 
 /* ===== Homepage Hero ===== */
 .hero-root {
-  background: #f5f1ea;
+  background: #ffffff;
   position: relative;
   isolation: isolate;
 }

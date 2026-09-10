@@ -30,7 +30,7 @@ export function HRForgotPasswordPage() {
   };
 
   const s = {
-    page: { minHeight: '100dvh', display: 'flex' as const, flexDirection: 'column' as const, background: '#F5F1EA' },
+    page: { minHeight: '100dvh', display: 'flex' as const, flexDirection: 'column' as const, background: '#FFFFFF' },
     center: { flex: 1, display: 'flex' as const, flexDirection: 'column' as const, alignItems: 'center' as const, justifyContent: 'center' as const, padding: '24px 20px', width: '100%' },
     card: { width: '100%', maxWidth: '400px', background: '#fff', borderRadius: '24px', padding: '32px', boxShadow: '0 4px 24px rgba(27,42,91,0.08)', border: '1px solid rgba(27,42,91,0.1)' },
     logo: { marginBottom: '24px', display: 'flex' as const, justifyContent: 'center' as const },
@@ -40,7 +40,7 @@ export function HRForgotPasswordPage() {
     successMsg: { marginBottom: '20px', padding: '12px 16px', borderRadius: '12px', background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#16a34a', fontFamily: FONT_BODY, fontSize: '14px', fontWeight: 500, textAlign: 'center' as const },
     field: { marginBottom: '20px' },
     label: { display: 'block' as const, fontFamily: FONT_BODY, fontSize: '13px', fontWeight: 600, color: 'rgba(27,42,91,0.7)', marginBottom: '8px' },
-    input: { width: '100%', padding: '14px 16px', background: '#F5F1EA', border: '1px solid rgba(27,42,91,0.15)', borderRadius: '12px', color: '#1B2A5B', fontFamily: FONT_BODY, fontSize: '16px', outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s' },
+    input: { width: '100%', padding: '14px 16px', background: '#FFFFFF', border: '1px solid rgba(27,42,91,0.15)', borderRadius: '12px', color: '#1B2A5B', fontFamily: FONT_BODY, fontSize: '16px', outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s' },
     btn: { width: '100%', padding: '16px', marginTop: '8px', color: '#fff', fontFamily: FONT_BODY, fontSize: '16px', fontWeight: 700, borderRadius: '12px', border: 'none', cursor: 'pointer', transition: 'all 0.2s' },
     backLink: { marginTop: '24px', textAlign: 'center' as const, fontFamily: FONT_BODY, fontSize: '14px', color: 'rgba(27,42,91,0.6)' },
   };
@@ -134,7 +134,7 @@ export function HRResetPasswordPage() {
   };
 
   const s = {
-    page: { minHeight: '100dvh', display: 'flex' as const, flexDirection: 'column' as const, background: '#F5F1EA' },
+    page: { minHeight: '100dvh', display: 'flex' as const, flexDirection: 'column' as const, background: '#FFFFFF' },
     center: { flex: 1, display: 'flex' as const, flexDirection: 'column' as const, alignItems: 'center' as const, justifyContent: 'center' as const, padding: '24px 20px', width: '100%' },
     card: { width: '100%', maxWidth: '400px', background: '#fff', borderRadius: '24px', padding: '32px', boxShadow: '0 4px 24px rgba(27,42,91,0.08)', border: '1px solid rgba(27,42,91,0.1)' },
     logo: { marginBottom: '24px', display: 'flex' as const, justifyContent: 'center' as const },
@@ -144,7 +144,7 @@ export function HRResetPasswordPage() {
     successMsg: { marginBottom: '20px', padding: '12px 16px', borderRadius: '12px', background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#16a34a', fontFamily: FONT_BODY, fontSize: '14px', fontWeight: 500, textAlign: 'center' as const },
     field: { marginBottom: '20px' },
     label: { display: 'block' as const, fontFamily: FONT_BODY, fontSize: '13px', fontWeight: 600, color: 'rgba(27,42,91,0.7)', marginBottom: '8px' },
-    input: { width: '100%', padding: '14px 16px', background: '#F5F1EA', border: '1px solid rgba(27,42,91,0.15)', borderRadius: '12px', color: '#1B2A5B', fontFamily: FONT_BODY, fontSize: '16px', outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s' },
+    input: { width: '100%', padding: '14px 16px', background: '#FFFFFF', border: '1px solid rgba(27,42,91,0.15)', borderRadius: '12px', color: '#1B2A5B', fontFamily: FONT_BODY, fontSize: '16px', outline: 'none', transition: 'border-color 0.2s, box-shadow 0.2s' },
     btn: { width: '100%', padding: '16px', marginTop: '8px', color: '#fff', fontFamily: FONT_BODY, fontSize: '16px', fontWeight: 700, borderRadius: '12px', border: 'none', cursor: 'pointer', transition: 'all 0.2s' },
     backLink: { marginTop: '24px', textAlign: 'center' as const, fontFamily: FONT_BODY, fontSize: '14px', color: 'rgba(27,42,91,0.6)' },
   };

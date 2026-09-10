@@ -467,7 +467,7 @@ export default function RegisterPage() {
                       those into a JPEG the server will actually accept. */}
                   <input
                     type="file"
-                    accept="image/png,image/jpeg,image/webp,image/heic,image/heif"
+                    accept="image/*"
                     className="hidden"
                     disabled={photoConverting}
                     onChange={async (e) => {

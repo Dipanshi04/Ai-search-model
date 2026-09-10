@@ -135,8 +135,11 @@ export default function ProfilePage({ onBack }: Props) {
       } else {
         setPhotoError(res.message || 'Failed to upload photo');
       }
-    } catch {
-      setPhotoError('Network error. Please try again.');
+    } catch (err) {
+      // Surface the real failure instead of a blanket "network error" —
+      // a HEIC conversion failure and an actual network drop need very
+      // different fixes, and this is the only place either shows up.
+      setPhotoError(err instanceof Error ? err.message : 'Upload failed. Please try again.');
     }
     setPhotoUploading(false);
   };
@@ -236,7 +239,7 @@ export default function ProfilePage({ onBack }: Props) {
           <label style={{ position: 'relative', display: 'inline-block', margin: '0 auto 12px', cursor: 'pointer' }}>
             {/* No `capture` attribute — that forces the camera open directly
                 on Android with no way to pick an existing photo instead. */}
-            <input type="file" accept="image/png,image/jpeg,image/webp,image/heic,image/heif" style={{ display: 'none' }} onChange={handlePhotoChange} />
+            <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePhotoChange} />
             {details?.avatarUrl ? (
               <img
                 src={`${API_URL}${details.avatarUrl}`}

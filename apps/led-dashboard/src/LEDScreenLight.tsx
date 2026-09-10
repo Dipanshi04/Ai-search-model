@@ -2,6 +2,7 @@ import { formatDuration } from '@isa/utils';
 import logoDark from './components/logo-dark.png';
 import liseInfoTechLogo from './components/Lise Logo 2.png';
 import nrcGroupLogo from './components/nrc-group-logo.png';
+import solugenixLogo from './components/solugenix-logo.png';
 import { useLedDashboardData, colorForGender, MALE_COLOR, FEMALE_COLOR } from './useLedDashboardData';
 import { SponsorTicker, SponsorGrid } from './components/SponsorDisplay';
 
@@ -27,6 +28,11 @@ export default function LEDScreenLight() {
           </div>
           <div className="w-px h-10 bg-[#1B2A5B]/10" />
           <img src={logoDark} alt="ISA Marathon" className="h-16 w-auto max-w-full object-contain" />
+          <div className="w-px h-10 bg-[#1B2A5B]/10" />
+          <div className="leading-tight">
+            <p className="text-[9px] font-bold text-[#1B2A5B]/45 uppercase tracking-[0.25em] mb-1">Co-Sponsored By</p>
+            <img src={solugenixLogo} alt="Solugenix" className="h-6 w-auto object-contain" />
+          </div>
         </div>
         <div className="flex items-center gap-10">
           <div className="text-center">

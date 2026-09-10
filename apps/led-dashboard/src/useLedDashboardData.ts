@@ -310,7 +310,9 @@ export function useLedDashboardData(mapStyle: string) {
       attributionControl: false,
     });
 
-    map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+    // No NavigationControl — this is an unattended LED/signage display, not
+    // something a viewer zooms or pans by hand, and the default dark widget
+    // looked out of place floating over the light theme's map.
 
     // Mapbox GL measures its container once at creation and never again on
     // its own — without this, the canvas stays frozen at whatever size the

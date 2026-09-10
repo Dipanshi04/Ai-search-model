@@ -18,7 +18,9 @@ export function SponsorTicker({ sponsors, theme }: Props) {
     return (
       <div key={`${s.id}-${i}`} className="flex items-center shrink-0">
         {imgUrl ? (
-          <img src={imgUrl} alt={label} className="h-9 w-auto max-w-[140px] object-contain" />
+          <div className="bg-white rounded-md px-3 py-1.5 flex items-center justify-center">
+            <img src={imgUrl} alt={label} className="h-6 w-auto max-w-[120px] object-contain" />
+          </div>
         ) : (
           <div className="h-9 px-5 rounded-lg flex items-center justify-center text-white font-bold text-base tracking-wide" style={{ background: s.tier === 'Platinum' ? '#E5E7EB' : s.tier === 'Gold' ? '#FDE047' : s.tier === 'Silver' ? '#94A3B8' : s.tier === 'Bronze' ? '#CD7F32' : '#6B7280' }}>
             {label}

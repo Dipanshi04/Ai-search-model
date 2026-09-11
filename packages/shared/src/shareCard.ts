@@ -213,26 +213,10 @@ function paint(ctx: CanvasRenderingContext2D, W: number, assets: PaintAssets): n
   y += 260;
 
   // ---- Photo (skipped, with a bigger name below, if none is available) ----
-  // A colorful gradient halo behind the frame — echoing the ribbon on the
-  // hero runner graphic — fills what would otherwise be a flat, empty gap
-  // between the banner and the photo.
   const hasPhoto = !!avatar;
   if (hasPhoto) {
     y += 60;
     const size = 380;
-    const haloR = size / 2 + 34;
-    const haloCx = W / 2, haloCy = y + size / 2;
-    const halo = ctx.createConicGradient(-Math.PI / 2, haloCx, haloCy);
-    halo.addColorStop(0, '#F5821F');
-    halo.addColorStop(0.35, '#E91E8C');
-    halo.addColorStop(0.65, '#7C3AED');
-    halo.addColorStop(1, '#F5821F');
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(haloCx, haloCy, haloR, 0, Math.PI * 2);
-    ctx.fillStyle = halo;
-    ctx.fill();
-    ctx.restore();
 
     const px = W / 2 - size / 2, py = y;
     ctx.save();

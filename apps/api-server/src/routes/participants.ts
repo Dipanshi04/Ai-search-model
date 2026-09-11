@@ -354,9 +354,14 @@ participantsRouter.delete('/:id', authenticate, requireRole('SUPER_ADMIN'), asyn
       res.status(404).json({ success: false, message: 'Participant not found' });
       return;
     }
-    await prisma.participant.delete({ where: { id: req.params.id as string } });
+    await prisma.$transaction([
+      prisma.payment.deleteMany({ where: { participantId: req.params.id as string } }),
+      prisma.gpsLog.deleteMany({ where: { participantId: req.params.id as string } }),
+      prisma.participant.delete({ where: { id: req.params.id as string } }),
+    ]);
     res.json({ success: true, message: 'Participant deleted' });
   } catch (error) {
+    logger.error('Admin delete participant error:', error);
     res.status(500).json({ success: false, message: 'Failed to delete participant' });
   }
 });

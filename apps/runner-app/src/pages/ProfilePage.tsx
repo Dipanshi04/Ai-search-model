@@ -263,16 +263,30 @@ export default function ProfilePage({ onBack }: Props) {
                 {(details?.name || '?').charAt(0).toUpperCase()}
               </div>
             )}
-            <div style={{
-              position: 'absolute', bottom: '-2px', right: '-2px',
-              width: '22px', height: '22px', borderRadius: '50%',
-              background: '#fff', border: '1.5px solid #e2e8f0',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-              </svg>
-            </div>
+            {photoUploading ? (
+              <div style={{
+                position: 'absolute', inset: 0,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <div style={{
+                  width: '24px', height: '24px', borderRadius: '50%',
+                  border: '3px solid rgba(16,185,129,0.25)', borderTopColor: '#10b981',
+                  animation: 'isa-spin 0.8s linear infinite',
+                }} />
+                <style>{`@keyframes isa-spin { to { transform: rotate(360deg); } }`}</style>
+              </div>
+            ) : (
+              <div style={{
+                position: 'absolute', bottom: '-2px', right: '-2px',
+                width: '22px', height: '22px', borderRadius: '50%',
+                background: '#fff', border: '1.5px solid #e2e8f0',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 20h9" /><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                </svg>
+              </div>
+            )}
           </label>
           {photoError && (
             <p style={{ fontSize: '11px', color: '#dc2626', margin: '0 0 8px' }}>{photoError}</p>

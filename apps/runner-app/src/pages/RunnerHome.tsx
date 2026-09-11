@@ -8,7 +8,7 @@ import imcLogo from '../components/imc-logo.png';
 import BrandHeader from '../components/BrandHeader';
 import ProfilePage from './ProfilePage';
 import MessagesPage from './MessagesPage';
-import { drawShareCard } from '@isa/shared';
+import { drawShareCard, saveOrShareCanvas } from '@isa/shared';
 
 interface RunnerDetails {
   name: string;
@@ -119,7 +119,7 @@ export default function RunnerHome({ bibNumber, category, onStart }: Props) {
         .filter((s: any) => s.logoUrl)
         .map((s: any) => ({ name: s.name, logoUrl: toAbsolute(s.logoUrl), category: s.category }));
 
-      await drawShareCard(document.createElement('canvas'), {
+      const canvas = await drawShareCard(document.createElement('canvas'), {
         name: details?.name || 'Runner',
         bibNumber: details?.bibNumber || bibNumber,
         category: details?.category || category,
@@ -129,12 +129,12 @@ export default function RunnerHome({ bibNumber, category, onStart }: Props) {
         isaLogoSrc: logoDark,
         solugenixLogoSrc: solugenixLogo,
         imcLogoSrc: imcLogo,
-      }).then((canvas) => {
-        const link = document.createElement('a');
-        link.download = `im-running-${details?.bibNumber || bibNumber}.png`;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
       });
+      // iOS Safari ignores <a download> for blob/data URLs — it just opens
+      // the image instead of saving it. saveOrShareCanvas tries the native
+      // share sheet (which has a working "Save Image") first, and only
+      // falls back to the anchor-click approach where that isn't supported.
+      await saveOrShareCanvas(canvas, `im-running-${details?.bibNumber || bibNumber}.png`, "I'm Running the ISA Tech Marathon!");
     } catch {
       // Best-effort — nothing to show the runner if canvas generation
       // itself fails, so just don't leave them stuck on a spinner.

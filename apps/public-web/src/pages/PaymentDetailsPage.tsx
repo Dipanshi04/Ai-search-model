@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import Footer from '../components/Footer';
-import { drawShareCard } from '@isa/shared';
+import { drawShareCard, saveOrShareCanvas } from '@isa/shared';
 import nrcGroupLogo from '../components/nrc-group-logo.png';
 import logoDark from '../components/logo-dark.png';
 import solugenixLogo from '../components/solugenix-logo.png';
@@ -108,10 +108,11 @@ export default function PaymentDetailsPage() {
         solugenixLogoSrc: solugenixLogo,
         imcLogoSrc: imcLogo,
       });
-      const link = document.createElement('a');
-      link.download = `im-running-${bibNumber}.png`;
-      link.href = canvas.toDataURL('image/png');
-      link.click();
+      // iOS Safari ignores <a download> for blob/data URLs — it just opens
+      // the image instead of saving it. saveOrShareCanvas tries the native
+      // share sheet (which has a working "Save Image") first, and only
+      // falls back to the anchor-click approach where that isn't supported.
+      await saveOrShareCanvas(canvas, `im-running-${bibNumber}.png`, "I'm Running the ISA Tech Marathon!");
     } catch {
       // Best-effort — nothing to show the runner if canvas generation
       // itself fails, so just don't leave them stuck on a spinner.

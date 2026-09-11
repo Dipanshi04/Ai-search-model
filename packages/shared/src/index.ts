@@ -83,3 +83,9 @@ export { drawShareCard, type ShareCardOptions, type ShareCardSponsor } from './s
 // ──────────────────────────────────────────────
 
 export { convertHeicIfNeeded } from './heic';
+
+// ──────────────────────────────────────────────
+//  ISA MARATHON - CROSS-BROWSER IMAGE SAVE
+// ──────────────────────────────────────────────
+
+export { saveOrShareCanvas } from './saveImage';

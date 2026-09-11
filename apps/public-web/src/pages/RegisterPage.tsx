@@ -37,6 +37,9 @@ export default function RegisterPage() {
   const [photo, setPhoto] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoConverting, setPhotoConverting] = useState(false);
+  const [showPhotoMenu, setShowPhotoMenu] = useState(false);
+  const cameraPhotoInputRef = useRef<HTMLInputElement>(null);
+  const galleryPhotoInputRef = useRef<HTMLInputElement>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState('');
@@ -90,6 +93,17 @@ export default function RegisterPage() {
     if (!tacScrolledToBottom) return;
     setTacAccepted(true);
     setShowTACModal(false);
+  };
+
+  const handlePhotoInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const rawFile = e.target.files?.[0] || null;
+    e.target.value = '';
+    if (!rawFile) return;
+    setPhotoConverting(true);
+    const file = await convertHeicIfNeeded(rawFile);
+    setPhoto(file);
+    setPhotoPreview(URL.createObjectURL(file));
+    setPhotoConverting(false);
   };
 
   const handleSubmitForm = async (e: React.FormEvent) => {
@@ -458,38 +472,83 @@ export default function RegisterPage() {
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><circle cx="12" cy="8" r="4" /><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8" /></svg>
                   </div>
                 )}
-                <label className="cursor-pointer px-3 py-2 rounded-lg border border-brand-navy/15 text-xs font-semibold text-brand-navy hover:bg-brand-cream transition focus-within:outline-none focus-within:ring-2 focus-within:ring-brand-orange inline-flex items-center gap-1.5">
+                <button
+                  type="button"
+                  disabled={photoConverting}
+                  onClick={() => setShowPhotoMenu(true)}
+                  className="cursor-pointer px-3 py-2 rounded-lg border border-brand-navy/15 text-xs font-semibold text-brand-navy hover:bg-brand-cream transition focus-within:outline-none focus-within:ring-2 focus-within:ring-brand-orange inline-flex items-center gap-1.5"
+                >
                   {photoConverting && (
                     <span className="inline-block w-3 h-3 rounded-full border-2 border-brand-orange/30 border-t-brand-orange animate-spin" />
                   )}
                   {photoConverting ? 'Converting…' : photo ? 'Change photo' : 'Add photo'}
-                  {/* No `capture` attribute — that forces the camera open
-                      directly on Android with no way to pick an existing
-                      photo instead. accept includes heic/heif since iPhone
-                      photos are HEIC by default — convertHeicIfNeeded turns
-                      those into a JPEG the server will actually accept. */}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    disabled={photoConverting}
-                    onChange={async (e) => {
-                      const rawFile = e.target.files?.[0] || null;
-                      if (!rawFile) {
-                        setPhoto(null);
-                        setPhotoPreview(null);
-                        return;
-                      }
-                      setPhotoConverting(true);
-                      const file = await convertHeicIfNeeded(rawFile);
-                      setPhoto(file);
-                      setPhotoPreview(URL.createObjectURL(file));
-                      setPhotoConverting(false);
-                    }}
-                  />
-                </label>
+                </button>
+                {/* Two separate inputs instead of one plain file input:
+                    relying on the OS file-chooser sheet to surface a
+                    "Camera" shortcut on its own is inconsistent — some
+                    Android/Samsung Chrome versions only show Gallery/Files
+                    with no camera option at all. capture="user" on this one
+                    guarantees a camera launch; the other (no capture)
+                    guarantees gallery access, which a bare capture
+                    attribute would have blocked entirely on iOS. accept
+                    includes heic/heif since iPhone photos are HEIC by
+                    default — convertHeicIfNeeded turns those into a JPEG
+                    the server will actually accept. */}
+                <input
+                  ref={cameraPhotoInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="user"
+                  className="hidden"
+                  onChange={handlePhotoInputChange}
+                />
+                <input
+                  ref={galleryPhotoInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handlePhotoInputChange}
+                />
               </div>
               <p className="hero-body text-[11px] text-brand-navy/40 mt-1">You can also add or change this later from the Runner App.</p>
+              {showPhotoMenu && (
+                <div
+                  onClick={() => setShowPhotoMenu(false)}
+                  className="fixed inset-0 z-50 flex items-end"
+                  style={{ background: 'rgba(15,23,42,0.4)' }}
+                >
+                  <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-t-2xl w-full px-4 pt-2" style={{ paddingBottom: 'calc(20px + env(safe-area-inset-bottom))' }}>
+                    <div className="w-9 h-1 bg-brand-navy/10 rounded-full mx-auto my-3" />
+                    <button
+                      type="button"
+                      onClick={() => { setShowPhotoMenu(false); cameraPhotoInputRef.current?.click(); }}
+                      className="flex items-center gap-3 w-full px-2 py-3.5 border-b border-brand-navy/5 text-left text-[15px] font-semibold text-brand-navy"
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F5821F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z" /><circle cx="12" cy="13" r="4" />
+                      </svg>
+                      Take Photo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setShowPhotoMenu(false); galleryPhotoInputRef.current?.click(); }}
+                      className="flex items-center gap-3 w-full px-2 py-3.5 text-left text-[15px] font-semibold text-brand-navy"
+                    >
+                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F5821F" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" />
+                      </svg>
+                      Choose from Gallery
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowPhotoMenu(false)}
+                      className="block w-full px-2 py-3.5 mt-1 bg-brand-cream rounded-xl text-center text-[15px] font-semibold text-brand-navy/60"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="relative" ref={companyFieldRef}>
               <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1">Company</label>

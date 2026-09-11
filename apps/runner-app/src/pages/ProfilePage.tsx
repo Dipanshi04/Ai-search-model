@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import PinInput from '../components/PinInput';
 import { convertHeicIfNeeded } from '@isa/shared';
@@ -40,6 +40,9 @@ export default function ProfilePage({ onBack }: Props) {
   const [details, setDetails] = useState<ProfileDetails | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
   const [photoError, setPhotoError] = useState('');
+  const [showPhotoMenu, setShowPhotoMenu] = useState(false);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   const [gpsStatus, setGpsStatus] = useState<GpsStatus>('unknown');
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
@@ -236,10 +239,20 @@ export default function ProfilePage({ onBack }: Props) {
           textAlign: 'center',
           boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
         }}>
-          <label style={{ position: 'relative', display: 'inline-block', margin: '0 auto 12px', cursor: 'pointer' }}>
-            {/* No `capture` attribute — that forces the camera open directly
-                on Android with no way to pick an existing photo instead. */}
-            <input type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePhotoChange} />
+          <button
+            type="button"
+            onClick={() => setShowPhotoMenu(true)}
+            style={{ position: 'relative', display: 'inline-block', margin: '0 auto 12px', cursor: 'pointer', background: 'none', border: 'none', padding: 0 }}
+          >
+            {/* Two separate inputs instead of one plain file input: relying
+                on the OS file-chooser sheet to surface a "Camera" shortcut
+                on its own is inconsistent — some Android/Samsung Chrome
+                versions only show Gallery/Files with no camera option at
+                all. capture="user" on this one guarantees a camera launch;
+                the other (no capture) guarantees gallery access, which a
+                bare capture attribute would have blocked entirely on iOS. */}
+            <input ref={cameraInputRef} type="file" accept="image/*" capture="user" style={{ display: 'none' }} onChange={handlePhotoChange} />
+            <input ref={galleryInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={handlePhotoChange} />
             {details?.avatarUrl ? (
               <img
                 src={`${API_URL}${details.avatarUrl}`}
@@ -287,7 +300,47 @@ export default function ProfilePage({ onBack }: Props) {
                 </svg>
               </div>
             )}
-          </label>
+          </button>
+          {showPhotoMenu && (
+            <div
+              onClick={() => setShowPhotoMenu(false)}
+              style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.4)', zIndex: 60, display: 'flex', alignItems: 'flex-end' }}
+            >
+              <div
+                onClick={(e) => e.stopPropagation()}
+                style={{ background: '#fff', borderRadius: '20px 20px 0 0', padding: '8px 16px calc(20px + env(safe-area-inset-bottom))', width: '100%' }}
+              >
+                <div style={{ width: '36px', height: '4px', background: '#e2e8f0', borderRadius: '2px', margin: '4px auto 16px' }} />
+                <button
+                  type="button"
+                  onClick={() => { setShowPhotoMenu(false); cameraInputRef.current?.click(); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '14px 8px', background: 'none', border: 'none', borderBottom: '1px solid #f1f5f9', textAlign: 'left', fontSize: '15px', fontWeight: 600, color: '#1e293b', cursor: 'pointer' }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2Z" /><circle cx="12" cy="13" r="4" />
+                  </svg>
+                  Take Photo
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowPhotoMenu(false); galleryInputRef.current?.click(); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', padding: '14px 8px', background: 'none', border: 'none', textAlign: 'left', fontSize: '15px', fontWeight: 600, color: '#1e293b', cursor: 'pointer' }}
+                >
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="M21 15l-5-5L5 21" />
+                  </svg>
+                  Choose from Gallery
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowPhotoMenu(false)}
+                  style={{ display: 'block', width: '100%', padding: '14px 8px', marginTop: '4px', background: '#f8fafc', border: 'none', borderRadius: '12px', textAlign: 'center', fontSize: '15px', fontWeight: 600, color: '#64748b', cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
           {photoError && (
             <p style={{ fontSize: '11px', color: '#dc2626', margin: '0 0 8px' }}>{photoError}</p>
           )}

@@ -354,6 +354,13 @@ participantsRouter.delete('/:id', authenticate, requireRole('SUPER_ADMIN'), asyn
       res.status(404).json({ success: false, message: 'Participant not found' });
       return;
     }
+    const hasCompletedPayment = await prisma.payment.findFirst({
+      where: { participantId: req.params.id as string, status: 'COMPLETED' },
+    });
+    if (hasCompletedPayment) {
+      res.status(400).json({ success: false, message: 'Cannot delete: this participant has a completed payment. Refund it first.' });
+      return;
+    }
     await prisma.$transaction([
       prisma.payment.deleteMany({ where: { participantId: req.params.id as string } }),
       prisma.gpsLog.deleteMany({ where: { participantId: req.params.id as string } }),

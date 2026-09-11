@@ -62,7 +62,7 @@ export default function ParticipantsPage() {
         await api.deleteParticipant(id);
         loadParticipants();
       } catch (e) {
-        console.error('Failed to delete participant:', e);
+        alert(e instanceof Error ? e.message : 'Failed to delete participant');
       }
     }
   };

@@ -204,11 +204,11 @@ class ApiClient {
     return this.request<any[]>('/api/v1/coupons');
   }
 
-  async createCoupon(data: { code: string; discountPercent: number; active?: boolean; usageLimit?: number | null; expiresAt?: string | null }) {
+  async createCoupon(data: { code: string; discountPercent: number; active?: boolean; usageLimit?: number | null; expiresAt?: string | null; audience?: 'ALL' | 'PREMIUM_ONLY' }) {
     return this.request<any>('/api/v1/coupons', { method: 'POST', body: JSON.stringify(data) });
   }
 
-  async updateCoupon(id: string, data: { code?: string; discountPercent?: number; active?: boolean; usageLimit?: number | null; expiresAt?: string | null }) {
+  async updateCoupon(id: string, data: { code?: string; discountPercent?: number; active?: boolean; usageLimit?: number | null; expiresAt?: string | null; audience?: 'ALL' | 'PREMIUM_ONLY' }) {
     return this.request<any>(`/api/v1/coupons/${id}`, { method: 'PUT', body: JSON.stringify(data) });
   }
 

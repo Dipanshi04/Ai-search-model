@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { api } from '../lib/api';
 
+type CouponAudience = 'ALL' | 'PREMIUM_ONLY';
+
 interface Coupon {
   id: string;
   code: string;
@@ -9,6 +11,7 @@ interface Coupon {
   usageLimit: number | null;
   usedCount: number;
   expiresAt: string | null;
+  audience: CouponAudience;
   createdAt: string;
 }
 
@@ -21,8 +24,8 @@ export default function CouponsPage() {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState<{ code: string; discountPercent: string; active: boolean; usageLimit: string; expiresAt: string }>({
-    code: '', discountPercent: '', active: true, usageLimit: '', expiresAt: '',
+  const [form, setForm] = useState<{ code: string; discountPercent: string; active: boolean; usageLimit: string; expiresAt: string; audience: CouponAudience }>({
+    code: '', discountPercent: '', active: true, usageLimit: '', expiresAt: '', audience: 'ALL',
   });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState('');
@@ -40,7 +43,7 @@ export default function CouponsPage() {
   }
 
   function resetForm() {
-    setForm({ code: '', discountPercent: '', active: true, usageLimit: '', expiresAt: '' });
+    setForm({ code: '', discountPercent: '', active: true, usageLimit: '', expiresAt: '', audience: 'ALL' });
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -57,6 +60,7 @@ export default function CouponsPage() {
       active: form.active,
       usageLimit: form.usageLimit.trim() === '' ? null : Number(form.usageLimit),
       expiresAt: form.expiresAt || null,
+      audience: form.audience,
     };
     try {
       const res = editingId
@@ -103,6 +107,7 @@ export default function CouponsPage() {
       active: c.active,
       usageLimit: c.usageLimit == null ? '' : String(c.usageLimit),
       expiresAt: c.expiresAt ? c.expiresAt.slice(0, 10) : '',
+      audience: c.audience,
     });
     setEditingId(c.id);
     setError('');
@@ -145,6 +150,7 @@ export default function CouponsPage() {
             <tr>
               <th className="text-left px-5 py-4 text-slate-500 font-semibold">Code</th>
               <th className="text-left px-5 py-4 text-slate-500 font-semibold">Discount</th>
+              <th className="text-left px-5 py-4 text-slate-500 font-semibold">Audience</th>
               <th className="text-left px-5 py-4 text-slate-500 font-semibold">Status</th>
               <th className="text-left px-5 py-4 text-slate-500 font-semibold">Usage</th>
               <th className="text-left px-5 py-4 text-slate-500 font-semibold">Expires</th>
@@ -159,6 +165,13 @@ export default function CouponsPage() {
                 <tr key={c.id} className="border-t border-white/10 hover:bg-slate-50/60 transition-colors">
                   <td className="px-5 py-4 text-slate-950 font-mono font-bold">{c.code}</td>
                   <td className="px-5 py-4 text-emerald-700 font-semibold">{c.discountPercent}% off</td>
+                  <td className="px-5 py-4">
+                    {c.audience === 'PREMIUM_ONLY' ? (
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-violet-100 text-violet-700">Premium only</span>
+                    ) : (
+                      <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">Anyone</span>
+                    )}
+                  </td>
                   <td className="px-5 py-4">
                     <button
                       onClick={() => handleToggleActive(c)}
@@ -186,7 +199,7 @@ export default function CouponsPage() {
               );
             })}
             {visibleCoupons.length === 0 && (
-              <tr><td colSpan={6} className="px-5 py-8 text-center text-slate-500">No coupons match</td></tr>
+              <tr><td colSpan={7} className="px-5 py-8 text-center text-slate-500">No coupons match</td></tr>
             )}
           </tbody>
         </table>
@@ -244,6 +257,17 @@ export default function CouponsPage() {
                     className="w-full px-3 py-2 bg-white/80 border border-white/70 rounded-3xl text-slate-950 text-sm focus:ring-2 focus:ring-violet-200 outline-none"
                   />
                 </div>
+              </div>
+              <div>
+                <label className="block text-slate-600 text-sm mb-1">Who can use this?</label>
+                <select
+                  value={form.audience}
+                  onChange={(e) => setForm({ ...form, audience: e.target.value as CouponAudience })}
+                  className="w-full px-3 py-2 bg-white/80 border border-white/70 rounded-3xl text-slate-950 text-sm focus:ring-2 focus:ring-violet-200 outline-none"
+                >
+                  <option value="ALL">Anyone</option>
+                  <option value="PREMIUM_ONLY">ISA Premium members only</option>
+                </select>
               </div>
               <label className="flex items-center gap-2 text-sm text-slate-600">
                 <input

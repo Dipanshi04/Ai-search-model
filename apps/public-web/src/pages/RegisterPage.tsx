@@ -166,7 +166,7 @@ export default function RegisterPage() {
     setCouponChecking(true);
     setCouponError('');
     try {
-      const res = await api.validateCoupon(code);
+      const res = await api.validateCoupon(code, result?.participant?.id);
       if (res.success && res.data) {
         setCouponApplied(res.data);
       } else {

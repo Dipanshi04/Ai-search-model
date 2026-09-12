@@ -89,10 +89,10 @@ class ApiClient {
     );
   }
 
-  async validateCoupon(code: string) {
+  async validateCoupon(code: string, participantId?: string) {
     return this.request<{ code: string; discountPercent: number }>('/api/v1/coupons/validate', {
       method: 'POST',
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({ code, participantId }),
     });
   }
 

@@ -359,18 +359,24 @@ model Payment {
 // independent of the premium-company discount (any runner can use one, not
 // just those from a premium company). e.g. IHRC25 = 25% off.
 model Coupon {
-  id              String    @id @default(cuid())
-  code            String    @unique
+  id              String         @id @default(cuid())
+  code            String         @unique
   discountPercent Int
-  active          Boolean   @default(true)
+  active          Boolean        @default(true)
   // null = unlimited redemptions
-  usageLimit      Int?      @map("usage_limit")
-  usedCount       Int       @default(0) @map("used_count")
-  expiresAt       DateTime? @map("expires_at")
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  usageLimit      Int?           @map("usage_limit")
+  usedCount       Int            @default(0) @map("used_count")
+  expiresAt       DateTime?      @map("expires_at")
+  audience        CouponAudience @default(ALL)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   @@map("coupons")
+}
+
+enum CouponAudience {
+  ALL
+  PREMIUM_ONLY
 }
 
 enum PaymentProvider {

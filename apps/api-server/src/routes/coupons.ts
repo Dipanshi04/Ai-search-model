@@ -10,15 +10,17 @@ function normalizeCode(code: unknown): string {
 }
 
 // Shared by /validate and cashfree.ts's own re-check at payment time — a
-// coupon is only usable while active, not past its expiry, and under its
-// usage limit (null limit = unlimited).
-export async function findRedeemableCoupon(rawCode: string) {
+// coupon is only usable while active, not past its expiry, under its usage
+// limit (null limit = unlimited), and — if restricted to PREMIUM_ONLY —
+// only for a participant whose company actually has PREMIUM status.
+export async function findRedeemableCoupon(rawCode: string, isPremiumCompany = false) {
   const code = normalizeCode(rawCode);
   if (!code) return null;
   const coupon = await prisma.coupon.findUnique({ where: { code } });
   if (!coupon || !coupon.active) return null;
   if (coupon.expiresAt && coupon.expiresAt < new Date()) return null;
   if (coupon.usageLimit != null && coupon.usedCount >= coupon.usageLimit) return null;
+  if (coupon.audience === 'PREMIUM_ONLY' && !isPremiumCompany) return null;
   return coupon;
 }
 
@@ -34,7 +36,7 @@ couponsRouter.get('/', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'),
 
 couponsRouter.post('/', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'), async (req: Request, res: Response) => {
   try {
-    const { code, discountPercent, active, usageLimit, expiresAt } = req.body;
+    const { code, discountPercent, active, usageLimit, expiresAt, audience } = req.body;
     const normalized = normalizeCode(code);
     const percent = Number(discountPercent);
 
@@ -46,6 +48,10 @@ couponsRouter.post('/', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER')
       res.status(400).json({ success: false, message: 'discountPercent must be an integer between 1 and 100' });
       return;
     }
+    if (audience !== undefined && audience !== 'ALL' && audience !== 'PREMIUM_ONLY') {
+      res.status(400).json({ success: false, message: 'audience must be ALL or PREMIUM_ONLY' });
+      return;
+    }
 
     const coupon = await prisma.coupon.create({
       data: {
@@ -54,6 +60,7 @@ couponsRouter.post('/', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER')
         active: active !== false,
         usageLimit: usageLimit === '' || usageLimit == null ? null : Number(usageLimit),
         expiresAt: expiresAt ? new Date(expiresAt) : null,
+        audience: audience === 'PREMIUM_ONLY' ? 'PREMIUM_ONLY' : 'ALL',
       },
     });
     res.status(201).json({ success: true, data: coupon });
@@ -69,7 +76,7 @@ couponsRouter.post('/', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER')
 
 couponsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'), async (req: Request, res: Response) => {
   try {
-    const { code, discountPercent, active, usageLimit, expiresAt } = req.body;
+    const { code, discountPercent, active, usageLimit, expiresAt, audience } = req.body;
     const existing = await prisma.coupon.findUnique({ where: { id: req.params.id as string } });
     if (!existing) {
       res.status(404).json({ success: false, message: 'Coupon not found' });
@@ -83,6 +90,10 @@ couponsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER
         return;
       }
     }
+    if (audience !== undefined && audience !== 'ALL' && audience !== 'PREMIUM_ONLY') {
+      res.status(400).json({ success: false, message: 'audience must be ALL or PREMIUM_ONLY' });
+      return;
+    }
 
     const coupon = await prisma.coupon.update({
       where: { id: req.params.id as string },
@@ -92,6 +103,7 @@ couponsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER
         ...(active !== undefined && { active: active === true }),
         ...(usageLimit !== undefined && { usageLimit: usageLimit === '' || usageLimit == null ? null : Number(usageLimit) }),
         ...(expiresAt !== undefined && { expiresAt: expiresAt ? new Date(expiresAt) : null }),
+        ...(audience !== undefined && { audience }),
       },
     });
     res.json({ success: true, data: coupon });
@@ -125,8 +137,27 @@ couponsRouter.delete('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANA
 // discount actually charged; cashfree.ts re-validates independently.
 couponsRouter.post('/validate', async (req: Request, res: Response) => {
   try {
-    const coupon = await findRedeemableCoupon(req.body?.code);
+    const { code, participantId } = req.body || {};
+    let isPremiumCompany = false;
+    if (participantId) {
+      const participant = await prisma.participant.findUnique({
+        where: { id: participantId },
+        include: { company: { select: { status: true } } },
+      });
+      isPremiumCompany = participant?.company?.status === 'PREMIUM';
+    }
+
+    const coupon = await findRedeemableCoupon(code, isPremiumCompany);
     if (!coupon) {
+      // Distinguish "exists but restricted" from "doesn't exist at all" —
+      // only when the code itself is otherwise valid, so we don't leak
+      // whether an unrelated invalid code happens to be premium-only.
+      const raw = normalizeCode(code);
+      const anyMatch = raw ? await prisma.coupon.findUnique({ where: { code: raw } }) : null;
+      if (anyMatch?.audience === 'PREMIUM_ONLY' && !isPremiumCompany) {
+        res.status(403).json({ success: false, message: 'This coupon is only valid for ISA Premium member companies' });
+        return;
+      }
       res.status(404).json({ success: false, message: 'Invalid or expired coupon code' });
       return;
     }

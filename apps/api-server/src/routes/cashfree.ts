@@ -74,7 +74,7 @@ cashfreeRouter.post('/start', async (req: Request, res: Response) => {
     let discountPercent = isPremiumCompany ? 50 : 0;
     let appliedCouponCode: string | null = null;
     if (couponCode) {
-      const coupon = await findRedeemableCoupon(couponCode);
+      const coupon = await findRedeemableCoupon(couponCode, isPremiumCompany);
       if (coupon && coupon.discountPercent > discountPercent) {
         discountPercent = coupon.discountPercent;
         appliedCouponCode = coupon.code;

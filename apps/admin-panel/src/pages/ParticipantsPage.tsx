@@ -19,6 +19,8 @@ export default function ParticipantsPage() {
   const [distError, setDistError] = useState('');
   const [paymentError, setPaymentError] = useState('');
   const [paymentSaving, setPaymentSaving] = useState(false);
+  const [reminderSending, setReminderSending] = useState(false);
+  const [reminderMessage, setReminderMessage] = useState('');
 
   useEffect(() => {
     api.getEvents().then((res) => {
@@ -73,6 +75,7 @@ export default function ParticipantsPage() {
     setPinError('');
     setDistError('');
     setPaymentError('');
+    setReminderMessage('');
   };
 
   const closeView = () => {
@@ -81,6 +84,20 @@ export default function ParticipantsPage() {
     setPinError('');
     setDistError('');
     setPaymentError('');
+    setReminderMessage('');
+  };
+
+  const handleSendReminder = async () => {
+    if (!viewParticipant) return;
+    setReminderSending(true);
+    setReminderMessage('');
+    try {
+      const res = await api.sendPaymentReminder(viewParticipant.id);
+      setReminderMessage(res.success ? (res.message || 'Reminder sent') : (res.message || 'Failed to send reminder'));
+    } catch (e: any) {
+      setReminderMessage(e.message || 'Failed to send reminder');
+    }
+    setReminderSending(false);
   };
 
   const handleSetPaymentStatus = async (paymentStatus: 'COMPLETED' | 'PENDING' | 'FAILED' | 'REFUNDED') => {
@@ -363,6 +380,20 @@ export default function ParticipantsPage() {
                   </button>
                 )}
               </div>
+              {viewParticipant.paymentStatus !== 'COMPLETED' && (
+                <div className="mt-3 pt-3 border-t border-slate-100">
+                  {reminderMessage && (
+                    <p className="text-xs text-slate-500 mb-2">{reminderMessage}</p>
+                  )}
+                  <button
+                    onClick={handleSendReminder}
+                    disabled={reminderSending}
+                    className="text-xs font-semibold text-violet-700 hover:text-violet-900 disabled:opacity-50"
+                  >
+                    {reminderSending ? 'Sending...' : 'Send Payment Reminder Email'}
+                  </button>
+                </div>
+              )}
             </div>
 
             <div className="border-t border-slate-200 pt-4 pb-4">

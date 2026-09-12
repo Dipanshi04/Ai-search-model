@@ -129,6 +129,23 @@ function wrapEmailTemplate(bodyHtml: string): string {
         <p style="margin: 12px 0 0; font-size: 11px; font-weight: 800; letter-spacing: 0.15em; text-transform: uppercase; color: ${BRAND_NAVY};">
           Indore Software Association
         </p>
+        <table role="presentation" align="center" style="margin: 14px auto 0;"><tr>
+          <td style="padding: 0 6px;">
+            <div style="background: #fff; border-radius: 12px; padding: 6px 10px; display: inline-block; border: 1px solid rgba(27,42,91,0.1);">
+              <img src="${SITE_URL}/uploads/email/mp-police-logo.png" alt="MP Police — Safety Partner" height="28" style="display: block; height: 28px; width: auto;" />
+            </div>
+          </td>
+          <td style="padding: 0 6px;">
+            <div style="background: #fff; border-radius: 12px; padding: 6px 10px; display: inline-block; border: 1px solid rgba(27,42,91,0.1);">
+              <img src="${SITE_URL}/uploads/email/imc-logo.png" alt="Indore Municipal Corporation — Green City Partner" height="28" style="display: block; height: 28px; width: auto;" />
+            </div>
+          </td>
+          <td style="padding: 0 6px;">
+            <div style="background: #fff; border-radius: 12px; padding: 6px 10px; display: inline-block; border: 1px solid rgba(27,42,91,0.1);">
+              <img src="${SITE_URL}/uploads/email/solugenix-logo.png" alt="Solugenix — Co-Sponsor" height="28" style="display: block; height: 28px; width: auto;" />
+            </div>
+          </td>
+        </tr></table>
       </div>
 
       <div style="background: #fff; border-radius: 20px; margin: 0 16px; padding: 32px 28px; border: 1px solid rgba(27,42,91,0.08);">
@@ -233,6 +250,61 @@ export async function sendWelcomeEmail(
   } catch (error) {
     console.error('[EMAIL] Welcome email FAILED:', error);
     logger.error('Failed to send welcome email:', error);
+    return false;
+  }
+}
+
+const RUNNER_APP_URL = process.env.RUNNER_APP_URL || 'http://localhost:3001';
+
+// Manually triggered by an admin from the Participants view — not automatic
+// — for nudging a runner whose registration is still PENDING_PAYMENT. The
+// PIN was already emailed at registration regardless of payment status, so
+// this just points them back to the Runner App login, which itself blocks
+// on PaymentPendingPage until they actually pay. See routes/participants.ts.
+export async function sendPaymentReminderEmail(
+  to: string,
+  name: string,
+  bibNumber: string,
+  amount: number
+): Promise<boolean> {
+  console.log('[EMAIL] Sending payment reminder email to:', to);
+
+  const html = wrapEmailTemplate(`
+    <p style="margin: 0 0 6px; font-size: 20px; font-weight: 800; color: ${BRAND_NAVY};">Complete Your Registration</p>
+    <p style="margin: 0 0 20px; font-size: 14px; color: rgba(27,42,91,0.65);">
+      Hello <strong>${name}</strong>, your ISA Marathon registration (BIB <strong>${bibNumber}</strong>) is still pending payment. Log in to the Runner App with your email and PIN to finish paying and secure your spot.
+    </p>
+    <div style="text-align: center;">
+      <div style="display: inline-block; background: ${BRAND_NAVY}; padding: 14px 36px; border-radius: 12px; font-size: 22px; font-weight: 900; color: ${BRAND_ORANGE};">
+        Rs. ${amount}
+      </div>
+    </div>
+    <div style="text-align: center; margin-top: 24px;">
+      <a href="${RUNNER_APP_URL}" target="_blank" style="display: inline-block; background: ${BRAND_ORANGE}; color: #fff; text-decoration: none; font-weight: 700; font-size: 14px; padding: 12px 28px; border-radius: 10px;">
+        Complete Payment
+      </a>
+    </div>
+    <p style="margin: 20px 0 0; font-size: 12px; color: rgba(27,42,91,0.45); text-align: center;">If you've already paid, please ignore this email.</p>
+  `);
+
+  const tp = getTransporter();
+  if (!tp) {
+    logger.warn(`[DEV] Payment reminder for ${name} (${to}), BIB: ${bibNumber}, amount: ${amount}`);
+    return true;
+  }
+
+  try {
+    await tp.sendMail({
+      from: config.from,
+      to,
+      subject: `Reminder: Complete Your ISA Marathon Payment — ${bibNumber}`,
+      html,
+    });
+    logger.info(`Payment reminder email sent to ${to}`);
+    return true;
+  } catch (error) {
+    console.error('[EMAIL] Payment reminder FAILED:', error);
+    logger.error('Failed to send payment reminder email:', error);
     return false;
   }
 }

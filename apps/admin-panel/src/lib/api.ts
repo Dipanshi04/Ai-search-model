@@ -105,6 +105,10 @@ class ApiClient {
     return this.request<void>(`/api/v1/participants/${id}`, { method: 'DELETE' });
   }
 
+  async sendPaymentReminder(id: string) {
+    return this.request<void>(`/api/v1/participants/${id}/send-payment-reminder`, { method: 'POST' });
+  }
+
   async resetParticipantPin(id: string) {
     return this.request<{ pin: string; email: string }>(`/api/v1/participants/${id}/reset-pin`, {
       method: 'POST',

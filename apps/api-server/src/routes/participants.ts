@@ -4,7 +4,8 @@ import { prisma } from '../config/database.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireRole } from '../middleware/auth.js';
 import { logger } from '../config/logger.js';
-import { sendPinEmail } from '../services/email.js';
+import { sendPinEmail, sendPaymentReminderEmail } from '../services/email.js';
+import { feeForCategory } from './payment.js';
 
 export const participantsRouter: Router = Router();
 
@@ -370,6 +371,39 @@ participantsRouter.delete('/:id', authenticate, requireRole('SUPER_ADMIN'), asyn
   } catch (error) {
     logger.error('Admin delete participant error:', error);
     res.status(500).json({ success: false, message: 'Failed to delete participant' });
+  }
+});
+
+// Manual only — an admin clicks a button for one participant at a time.
+// No automatic/scheduled reminders exist; this is deliberately a one-off.
+participantsRouter.post('/:id/send-payment-reminder', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'), async (req, res) => {
+  try {
+    const participant = await prisma.participant.findUnique({
+      where: { id: req.params.id as string },
+      include: { user: { select: { name: true, email: true } }, company: { select: { status: true } } },
+    });
+    if (!participant) {
+      res.status(404).json({ success: false, message: 'Participant not found' });
+      return;
+    }
+    if (participant.paymentStatus === 'COMPLETED') {
+      res.status(400).json({ success: false, message: 'This registration is already paid — no reminder needed.' });
+      return;
+    }
+
+    const baseAmount = feeForCategory(participant.category);
+    const isPremiumCompany = participant.company?.status === 'PREMIUM';
+    const amount = isPremiumCompany ? Math.round(baseAmount * 0.5) : baseAmount;
+
+    const sent = await sendPaymentReminderEmail(participant.user.email, participant.user.name, participant.bibNumber, amount);
+    if (!sent) {
+      res.status(500).json({ success: false, message: 'Failed to send reminder email' });
+      return;
+    }
+    res.json({ success: true, message: `Reminder sent to ${participant.user.email}` });
+  } catch (error) {
+    logger.error('Send payment reminder error:', error);
+    res.status(500).json({ success: false, message: 'Failed to send payment reminder' });
   }
 });
 

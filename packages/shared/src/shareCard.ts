@@ -20,6 +20,7 @@ export interface ShareCardOptions {
   isaLogoSrc: string;
   solugenixLogoSrc: string;
   imcLogoSrc: string;
+  mpPoliceLogoSrc?: string;
 }
 
 const NAVY = '#1B2A5B';
@@ -69,11 +70,12 @@ export async function drawShareCard(canvas: HTMLCanvasElement, opts: ShareCardOp
     .filter((s) => s.logoUrl && s.category?.name !== 'Community Partner')
     .slice(0, 10);
 
-  const [nrcLogo, isaLogo, solugenixLogo, imcLogo, avatar, ...sponsorLogos] = await Promise.all([
+  const [nrcLogo, isaLogo, solugenixLogo, imcLogo, mpPoliceLogo, avatar, ...sponsorLogos] = await Promise.all([
     loadImageSafe(opts.nrcLogoSrc),
     loadImageSafe(opts.isaLogoSrc),
     loadImageSafe(opts.solugenixLogoSrc),
     loadImageSafe(opts.imcLogoSrc),
+    loadImageSafe(opts.mpPoliceLogoSrc),
     loadImageSafe(opts.avatarSrc),
     ...usableSponsors.map((s) => loadImageSafe(s.logoUrl)),
   ]);
@@ -103,13 +105,13 @@ export async function drawShareCard(canvas: HTMLCanvasElement, opts: ShareCardOp
   measureCanvas.width = W;
   measureCanvas.height = 1;
   const naturalHeight = paint(measureCanvas.getContext('2d')!, W, {
-    nrcLogo, isaLogo, solugenixLogo, imcLogo, avatar, sponsorLogos, usableSponsors, opts,
+    nrcLogo, isaLogo, solugenixLogo, imcLogo, mpPoliceLogo, avatar, sponsorLogos, usableSponsors, opts,
   }) + 40;
 
   const naturalCanvas = document.createElement('canvas');
   naturalCanvas.width = W;
   naturalCanvas.height = naturalHeight;
-  paint(naturalCanvas.getContext('2d')!, W, { nrcLogo, isaLogo, solugenixLogo, imcLogo, avatar, sponsorLogos, usableSponsors, opts });
+  paint(naturalCanvas.getContext('2d')!, W, { nrcLogo, isaLogo, solugenixLogo, imcLogo, mpPoliceLogo, avatar, sponsorLogos, usableSponsors, opts });
 
   canvas.width = STORY_W;
   canvas.height = STORY_H;
@@ -129,6 +131,7 @@ interface PaintAssets {
   isaLogo: HTMLImageElement | null;
   solugenixLogo: HTMLImageElement | null;
   imcLogo: HTMLImageElement | null;
+  mpPoliceLogo: HTMLImageElement | null;
   avatar: HTMLImageElement | null;
   sponsorLogos: (HTMLImageElement | null)[];
   usableSponsors: ShareCardSponsor[];
@@ -139,15 +142,31 @@ interface PaintAssets {
 // used both to measure the required canvas height and, on the real pass,
 // to know where the footer belongs.
 function paint(ctx: CanvasRenderingContext2D, W: number, assets: PaintAssets): number {
-  const { nrcLogo, isaLogo, solugenixLogo, imcLogo, avatar, sponsorLogos, opts } = assets;
+  const { nrcLogo, isaLogo, solugenixLogo, imcLogo, mpPoliceLogo, avatar, sponsorLogos, opts } = assets;
 
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, ctx.canvas.height);
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
 
-  // ---- Green City Partner badge, top-right — sized to fit its content
-  // tightly instead of leaving a block of empty space below the logo. ----
+  // ---- Safety Partner badge, top-left, and Green City Partner badge,
+  // top-right — sized to fit their content tightly instead of leaving a
+  // block of empty space below the logo. ----
+  if (mpPoliceLogo) {
+    const bx = 50, by = 60, bw = 170, bh = 120;
+    ctx.fillStyle = '#ffffff';
+    ctx.strokeStyle = 'rgba(27,42,91,0.1)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.roundRect(bx, by, bw, bh, 18);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(27,42,91,0.55)';
+    ctx.font = `700 14px ${FONT_BODY}`;
+    ctx.fillText('SAFETY', bx + bw / 2, by + 28);
+    ctx.fillText('PARTNER', bx + bw / 2, by + 45);
+    drawImageContain(ctx, mpPoliceLogo, bx + bw / 2, by + 84, 100, 56);
+  }
   if (imcLogo) {
     const bx = W - 220, by = 60, bw = 170, bh = 120;
     ctx.fillStyle = '#ffffff';

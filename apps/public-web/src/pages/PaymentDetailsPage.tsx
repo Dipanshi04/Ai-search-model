@@ -6,6 +6,7 @@ import nrcGroupLogo from '../components/nrc-group-logo.png';
 import logoDark from '../components/logo-dark.png';
 import solugenixLogo from '../components/solugenix-logo.png';
 import imcLogo from '../components/imc-logo.png';
+import mpPoliceLogo from '../components/mp-police-logo.png';
 
 type ViewState = 'checking' | 'waiting' | 'verified' | 'failed' | 'no-reference';
 
@@ -107,6 +108,7 @@ export default function PaymentDetailsPage() {
         isaLogoSrc: logoDark,
         solugenixLogoSrc: solugenixLogo,
         imcLogoSrc: imcLogo,
+        mpPoliceLogoSrc: mpPoliceLogo,
       });
       // iOS Safari ignores <a download> for blob/data URLs — it just opens
       // the image instead of saving it. saveOrShareCanvas tries the native

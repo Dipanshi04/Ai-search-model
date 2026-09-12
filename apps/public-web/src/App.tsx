@@ -19,6 +19,7 @@ import logoDark from './components/logo-dark.png';
 import heroRunner from './components/hero-runner.webp';
 import nrcGroupLogo from './components/nrc-group-logo.png';
 import imcLogo from './components/imc-logo.png';
+import mpPoliceLogo from './components/mp-police-logo.png';
 import solugenixLogo from './components/solugenix-logo.png';
 import { useEffect, useState } from "react";
 
@@ -105,8 +106,19 @@ function HomePage() {
 
       {/* Top bar: "presented by" lockup — sponsor logo, then the marathon's
           own logo below it, mirroring how it reads on the print poster.
-          Green City Partner badge sits top-right, matching the poster. */}
+          Green City Partner badge sits top-right, Safety Partner top-left,
+          matching the poster. */}
       <div className="hero-anim relative pt-4 sm:pt-6 px-4 z-10 shrink-0" style={{ animationDelay: '0ms' }}>
+        <div
+          className="absolute top-4 sm:top-6 left-4 flex flex-col items-center gap-1 bg-white rounded-xl shadow-sm px-2.5 py-1.5 sm:px-3 sm:py-2 border"
+          style={{ borderColor: 'rgba(27,42,91,0.08)' }}
+        >
+          <span className="hero-kicker text-[6px] sm:text-[7px] font-bold uppercase tracking-wide text-center leading-tight" style={{ color: '#1B2A5B', opacity: 0.55 }}>
+            Safety<br />Partner
+          </span>
+          <img src={mpPoliceLogo} alt="Madhya Pradesh Police" className="h-6 sm:h-8 w-auto object-contain" />
+        </div>
+
         <div
           className="absolute top-4 sm:top-6 right-4 flex flex-col items-center gap-1 bg-white rounded-xl shadow-sm px-2.5 py-1.5 sm:px-3 sm:py-2 border"
           style={{ borderColor: 'rgba(27,42,91,0.08)' }}

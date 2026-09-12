@@ -65,7 +65,9 @@ function drawImageCover(ctx: CanvasRenderingContext2D, img: HTMLImageElement, x:
 export async function drawShareCard(canvas: HTMLCanvasElement, opts: ShareCardOptions): Promise<HTMLCanvasElement> {
   const W = 1080;
 
-  const usableSponsors = opts.sponsors.filter((s) => s.logoUrl).slice(0, 10);
+  const usableSponsors = opts.sponsors
+    .filter((s) => s.logoUrl && s.category?.name !== 'Community Partner')
+    .slice(0, 10);
 
   const [nrcLogo, isaLogo, solugenixLogo, imcLogo, avatar, ...sponsorLogos] = await Promise.all([
     loadImageSafe(opts.nrcLogoSrc),

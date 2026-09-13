@@ -268,6 +268,27 @@ function HomePage() {
         </div>
       </div>
 
+      {/* What's Included */}
+      <div className="hero-anim px-4 sm:px-8 pb-8 sm:pb-10 pt-2 relative z-10 max-w-[1400px] mx-auto w-full" style={{ animationDelay: '620ms' }}>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+          {[
+            { emoji: '🥤', label: 'Snack Included' },
+            { emoji: '👕', label: 'Official T-Shirt Included' },
+            { emoji: '🏅', label: 'Finisher Medal Included' },
+            { emoji: '📜', label: 'Digital Certificate Included' },
+          ].map((item) => (
+            <div
+              key={item.label}
+              className="flex flex-col items-center text-center gap-2 rounded-2xl bg-white border p-4 sm:p-5"
+              style={{ borderColor: 'rgba(27,42,91,0.1)' }}
+            >
+              <span className="text-2xl sm:text-3xl" aria-hidden="true">{item.emoji}</span>
+              <p className="hero-body text-xs sm:text-sm font-bold" style={{ color: '#1B2A5B' }}>{item.label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <RaceRouteSection />
 
       <SponsorStrip />

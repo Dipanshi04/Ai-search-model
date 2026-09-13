@@ -34,6 +34,36 @@ couponsRouter.get('/', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'),
   }
 });
 
+// Who actually redeemed this coupon — every payment attempt that carried
+// this code, not just the ones that completed, so an admin can see
+// abandoned/failed attempts too, not only the count in usedCount.
+couponsRouter.get('/:id/usages', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'), async (req: Request, res: Response) => {
+  try {
+    const coupon = await prisma.coupon.findUnique({ where: { id: req.params.id as string } });
+    if (!coupon) {
+      res.status(404).json({ success: false, message: 'Coupon not found' });
+      return;
+    }
+    const payments = await prisma.payment.findMany({
+      where: { couponCode: coupon.code },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        participant: {
+          select: {
+            bibNumber: true,
+            category: true,
+            user: { select: { name: true, email: true } },
+          },
+        },
+      },
+    });
+    res.json({ success: true, data: payments });
+  } catch (error) {
+    logger.error('List coupon usages error:', error);
+    res.status(500).json({ success: false, message: 'Failed to fetch coupon usages' });
+  }
+});
+
 couponsRouter.post('/', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'), async (req: Request, res: Response) => {
   try {
     const { code, discountPercent, active, usageLimit, expiresAt, audience } = req.body;

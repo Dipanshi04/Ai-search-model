@@ -208,6 +208,10 @@ class ApiClient {
     return this.request<any[]>('/api/v1/coupons');
   }
 
+  async getCouponUsages(id: string) {
+    return this.request<any[]>(`/api/v1/coupons/${id}/usages`);
+  }
+
   async createCoupon(data: { code: string; discountPercent: number; active?: boolean; usageLimit?: number | null; expiresAt?: string | null; audience?: 'ALL' | 'PREMIUM_ONLY' }) {
     return this.request<any>('/api/v1/coupons', { method: 'POST', body: JSON.stringify(data) });
   }

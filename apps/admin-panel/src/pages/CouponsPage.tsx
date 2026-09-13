@@ -15,6 +15,19 @@ interface Coupon {
   createdAt: string;
 }
 
+interface CouponUsage {
+  id: string;
+  amount: number;
+  status: string;
+  paidAt: string | null;
+  createdAt: string;
+  participant: {
+    bibNumber: string;
+    category: string;
+    user: { name: string; email: string };
+  } | null;
+}
+
 function fmtDate(d?: string | null) {
   if (!d) return '-';
   return new Date(d).toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: 'numeric' });
@@ -30,6 +43,9 @@ export default function CouponsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [toggleBusyId, setToggleBusyId] = useState<string | null>(null);
+  const [usagesCoupon, setUsagesCoupon] = useState<Coupon | null>(null);
+  const [usages, setUsages] = useState<CouponUsage[]>([]);
+  const [usagesLoading, setUsagesLoading] = useState(false);
 
   useEffect(() => { fetchCoupons(); }, []);
 
@@ -98,6 +114,19 @@ export default function CouponsPage() {
       console.error('Failed to update coupon:', e);
     }
     setToggleBusyId(null);
+  }
+
+  async function openUsages(c: Coupon) {
+    setUsagesCoupon(c);
+    setUsages([]);
+    setUsagesLoading(true);
+    try {
+      const res = await api.getCouponUsages(c.id);
+      if (res.success && res.data) setUsages(res.data);
+    } catch (e) {
+      console.error('Failed to fetch coupon usages:', e);
+    }
+    setUsagesLoading(false);
   }
 
   function openEdit(c: Coupon) {
@@ -189,7 +218,15 @@ export default function CouponsPage() {
                       </span>
                     )}
                   </td>
-                  <td className="px-5 py-4 text-slate-600">{c.usedCount}{c.usageLimit != null ? ` / ${c.usageLimit}` : ' / ∞'}</td>
+                  <td className="px-5 py-4">
+                    <button
+                      onClick={() => openUsages(c)}
+                      className="text-slate-600 hover:text-violet-700 hover:underline"
+                      title="See who used this coupon"
+                    >
+                      {c.usedCount}{c.usageLimit != null ? ` / ${c.usageLimit}` : ' / ∞'}
+                    </button>
+                  </td>
                   <td className="px-5 py-4 text-slate-600">{fmtDate(c.expiresAt)}</td>
                   <td className="px-5 py-4 text-right space-x-3">
                     <button onClick={() => openEdit(c)} className="text-violet-700 hover:text-violet-900 text-xs">Edit</button>
@@ -288,6 +325,45 @@ export default function CouponsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {usagesCoupon && (
+        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="glass rounded-[2rem] p-6 w-full max-w-lg border border-white/20 shadow-lg max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-slate-950 font-semibold font-mono">{usagesCoupon.code}</h3>
+              <button onClick={() => setUsagesCoupon(null)} className="text-slate-400 hover:text-slate-600 text-sm">Close</button>
+            </div>
+            <p className="text-xs text-slate-500 mb-4">Every payment attempt that carried this code — not just completed ones.</p>
+            <div className="overflow-y-auto -mx-6 px-6 space-y-2">
+              {usagesLoading ? (
+                <p className="text-sm text-slate-500 py-6 text-center">Loading...</p>
+              ) : usages.length === 0 ? (
+                <p className="text-sm text-slate-500 py-6 text-center">Nobody has used this coupon yet.</p>
+              ) : (
+                usages.map((u) => (
+                  <div key={u.id} className="rounded-2xl border border-white/40 bg-white/60 px-4 py-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-semibold text-slate-900 truncate">{u.participant?.user?.name || 'Unknown'}</p>
+                      <span
+                        className={`text-xs font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                          u.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-700' :
+                          u.status === 'FAILED' ? 'bg-red-100 text-red-700' :
+                          'bg-amber-100 text-amber-700'
+                        }`}
+                      >
+                        {u.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      #{u.participant?.bibNumber} &middot; {u.participant?.user?.email} &middot; ₹{u.amount}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}

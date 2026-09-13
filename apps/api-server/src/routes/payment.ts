@@ -98,6 +98,13 @@ paymentRouter.post(
       sendWelcomeEmail(participant.user.email, participant.user.name, participant.bibNumber, participant.category)
         .catch((e) => logger.error('[Payment] Welcome email failed:', e));
 
+      // Same cleanup as the Cashfree webhook — close out any other stray
+      // PENDING attempts for this participant now that one has gone through.
+      prisma.payment.updateMany({
+        where: { participantId: payment.participantId, status: 'PENDING', id: { not: payment.id } },
+        data: { status: 'FAILED', failureReason: 'Superseded by a completed payment' },
+      }).catch((e) => logger.error('[Payment] Failed to close out superseded pending payments:', e));
+
       logger.info(`[Payment] ${payment.reference} verified by ${req.user?.email}`);
       res.json({ success: true });
     } catch (error) {

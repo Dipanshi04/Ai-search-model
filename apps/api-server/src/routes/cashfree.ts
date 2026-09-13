@@ -263,6 +263,16 @@ cashfreeRouter.post('/webhook', async (req: Request, res: Response) => {
           .catch((e) => logger.error('[Payment] Coupon usedCount increment failed:', e));
       }
 
+      // A fresh order per checkout attempt (see /start above) means a
+      // participant who retried after an abandoned attempt can have several
+      // stray PENDING rows once one of them actually completes. Close those
+      // out here so the admin Payments list doesn't show duplicate pending
+      // entries for someone who's already paid.
+      prisma.payment.updateMany({
+        where: { participantId: payment.participantId, status: 'PENDING', id: { not: payment.id } },
+        data: { status: 'FAILED', failureReason: 'Superseded by a completed payment' },
+      }).catch((e) => logger.error('[Payment] Failed to close out superseded pending payments:', e));
+
       logger.info(`[Payment] Cashfree order ${orderId} completed`);
     } else if (isFailed) {
       await prisma.payment.update({

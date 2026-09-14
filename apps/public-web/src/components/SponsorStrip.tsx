@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
-import logoDark from './logo-dark.png';
+import isaAssociationLogo from './isa-association-logo.png';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -114,7 +114,7 @@ export default function SponsorStrip() {
     <div className="hero-anim px-4 sm:px-8 pb-6 sm:pb-8 relative z-10 max-w-[1400px] mx-auto w-full" style={{ animationDelay: '600ms' }}>
       <div className="bg-white rounded-2xl border shadow-sm p-5 sm:p-6" style={{ borderColor: 'rgba(27,42,91,0.1)' }}>
         <div className="flex flex-wrap justify-center sm:justify-between gap-6 sm:gap-8">
-          <SponsorGroup label="Event By" sponsors={[{ id: 'isa', name: 'Indore Software Association', logoUrl: logoDark }]} />
+          <SponsorGroup label="Event By" sponsors={[{ id: 'isa', name: 'Indore Software Association', logoUrl: isaAssociationLogo }]} />
           {groups.map((g) => <SponsorGroup key={g.label} label={g.label} sponsors={g.sponsors} />)}
         </div>
       </div>

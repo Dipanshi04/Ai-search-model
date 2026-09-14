@@ -30,6 +30,8 @@ export default function CompaniesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [toggleBusyId, setToggleBusyId] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<'runners' | 'name'>('runners');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
 
   useEffect(() => {
     api.getEvents().then((res) => {
@@ -108,11 +110,33 @@ export default function CompaniesPage() {
     setShowModal(true);
   }
 
-  const visibleCompanies = companies.filter((c) => {
-    if (statusFilter !== 'ALL' && (c.status || 'NON_PREMIUM') !== statusFilter) return false;
-    if (search.trim() && !c.name.toLowerCase().includes(search.trim().toLowerCase())) return false;
-    return true;
-  });
+  const visibleCompanies = companies
+    .filter((c) => {
+      if (statusFilter !== 'ALL' && (c.status || 'NON_PREMIUM') !== statusFilter) return false;
+      if (search.trim() && !c.name.toLowerCase().includes(search.trim().toLowerCase())) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      const dir = sortDir === 'asc' ? 1 : -1;
+      if (sortBy === 'runners') {
+        return ((a._count?.participants || 0) - (b._count?.participants || 0)) * dir;
+      }
+      return a.name.localeCompare(b.name) * dir;
+    });
+
+  function toggleSort(col: 'runners' | 'name') {
+    if (sortBy === col) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(col);
+      setSortDir(col === 'runners' ? 'desc' : 'asc');
+    }
+  }
+
+  function sortIndicator(col: 'runners' | 'name') {
+    if (sortBy !== col) return '';
+    return sortDir === 'asc' ? ' ↑' : ' ↓';
+  }
 
   return (
     <div className="space-y-6">
@@ -160,12 +184,16 @@ export default function CompaniesPage() {
         <table className="w-full text-sm">
           <thead className="bg-white/80 backdrop-blur-md">
             <tr>
-              <th className="text-left px-5 py-4 text-slate-500 font-semibold">Company</th>
+              <th className="text-left px-5 py-4 text-slate-500 font-semibold">
+                <button onClick={() => toggleSort('name')} className="hover:text-slate-800">Company{sortIndicator('name')}</button>
+              </th>
               <th className="text-left px-5 py-4 text-slate-500 font-semibold">Status</th>
               <th className="text-left px-5 py-4 text-slate-500 font-semibold">Membership</th>
               <th className="text-left px-5 py-4 text-slate-500 font-semibold">Contact Email</th>
               <th className="text-left px-5 py-4 text-slate-500 font-semibold">Phone</th>
-              <th className="text-left px-5 py-4 text-slate-500 font-semibold">Runners</th>
+              <th className="text-left px-5 py-4 text-slate-500 font-semibold">
+                <button onClick={() => toggleSort('runners')} className="hover:text-slate-800">Runners{sortIndicator('runners')}</button>
+              </th>
               <th className="text-right px-5 py-4 text-slate-500 font-semibold">Actions</th>
             </tr>
           </thead>

@@ -13,6 +13,7 @@ import Footer from './components/Footer';
 import SponsorInquiryModal from './components/SponsorInquiryModal';
 import BulkInquiryModal from './components/BulkInquiryModal';
 import SponsorStrip from './components/SponsorStrip';
+import AssociateSponsorRow from './components/AssociateSponsorRow';
 import RaceRouteSection from './components/RaceRouteSection';
 import FAQSection from './components/FAQSection';
 import logoDark from './components/logo-dark.png';
@@ -146,6 +147,7 @@ function HomePage() {
               <img src={solugenixLogo} alt="Solugenix" className="h-4 sm:h-5 w-auto object-contain" />
             </div>
           </div>
+          <AssociateSponsorRow />
         </div>
       </div>
 

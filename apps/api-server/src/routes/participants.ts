@@ -99,12 +99,14 @@ participantsRouter.get('/', async (req, res) => {
     const search = typeof req.query.search === 'string' ? req.query.search : undefined;
     const category = typeof req.query.category === 'string' ? req.query.category : undefined;
     const status = typeof req.query.status === 'string' ? req.query.status : undefined;
+    const tshirtSize = typeof req.query.tshirtSize === 'string' ? req.query.tshirtSize : undefined;
     const eventId = typeof req.query.eventId === 'string' ? req.query.eventId : undefined;
 
     const where: any = {};
     if (eventId) where.eventId = eventId;
     if (category) where.category = category;
     if (status) where.status = status;
+    if (tshirtSize) where.tshirtSize = tshirtSize;
     if (search) {
       where.OR = [
         { bibNumber: { contains: search, mode: 'insensitive' } },

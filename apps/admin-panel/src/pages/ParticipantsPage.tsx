@@ -8,6 +8,7 @@ export default function ParticipantsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [category, setCategory] = useState('');
   const [status, setStatus] = useState('');
+  const [tshirtSize, setTshirtSize] = useState('');
   const [eventId, setEventId] = useState('');
   const [events, setEvents] = useState<any[]>([]);
   const [page, setPage] = useState(1);
@@ -25,6 +26,7 @@ export default function ParticipantsPage() {
   const [editingDetails, setEditingDetails] = useState(false);
   const [editCategory, setEditCategory] = useState('');
   const [editPhone, setEditPhone] = useState('');
+  const [editTshirtSize, setEditTshirtSize] = useState('');
   const [detailsSaving, setDetailsSaving] = useState(false);
   const [detailsError, setDetailsError] = useState('');
 
@@ -40,6 +42,7 @@ export default function ParticipantsPage() {
     if (debouncedSearch) params.search = debouncedSearch;
     if (category) params.category = category;
     if (status) params.status = status;
+    if (tshirtSize) params.tshirtSize = tshirtSize;
     if (eventId) params.eventId = eventId;
 
     const res = await api.getParticipants(params);
@@ -63,7 +66,7 @@ export default function ParticipantsPage() {
 
   useEffect(() => {
     loadParticipants();
-  }, [page, category, status, eventId, debouncedSearch]);
+  }, [page, category, status, tshirtSize, eventId, debouncedSearch]);
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this participant?')) {
@@ -102,6 +105,7 @@ export default function ParticipantsPage() {
     if (!viewParticipant) return;
     setEditCategory(viewParticipant.category || 'RUN_3K');
     setEditPhone(viewParticipant.user?.phone || '');
+    setEditTshirtSize(viewParticipant.tshirtSize || '');
     setDetailsError('');
     setEditingDetails(true);
   };
@@ -111,7 +115,7 @@ export default function ParticipantsPage() {
     setDetailsError('');
     setDetailsSaving(true);
     try {
-      const res = await api.updateParticipant(viewParticipant.id, { category: editCategory, phone: editPhone });
+      const res = await api.updateParticipant(viewParticipant.id, { category: editCategory, phone: editPhone, tshirtSize: editTshirtSize || null });
       if (res.success && res.data) {
         setViewParticipant(res.data);
         setEditingDetails(false);
@@ -243,6 +247,19 @@ export default function ParticipantsPage() {
             <option value="FINISHED">Finished</option>
             <option value="DNF">DNF</option>
             <option value="DNS">DNS</option>
+          </select>
+          <select
+            value={tshirtSize}
+            onChange={(e) => { setTshirtSize(e.target.value); setPage(1); }}
+            className="px-4 py-3 bg-white/80 border border-white/60 rounded-3xl text-slate-900 text-sm outline-none"
+          >
+            <option value="">All T-Shirt Sizes</option>
+            <option value="XS">XS</option>
+            <option value="S">S</option>
+            <option value="M">M</option>
+            <option value="L">L</option>
+            <option value="XL">XL</option>
+            <option value="XXL">XXL</option>
           </select>
           <select
             value={eventId}
@@ -388,6 +405,22 @@ export default function ParticipantsPage() {
                     className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
                   />
                 </div>
+                <div>
+                  <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">T-Shirt Size</label>
+                  <select
+                    value={editTshirtSize}
+                    onChange={(e) => setEditTshirtSize(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
+                  >
+                    <option value="">Not set</option>
+                    <option value="XS">XS</option>
+                    <option value="S">S</option>
+                    <option value="M">M</option>
+                    <option value="L">L</option>
+                    <option value="XL">XL</option>
+                    <option value="XXL">XXL</option>
+                  </select>
+                </div>
                 <div className="flex gap-2 pt-1">
                   <button
                     onClick={handleSaveDetails}
@@ -438,6 +471,10 @@ export default function ParticipantsPage() {
               <div>
                 <p className="text-xs text-slate-400 uppercase tracking-wide">Blood Group</p>
                 <p className="text-slate-800">{viewParticipant.bloodGroup || '—'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-slate-400 uppercase tracking-wide">T-Shirt Size</p>
+                <p className="text-slate-800">{viewParticipant.tshirtSize || '—'}</p>
               </div>
               <div>
                 <p className="text-xs text-slate-400 uppercase tracking-wide">Emergency Contact</p>

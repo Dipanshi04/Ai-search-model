@@ -280,11 +280,20 @@ participantsRouter.get('/:id', async (req, res) => {
 
 participantsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'), async (req, res) => {
   try {
-    const { status, category, gender, companyId, bibNumber, emergencyContact, emergencyPhone, bloodGroup, tshirtSize, kitDistributed, foodDistributed, paymentStatus } = req.body;
+    const { status, category, gender, companyId, bibNumber, emergencyContact, emergencyPhone, bloodGroup, tshirtSize, kitDistributed, foodDistributed, paymentStatus, phone } = req.body;
     const participant = await prisma.participant.findUnique({ where: { id: req.params.id as string } });
     if (!participant) {
       res.status(404).json({ success: false, message: 'Participant not found' });
       return;
+    }
+
+    // Phone lives on the linked User, not Participant — updated separately
+    // from the fields below. BIB number is intentionally never accepted
+    // from the admin-panel edit form (even though the field below still
+    // supports it for scripted/manual fixes) since it's already printed
+    // on kits and used as the runner's public identity.
+    if (phone !== undefined) {
+      await prisma.user.update({ where: { id: participant.userId }, data: { phone: String(phone).trim() } });
     }
 
     const updated = await prisma.participant.update({
@@ -310,7 +319,12 @@ participantsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MA
     });
 
     res.json({ success: true, data: updated });
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.code === 'P2002') {
+      res.status(409).json({ success: false, message: 'Another account already uses that phone number' });
+      return;
+    }
+    logger.error('Admin update participant error:', error);
     res.status(500).json({ success: false, message: 'Failed to update participant' });
   }
 });

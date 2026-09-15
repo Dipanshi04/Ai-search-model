@@ -22,6 +22,11 @@ export default function ParticipantsPage() {
   const [paymentSaving, setPaymentSaving] = useState(false);
   const [reminderSending, setReminderSending] = useState(false);
   const [reminderMessage, setReminderMessage] = useState('');
+  const [editingDetails, setEditingDetails] = useState(false);
+  const [editCategory, setEditCategory] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [detailsSaving, setDetailsSaving] = useState(false);
+  const [detailsError, setDetailsError] = useState('');
 
   useEffect(() => {
     api.getEvents().then((res) => {
@@ -78,6 +83,8 @@ export default function ParticipantsPage() {
     setDistError('');
     setPaymentError('');
     setReminderMessage('');
+    setEditingDetails(false);
+    setDetailsError('');
   };
 
   const closeView = () => {
@@ -87,6 +94,35 @@ export default function ParticipantsPage() {
     setDistError('');
     setPaymentError('');
     setReminderMessage('');
+    setEditingDetails(false);
+    setDetailsError('');
+  };
+
+  const startEditDetails = () => {
+    if (!viewParticipant) return;
+    setEditCategory(viewParticipant.category || 'RUN_3K');
+    setEditPhone(viewParticipant.user?.phone || '');
+    setDetailsError('');
+    setEditingDetails(true);
+  };
+
+  const handleSaveDetails = async () => {
+    if (!viewParticipant) return;
+    setDetailsError('');
+    setDetailsSaving(true);
+    try {
+      const res = await api.updateParticipant(viewParticipant.id, { category: editCategory, phone: editPhone });
+      if (res.success && res.data) {
+        setViewParticipant(res.data);
+        setEditingDetails(false);
+        loadParticipants();
+      } else {
+        setDetailsError(res.message || 'Failed to save changes');
+      }
+    } catch (e: any) {
+      setDetailsError(e.message || 'Failed to save changes');
+    }
+    setDetailsSaving(false);
   };
 
   const handleSendReminder = async () => {
@@ -308,14 +344,67 @@ export default function ParticipantsPage() {
                 <p className="text-xs font-mono text-violet-700">{viewParticipant.bibNumber}</p>
                 <h2 className="text-lg font-bold text-slate-950">{viewParticipant.user?.name}</h2>
               </div>
-              <button
-                onClick={closeView}
-                className="text-slate-400 hover:text-slate-600 text-xl leading-none px-2"
-                aria-label="Close"
-              >
-                &times;
-              </button>
+              <div className="flex items-center gap-2">
+                {!editingDetails && (
+                  <button
+                    onClick={startEditDetails}
+                    className="text-xs font-semibold text-violet-700 hover:text-violet-900"
+                  >
+                    Edit
+                  </button>
+                )}
+                <button
+                  onClick={closeView}
+                  className="text-slate-400 hover:text-slate-600 text-xl leading-none px-2"
+                  aria-label="Close"
+                >
+                  &times;
+                </button>
+              </div>
             </div>
+
+            {editingDetails && (
+              <div className="mb-4 rounded-2xl border border-violet-200 bg-violet-50/60 p-4 space-y-3">
+                {detailsError && (
+                  <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-2xl px-3 py-2">{detailsError}</p>
+                )}
+                <p className="text-xs text-slate-400">BIB number can't be changed here.</p>
+                <div>
+                  <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Category</label>
+                  <select
+                    value={editCategory}
+                    onChange={(e) => setEditCategory(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
+                  >
+                    <option value="RUN_3K">3K</option>
+                    <option value="RUN_5K">5K</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Phone</label>
+                  <input
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
+                  />
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={handleSaveDetails}
+                    disabled={detailsSaving}
+                    className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-full text-xs font-semibold disabled:opacity-50"
+                  >
+                    {detailsSaving ? 'Saving...' : 'Save'}
+                  </button>
+                  <button
+                    onClick={() => { setEditingDetails(false); setDetailsError(''); }}
+                    className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-full text-xs font-semibold"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm mb-6">
               <div>

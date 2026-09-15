@@ -7,6 +7,7 @@ export default function ParticipantsPage() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [category, setCategory] = useState('');
+  const [status, setStatus] = useState('');
   const [eventId, setEventId] = useState('');
   const [events, setEvents] = useState<any[]>([]);
   const [page, setPage] = useState(1);
@@ -33,6 +34,7 @@ export default function ParticipantsPage() {
     const params: Record<string, string> = { page: page.toString(), limit: '20' };
     if (debouncedSearch) params.search = debouncedSearch;
     if (category) params.category = category;
+    if (status) params.status = status;
     if (eventId) params.eventId = eventId;
 
     const res = await api.getParticipants(params);
@@ -56,7 +58,7 @@ export default function ParticipantsPage() {
 
   useEffect(() => {
     loadParticipants();
-  }, [page, category, eventId, debouncedSearch]);
+  }, [page, category, status, eventId, debouncedSearch]);
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this participant?')) {
@@ -190,6 +192,21 @@ export default function ParticipantsPage() {
             <option value="">All Categories</option>
             <option value="RUN_3K">3K</option>
             <option value="RUN_5K">5K</option>
+          </select>
+          <select
+            value={status}
+            onChange={(e) => { setStatus(e.target.value); setPage(1); }}
+            className="px-4 py-3 bg-white/80 border border-white/60 rounded-3xl text-slate-900 text-sm outline-none"
+          >
+            <option value="">All Statuses</option>
+            <option value="PENDING_PAYMENT">Pending Payment</option>
+            <option value="REGISTERED">Registered</option>
+            <option value="CHECKED_IN">Checked In</option>
+            <option value="RUNNING">Running</option>
+            <option value="PAUSED">Paused</option>
+            <option value="FINISHED">Finished</option>
+            <option value="DNF">DNF</option>
+            <option value="DNS">DNS</option>
           </select>
           <select
             value={eventId}

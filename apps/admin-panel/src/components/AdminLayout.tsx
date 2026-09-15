@@ -30,6 +30,7 @@ const navItems = [
   { to: '/analytics', label: 'Analytics' },
   { to: '/announcements', label: 'Announcements' },
   { to: '/settings', label: 'Settings' },
+  { to: '/admins', label: 'Admins', superAdminOnly: true },
 ];
 
 export default function AdminLayout() {
@@ -51,7 +52,7 @@ export default function AdminLayout() {
         </div>
 
         <nav className="flex-1 p-4 space-y-2">
-          {navItems.map((item) => (
+          {navItems.filter((item) => !item.superAdminOnly || user?.role === 'SUPER_ADMIN').map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

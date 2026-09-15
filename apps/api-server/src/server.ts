@@ -37,6 +37,7 @@ import { paymentRouter } from './routes/payment.js';
 import { bulkRegistrationRouter } from './routes/bulk-registration.js';
 import { hrRouter } from './routes/hr.js';
 import { settingsRouter } from './routes/settings.js';
+import { adminsRouter } from './routes/admins.js';
 import { cashfreeRouter } from './routes/cashfree.js';
 
 const PORT = parseInt(process.env.PORT || '4000', 10);
@@ -85,6 +86,7 @@ app.use('/api/v1/analytics', analyticsRouter);
 app.use('/api/v1/bulk-registration', bulkRegistrationRouter);
 app.use('/api/v1/hr', hrRouter);
 app.use('/api/v1/settings', settingsRouter);
+app.use('/api/v1/admins', adminsRouter);
 
 app.use('/certificates', express.static(path.join(PACKAGE_ROOT, 'certificates')));
 app.use('/uploads', (req, res, next) => {

@@ -85,6 +85,22 @@ class ApiClient {
     return this.request<any>('/api/v1/auth/me');
   }
 
+  async getAdmins() {
+    return this.request<any[]>('/api/v1/admins');
+  }
+
+  async createAdmin(data: { name: string; email: string; phone: string; password: string; role: string }) {
+    return this.request<any>('/api/v1/admins', { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  async updateAdmin(id: string, data: { role?: string; password?: string }) {
+    return this.request<any>(`/api/v1/admins/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+
+  async deleteAdmin(id: string) {
+    return this.request<void>(`/api/v1/admins/${id}`, { method: 'DELETE' });
+  }
+
   async getParticipants(params?: Record<string, string>) {
     const query = params ? '?' + new URLSearchParams(params).toString() : '';
     return this.request<any[]>(`/api/v1/participants${query}`);

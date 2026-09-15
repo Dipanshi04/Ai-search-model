@@ -21,6 +21,7 @@ import PaymentsPage from './pages/PaymentsPage';
 import CouponsPage from './pages/CouponsPage';
 import BulkInquiriesPage from './pages/BulkInquiriesPage';
 import SponsorInquiriesPage from './pages/SponsorInquiriesPage';
+import AdminsPage from './pages/AdminsPage';
 
 function HrPortalRedirect() {
   const h = window.location.hostname;
@@ -87,6 +88,7 @@ function AppRoutes() {
         <Route path="analytics" element={<AnalyticsPage />} />
         <Route path="announcements" element={<AnnouncementsPage />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="admins" element={<AdminsPage />} />
       </Route>
     </Routes>
   );

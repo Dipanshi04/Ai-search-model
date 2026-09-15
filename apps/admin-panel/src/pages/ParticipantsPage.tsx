@@ -413,7 +413,6 @@ export default function ParticipantsPage() {
                     className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
                   >
                     <option value="">Not set</option>
-                    <option value="XS">XS</option>
                     <option value="S">S</option>
                     <option value="M">M</option>
                     <option value="L">L</option>

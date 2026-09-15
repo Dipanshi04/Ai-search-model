@@ -684,7 +684,6 @@ export default function RegisterPage() {
                 onChange={(e) => setForm({ ...form, tshirtSize: e.target.value })}
                 className="w-full px-3 py-2 bg-brand-cream border border-brand-navy/15 rounded-lg text-brand-navy focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition"
               >
-                <option value="XS">XS</option>
                 <option value="S">S</option>
                 <option value="M">M</option>
                 <option value="L">L</option>

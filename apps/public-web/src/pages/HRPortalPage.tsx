@@ -393,7 +393,7 @@ export default function HRPortalPage() {
                     <span className="px-6 py-4 bg-brand-cream text-brand-navy/60 text-base border-r border-brand-navy/10 shrink-0 flex items-center">T-Shirt</span>
                     <select value={form.tshirtSize} onChange={e => setForm({...form, tshirtSize: e.target.value})}
                       className="flex-1 px-5 py-4 text-brand-navy text-base outline-none min-w-0 bg-white">
-                      {['XS','S','M','L','XL','XXL'].map(s => <option key={s} value={s}>{s}</option>)}
+                      {['S','M','L','XL','XXL'].map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                   </div>
                 </div>

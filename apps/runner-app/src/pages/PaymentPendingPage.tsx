@@ -34,10 +34,43 @@ export default function PaymentPendingPage({ participantId, bibNumber, category,
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [error, setError] = useState('');
   const [confirming, setConfirming] = useState(false);
+  const [couponInput, setCouponInput] = useState('');
+  const [couponApplied, setCouponApplied] = useState<{ code: string; discountPercent: number } | null>(null);
+  const [couponError, setCouponError] = useState('');
+  const [couponChecking, setCouponChecking] = useState(false);
 
   const categoryFee = CATEGORY_FEES[category] || CATEGORY_FEES.RUN_3K!;
   const baseAmount = categoryFee.amount;
-  const displayAmount = isPremiumCompany ? Math.round(baseAmount * 0.5) : baseAmount;
+  // Same "whichever is bigger, never stacked" rule as public-web's
+  // RegisterPage — the server re-enforces this independently at checkout.
+  const premiumPercent = isPremiumCompany ? 50 : 0;
+  const effectivePercent = couponApplied ? Math.max(couponApplied.discountPercent, premiumPercent) : premiumPercent;
+  const displayAmount = Math.round(baseAmount * (1 - effectivePercent / 100));
+  const discountLabel = couponApplied && couponApplied.discountPercent >= premiumPercent
+    ? `Coupon ${couponApplied.code}`
+    : isPremiumCompany
+      ? 'Premium Member Discount'
+      : null;
+
+  const handleApplyCoupon = async () => {
+    const code = couponInput.trim();
+    if (!code) return;
+    setCouponChecking(true);
+    setCouponError('');
+    try {
+      const res = await api.validateCoupon(code, participantId);
+      if (res.success && res.data) {
+        setCouponApplied(res.data);
+      } else {
+        setCouponApplied(null);
+        setCouponError(res.message || 'Invalid or expired coupon code');
+      }
+    } catch {
+      setCouponApplied(null);
+      setCouponError('Network error. Please try again.');
+    }
+    setCouponChecking(false);
+  };
 
   useEffect(() => {
     if (!document.querySelector('script[src="https://sdk.cashfree.com/js/v3/cashfree.js"]')) {
@@ -96,7 +129,7 @@ export default function PaymentPendingPage({ participantId, bibNumber, category,
     setPaymentLoading(true);
     setError('');
 
-    const res = await api.startCashfreePayment(participantId);
+    const res = await api.startCashfreePayment(participantId, couponApplied?.code);
     if (!res.success || !res.data?.paymentSessionId) {
       setError(res.message || 'Failed to start payment. Please try again.');
       setPaymentLoading(false);
@@ -152,16 +185,55 @@ export default function PaymentPendingPage({ participantId, bibNumber, category,
               <span style={{ fontSize: '13px', color: '#64748b' }}>Category</span>
               <span style={{ fontSize: '13px', color: '#1e293b', fontWeight: 600 }}>{categoryFee.label}</span>
             </div>
-            {isPremiumCompany && (
+            {effectivePercent > 0 && discountLabel && (
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ fontSize: '13px', color: '#059669' }}>Premium Member Discount</span>
-                <span style={{ fontSize: '13px', color: '#059669', fontWeight: 600 }}>50% off</span>
+                <span style={{ fontSize: '13px', color: '#059669' }}>{discountLabel}</span>
+                <span style={{ fontSize: '13px', color: '#059669', fontWeight: 600 }}>{effectivePercent}% off</span>
               </div>
             )}
             <div style={{ display: 'flex', justifyContent: 'space-between', paddingTop: '10px', marginTop: '4px', borderTop: '1px solid #e2e8f0' }}>
               <span style={{ fontSize: '14px', color: '#1e293b', fontWeight: 700 }}>Amount Due</span>
               <span style={{ fontSize: '20px', color: '#F5821F', fontWeight: 800 }}>Rs. {displayAmount}</span>
             </div>
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{ display: 'block', fontSize: '12px', fontWeight: 600, color: '#64748b', marginBottom: '6px' }}>
+              Have a coupon code?
+            </label>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <input
+                type="text"
+                value={couponInput}
+                onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); setCouponError(''); }}
+                disabled={!!couponApplied}
+                placeholder="e.g. ISA10"
+                style={{
+                  flex: 1, padding: '10px 12px', background: '#f8fafc', border: '1.5px solid #e2e8f0',
+                  borderRadius: '10px', color: '#1e293b', fontSize: '14px', outline: 'none',
+                }}
+              />
+              {couponApplied ? (
+                <button
+                  type="button"
+                  onClick={() => { setCouponApplied(null); setCouponInput(''); }}
+                  style={{ padding: '10px 16px', borderRadius: '10px', border: '1.5px solid #e2e8f0', background: '#fff', color: '#1e293b', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Remove
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleApplyCoupon}
+                  disabled={couponChecking || !couponInput.trim()}
+                  style={{ padding: '10px 16px', borderRadius: '10px', border: 'none', background: '#1B2A5B', color: '#fff', fontSize: '13px', fontWeight: 700, cursor: couponChecking ? 'not-allowed' : 'pointer', opacity: couponChecking || !couponInput.trim() ? 0.5 : 1 }}
+                >
+                  {couponChecking ? 'Checking...' : 'Apply'}
+                </button>
+              )}
+            </div>
+            {couponError && <p style={{ fontSize: '12px', color: '#dc2626', marginTop: '6px' }}>{couponError}</p>}
+            {couponApplied && <p style={{ fontSize: '12px', color: '#059669', marginTop: '6px' }}>Coupon applied — {couponApplied.discountPercent}% off.</p>}
           </div>
 
           {error && (

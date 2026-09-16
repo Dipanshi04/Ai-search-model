@@ -224,7 +224,12 @@ export async function sendWelcomeEmail(
     </div>
     <p style="margin: 18px 0 0; font-size: 14px; color: rgba(27,42,91,0.65); text-align: center;">Category: <strong style="color: ${BRAND_NAVY};">${category}</strong></p>
     <p style="margin: 20px 0 0; font-size: 12px; color: rgba(27,42,91,0.45); text-align: center;">Your PIN was sent in a separate email — use it to log into the Runner App.</p>
-    <div style="text-align: center; margin-top: 24px; padding-top: 20px; border-top: 1px solid rgba(27,42,91,0.08);">
+    <div style="text-align: center; margin-top: 20px;">
+      <a href="${RUNNER_APP_URL}" target="_blank" style="display: inline-block; background: ${BRAND_NAVY}; color: #fff; text-decoration: none; font-weight: 700; font-size: 13px; padding: 10px 22px; border-radius: 10px;">
+        Log In to Runner App
+      </a>
+    </div>
+    <div style="text-align: center; margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(27,42,91,0.08);">
       <p style="margin: 0 0 12px; font-size: 13px; color: ${BRAND_NAVY};">Race starts <strong>6:30 AM, 27th September 2026</strong></p>
       <a href="${CALENDAR_URL}" target="_blank" style="display: inline-block; background: ${BRAND_ORANGE}; color: #fff; text-decoration: none; font-weight: 700; font-size: 13px; padding: 10px 22px; border-radius: 10px;">
         Add to Calendar

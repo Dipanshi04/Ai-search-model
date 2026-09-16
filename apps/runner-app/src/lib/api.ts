@@ -121,15 +121,22 @@ class ApiClient {
     return this.request<any[]>('/api/v1/sponsors');
   }
 
-  async startCashfreePayment(participantId: string) {
+  async startCashfreePayment(participantId: string, couponCode?: string) {
     // window.location.origin + BASE_URL ('/runner/' in prod & dev) so
     // Cashfree sends the runner back into this app after checkout, not
     // the public site's own payment-confirmation page.
     const returnUrl = `${window.location.origin}${import.meta.env.BASE_URL}`;
     return this.request<{ paymentSessionId: string; orderId: string; amount: number; environment: 'sandbox' | 'production' }>(
       '/api/v1/payments/cashfree/start',
-      { method: 'POST', body: JSON.stringify({ participantId, returnUrl }) }
+      { method: 'POST', body: JSON.stringify({ participantId, returnUrl, couponCode }) }
     );
+  }
+
+  async validateCoupon(code: string, participantId?: string) {
+    return this.request<{ code: string; discountPercent: number }>('/api/v1/coupons/validate', {
+      method: 'POST',
+      body: JSON.stringify({ code, participantId }),
+    });
   }
 
   async getCashfreePaymentStatus(orderId: string) {

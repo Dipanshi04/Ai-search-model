@@ -110,6 +110,13 @@ class ApiClient {
     return this.request<any>(`/api/v1/participants/${id}`);
   }
 
+  async createParticipant(data: any) {
+    return this.request<any>('/api/v1/participants', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
   async updateParticipant(id: string, data: any) {
     return this.request<any>(`/api/v1/participants/${id}`, {
       method: 'PUT',

@@ -4,8 +4,10 @@ import { prisma } from '../config/database.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireRole } from '../middleware/auth.js';
 import { logger } from '../config/logger.js';
-import { sendPinEmail, sendPaymentReminderEmail } from '../services/email.js';
+import { sendPinEmail, sendPaymentReminderEmail, sendWelcomeEmail } from '../services/email.js';
 import { feeForCategory } from './payment.js';
+import { hashPassword } from '../utils/jwt.js';
+import { generateQRCode } from '../utils/qrcode.js';
 
 export const participantsRouter: Router = Router();
 
@@ -135,6 +137,117 @@ participantsRouter.get('/', async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch participants' });
+  }
+});
+
+// Manual add from the admin panel — e.g. a walk-in, cash-at-venue, or VIP
+// registration that shouldn't go through the public checkout flow. Mirrors
+// hr.ts's single-participant add (same BIB-allocation and new-user pattern)
+// but isn't tied to an HR bulk-registration slot limit, and lets the admin
+// choose the payment status directly instead of always force-completing it.
+participantsRouter.post('/', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'), async (req, res) => {
+  try {
+    const {
+      name, email, phone, category, gender, companyId, eventId: reqEventId,
+      emergencyContact, emergencyPhone, bloodGroup, bloodDonation, tshirtSize,
+      paymentStatus,
+    } = req.body as {
+      name: string; email: string; phone: string; category: string; gender: string;
+      companyId?: string; eventId?: string;
+      emergencyContact?: string; emergencyPhone?: string; bloodGroup?: string;
+      bloodDonation?: boolean; tshirtSize?: string; paymentStatus?: 'COMPLETED' | 'PENDING';
+    };
+
+    if (!name || !email || !phone || !category || !gender) {
+      res.status(400).json({ success: false, message: 'Missing required fields: name, email, phone, category, gender' });
+      return;
+    }
+
+    let event;
+    if (reqEventId) {
+      event = await prisma.event.findUnique({ where: { id: reqEventId } });
+    } else {
+      event = await prisma.event.findFirst({ where: { status: { in: ['ACTIVE', 'PAUSED'] } }, orderBy: { updatedAt: 'desc' } });
+      if (!event) {
+        event = await prisma.event.findFirst({ where: { status: 'UPCOMING' }, orderBy: { date: 'asc' } });
+      }
+    }
+    if (!event) {
+      res.status(400).json({ success: false, message: 'No active event to register into' });
+      return;
+    }
+
+    let user = await prisma.user.findUnique({ where: { email: String(email).toLowerCase().trim() } });
+    let isNewUser = false;
+    let pin = '';
+    if (!user) {
+      const phoneUser = await prisma.user.findUnique({ where: { phone: String(phone).trim() } });
+      if (phoneUser) {
+        res.status(409).json({ success: false, message: `Phone ${phone} is already registered to another account` });
+        return;
+      }
+      const passwordHash = await hashPassword('marathon2026');
+      pin = String(Math.floor(1000 + Math.random() * 9000));
+      const pinHash = await hashPassword(pin);
+      user = await prisma.user.create({
+        data: { email: String(email).toLowerCase().trim(), phone: String(phone).trim(), name, passwordHash, pinHash },
+      });
+      isNewUser = true;
+    } else if (!user.pinHash) {
+      pin = String(Math.floor(1000 + Math.random() * 9000));
+      const pinHash = await hashPassword(pin);
+      user = await prisma.user.update({ where: { id: user.id }, data: { pinHash } });
+      isNewUser = true;
+    }
+
+    const { bibCounter } = await prisma.event.update({
+      where: { id: event.id },
+      data: { bibCounter: { increment: 1 } },
+      select: { bibCounter: true },
+    });
+    const bibNumber = `ISA${bibCounter.toString().padStart(4, '0')}`;
+    const completed = paymentStatus !== 'PENDING';
+
+    const participant = await prisma.participant.create({
+      data: {
+        eventId: event.id,
+        userId: user.id,
+        companyId: companyId || null,
+        bibNumber,
+        category: category as any,
+        gender: gender as any,
+        status: completed ? 'REGISTERED' : 'PENDING_PAYMENT',
+        paymentStatus: completed ? 'COMPLETED' : 'PENDING',
+        paymentAmount: completed ? feeForCategory(category) : null,
+        emergencyContact: emergencyContact || null,
+        emergencyPhone: emergencyPhone || null,
+        bloodGroup: bloodGroup || null,
+        bloodDonation: bloodDonation === true,
+        tshirtSize: tshirtSize || null,
+      },
+      include: { user: true, company: true },
+    });
+
+    const qrCodeDataUrl = await generateQRCode(bibNumber);
+    await prisma.participant.update({ where: { id: participant.id }, data: { qrCodeUrl: qrCodeDataUrl } });
+
+    logger.info(`Admin manually added participant ${bibNumber} (${name}) by ${req.user?.email}`);
+
+    if (isNewUser && pin) {
+      sendPinEmail(user.email, user.name, pin).catch((e) => logger.error('PIN email failed:', e));
+    }
+    if (completed) {
+      sendWelcomeEmail(user.email, user.name, bibNumber, category).catch((e) => logger.error('Welcome email failed:', e));
+    }
+
+    res.status(201).json({ success: true, data: participant });
+  } catch (error: any) {
+    if (error?.code === 'P2002') {
+      res.status(409).json({ success: false, message: 'An account with this email or phone already exists' });
+      return;
+    }
+    logger.error('Admin create participant error:', error);
+    res.status(500).json({ success: false, message: 'Failed to create participant' });
   }
 });
 

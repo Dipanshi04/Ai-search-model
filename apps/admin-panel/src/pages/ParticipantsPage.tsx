@@ -29,10 +29,21 @@ export default function ParticipantsPage() {
   const [editTshirtSize, setEditTshirtSize] = useState('');
   const [detailsSaving, setDetailsSaving] = useState(false);
   const [detailsError, setDetailsError] = useState('');
+  const [companies, setCompanies] = useState<any[]>([]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [addForm, setAddForm] = useState({
+    name: '', email: '', phone: '', category: 'RUN_3K', gender: 'MALE', companyId: '',
+    tshirtSize: '', bloodGroup: '', emergencyContact: '', emergencyPhone: '', paymentStatus: 'COMPLETED',
+  });
+  const [addSaving, setAddSaving] = useState(false);
+  const [addError, setAddError] = useState('');
 
   useEffect(() => {
     api.getEvents().then((res) => {
       if (res.success && res.data) setEvents(res.data);
+    });
+    api.getCompanies().then((res) => {
+      if (res.success && res.data) setCompanies(res.data);
     });
   }, []);
 
@@ -67,6 +78,51 @@ export default function ParticipantsPage() {
   useEffect(() => {
     loadParticipants();
   }, [page, category, status, tshirtSize, eventId, debouncedSearch]);
+
+  function resetAddForm() {
+    setAddForm({
+      name: '', email: '', phone: '', category: 'RUN_3K', gender: 'MALE', companyId: '',
+      tshirtSize: '', bloodGroup: '', emergencyContact: '', emergencyPhone: '', paymentStatus: 'COMPLETED',
+    });
+    setAddError('');
+  }
+
+  async function handleAddParticipant(e: React.FormEvent) {
+    e.preventDefault();
+    setAddError('');
+    if (!addForm.name.trim() || !addForm.email.trim() || !addForm.phone.trim()) {
+      setAddError('Name, email, and phone are required.');
+      return;
+    }
+    setAddSaving(true);
+    try {
+      const payload = {
+        name: addForm.name.trim(),
+        email: addForm.email.trim(),
+        phone: addForm.phone.trim(),
+        category: addForm.category,
+        gender: addForm.gender,
+        companyId: addForm.companyId || undefined,
+        tshirtSize: addForm.tshirtSize || undefined,
+        bloodGroup: addForm.bloodGroup || undefined,
+        emergencyContact: addForm.emergencyContact || undefined,
+        emergencyPhone: addForm.emergencyPhone || undefined,
+        paymentStatus: addForm.paymentStatus,
+      };
+      const res = await api.createParticipant(payload);
+      if (!res.success) {
+        setAddError(res.message || 'Failed to add participant');
+        setAddSaving(false);
+        return;
+      }
+      setShowAddModal(false);
+      resetAddForm();
+      loadParticipants();
+    } catch (e: any) {
+      setAddError(e.message || 'Failed to add participant');
+    }
+    setAddSaving(false);
+  }
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this participant?')) {
@@ -201,12 +257,20 @@ export default function ParticipantsPage() {
           <h1 className="text-2xl font-bold text-slate-950">Participants</h1>
           <p className="text-slate-500 text-sm">{total} registered</p>
         </div>
-        <button
-          onClick={() => api.exportParticipantsCSV()}
-          className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-3xl text-sm font-medium transition-colors shadow-sm"
-        >
-          Export CSV
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => { resetAddForm(); setShowAddModal(true); }}
+            className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-3xl text-sm font-medium transition-colors shadow-sm"
+          >
+            Add Participant
+          </button>
+          <button
+            onClick={() => api.exportParticipantsCSV()}
+            className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-3xl text-sm font-medium transition-colors shadow-sm"
+          >
+            Export CSV
+          </button>
+        </div>
       </div>
 
       <div className="glass rounded-[2rem] border border-white/20 p-4 shadow-sm">
@@ -593,6 +657,176 @@ export default function ParticipantsPage() {
               )}
               {pinError && <p className="text-xs text-red-500 mt-2">{pinError}</p>}
             </div>
+          </div>
+        </div>
+      )}
+
+      {showAddModal && (
+        <div
+          className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+          onClick={() => setShowAddModal(false)}
+        >
+          <div
+            className="bg-white rounded-[2rem] shadow-xl max-w-md w-full p-6 max-h-[85vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between mb-4">
+              <h2 className="text-lg font-bold text-slate-950">Add Participant</h2>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="text-slate-400 hover:text-slate-600 text-xl leading-none px-2"
+                aria-label="Close"
+              >
+                &times;
+              </button>
+            </div>
+            <p className="text-xs text-slate-400 mb-4">
+              For walk-ins, cash payments, or VIP entries — bypasses the public checkout. A BIB is allocated automatically and login details are emailed.
+            </p>
+
+            {addError && (
+              <div className="mb-4 rounded-2xl bg-red-50 border border-red-200 px-4 py-2.5 text-xs text-red-700">{addError}</div>
+            )}
+
+            <form onSubmit={handleAddParticipant} className="space-y-3">
+              <div>
+                <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Name</label>
+                <input
+                  value={addForm.name}
+                  onChange={(e) => setAddForm({ ...addForm, name: e.target.value })}
+                  required
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Email</label>
+                <input
+                  type="email"
+                  value={addForm.email}
+                  onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
+                  required
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Phone</label>
+                <input
+                  value={addForm.phone}
+                  onChange={(e) => setAddForm({ ...addForm, phone: e.target.value })}
+                  required
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Category</label>
+                  <select
+                    value={addForm.category}
+                    onChange={(e) => setAddForm({ ...addForm, category: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
+                  >
+                    <option value="RUN_3K">3K</option>
+                    <option value="RUN_5K">5K</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Gender</label>
+                  <select
+                    value={addForm.gender}
+                    onChange={(e) => setAddForm({ ...addForm, gender: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
+                  >
+                    <option value="MALE">Male</option>
+                    <option value="FEMALE">Female</option>
+                    <option value="NON_BINARY">Non-Binary</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Company</label>
+                <select
+                  value={addForm.companyId}
+                  onChange={(e) => setAddForm({ ...addForm, companyId: e.target.value })}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
+                >
+                  <option value="">None</option>
+                  {companies.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">T-Shirt Size</label>
+                  <select
+                    value={addForm.tshirtSize}
+                    onChange={(e) => setAddForm({ ...addForm, tshirtSize: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
+                  >
+                    <option value="">Not set</option>
+                    <option value="S">S</option>
+                    <option value="M">M</option>
+                    <option value="L">L</option>
+                    <option value="XL">XL</option>
+                    <option value="XXL">XXL</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Blood Group</label>
+                  <input
+                    value={addForm.bloodGroup}
+                    onChange={(e) => setAddForm({ ...addForm, bloodGroup: e.target.value })}
+                    placeholder="e.g. O+"
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Emergency Contact</label>
+                  <input
+                    value={addForm.emergencyContact}
+                    onChange={(e) => setAddForm({ ...addForm, emergencyContact: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Emergency Phone</label>
+                  <input
+                    value={addForm.emergencyPhone}
+                    onChange={(e) => setAddForm({ ...addForm, emergencyPhone: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Payment</label>
+                <select
+                  value={addForm.paymentStatus}
+                  onChange={(e) => setAddForm({ ...addForm, paymentStatus: e.target.value })}
+                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
+                >
+                  <option value="COMPLETED">Mark as paid (e.g. cash at venue)</option>
+                  <option value="PENDING">Leave pending (runner pays online later)</option>
+                </select>
+              </div>
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={addSaving}
+                  className="flex-1 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-3xl text-sm disabled:opacity-50"
+                >
+                  {addSaving ? 'Adding...' : 'Add Participant'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="px-4 py-2 bg-white border border-slate-200 text-slate-700 rounded-3xl text-sm"
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

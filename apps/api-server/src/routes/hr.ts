@@ -39,7 +39,7 @@ hrRouter.post('/login', async (req: Request, res: Response) => {
       return;
     }
 
-    const bulkReg = await prisma.bulkRegistration.findUnique({ where: { hrEmail: email } });
+    const bulkReg = await prisma.bulkRegistration.findUnique({ where: { hrEmail: String(email).trim().toLowerCase() } });
     if (!bulkReg) {
       res.status(401).json({ success: false, message: 'Invalid credentials' });
       return;
@@ -85,8 +85,8 @@ hrRouter.post('/forgot-password', async (req: Request, res: Response) => {
       return;
     }
 
-    const bulkReg = await prisma.bulkRegistration.findUnique({ where: { hrEmail: email } });
-    
+    const bulkReg = await prisma.bulkRegistration.findUnique({ where: { hrEmail: String(email).trim().toLowerCase() } });
+
     // Always return success to prevent email enumeration
     if (!bulkReg) {
       res.json({ success: true, message: 'If the email exists, a reset link has been sent' });
@@ -313,7 +313,8 @@ hrRouter.post('/participants', hrAuth, async (req: Request, res: Response) => {
       return;
     }
 
-    let user = await prisma.user.findUnique({ where: { email } });
+    const normalizedEmail = String(email).trim().toLowerCase();
+    let user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     let isNewUser = false;
     let pin = '';
     if (!user) {
@@ -325,7 +326,7 @@ hrRouter.post('/participants', hrAuth, async (req: Request, res: Response) => {
       const passwordHash = await hashPassword('marathon2026');
       pin = String(Math.floor(1000 + Math.random() * 9000));
       const pinHash = await hashPassword(pin);
-      user = await prisma.user.create({ data: { email, phone, name, passwordHash, pinHash } });
+      user = await prisma.user.create({ data: { email: normalizedEmail, phone, name, passwordHash, pinHash } });
       isNewUser = true;
     } else if (!user.pinHash) {
       // Existing user without PIN - generate one

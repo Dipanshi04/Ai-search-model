@@ -38,7 +38,7 @@ authRouter.post(
       }
 
       const user = await prisma.user.findUnique({
-        where: { email },
+        where: { email: String(email).trim().toLowerCase() },
         select: { id: true, email: true, name: true, phone: true, pinHash: true, role: true },
       });
 
@@ -103,7 +103,7 @@ authRouter.post(
       }
 
       const user = await prisma.user.findUnique({
-        where: { email },
+        where: { email: String(email).trim().toLowerCase() },
         select: { id: true, email: true, name: true, passwordHash: true, role: true },
       });
 
@@ -162,7 +162,7 @@ authRouter.post(
       }
 
       const user = await prisma.user.findUnique({
-        where: { email },
+        where: { email: String(email).trim().toLowerCase() },
         select: { id: true, name: true, email: true },
       });
 

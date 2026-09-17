@@ -44,7 +44,7 @@ bulkRegistrationRouter.get('/', async (_req: Request, res: Response) => {
 
 bulkRegistrationRouter.post('/', async (req: Request, res: Response) => {
   try {
-    const { companyName, hrName, hrEmail, hrPassword, numberOfRegistrations, notes, companyId } = req.body as {
+    const { companyName, hrName, hrEmail: hrEmailInput, hrPassword, numberOfRegistrations, notes, companyId } = req.body as {
       companyName: string;
       hrName: string;
       hrEmail: string;
@@ -54,10 +54,11 @@ bulkRegistrationRouter.post('/', async (req: Request, res: Response) => {
       companyId?: string;
     };
 
-    if (!companyName || !hrName || !hrEmail || !hrPassword || !numberOfRegistrations) {
+    if (!companyName || !hrName || !hrEmailInput || !hrPassword || !numberOfRegistrations) {
       res.status(400).json({ success: false, message: 'Missing required fields' });
       return;
     }
+    const hrEmail = String(hrEmailInput).trim().toLowerCase();
 
     if (typeof numberOfRegistrations !== 'number' || numberOfRegistrations < 1 || !Number.isInteger(numberOfRegistrations)) {
       res.status(400).json({ success: false, message: 'Number of registrations must be a positive integer' });
@@ -153,7 +154,7 @@ bulkRegistrationRouter.post('/', async (req: Request, res: Response) => {
 bulkRegistrationRouter.put('/:id', async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    const { companyName, companyId, hrName, hrEmail, numberOfRegistrations, paymentCompleted, notes } = req.body as {
+    const { companyName, companyId, hrName, hrEmail: hrEmailInput, numberOfRegistrations, paymentCompleted, notes } = req.body as {
       companyName?: string;
       companyId?: string;
       hrName?: string;
@@ -162,6 +163,7 @@ bulkRegistrationRouter.put('/:id', async (req: Request, res: Response) => {
       paymentCompleted?: boolean;
       notes?: string;
     };
+    const hrEmail = hrEmailInput !== undefined ? String(hrEmailInput).trim().toLowerCase() : undefined;
 
     const existing = await prisma.bulkRegistration.findUnique({ where: { id } });
     if (!existing) {

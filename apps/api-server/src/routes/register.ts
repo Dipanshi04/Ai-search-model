@@ -31,8 +31,13 @@ registerRouter.post('/', async (req: Request, res: Response) => {
       return;
     }
 
+    // Normalized so "Name@x.com" and "name@x.com" are the same account —
+    // otherwise a runner who typed their email differently at registration
+    // vs. login (or two different admins/forms) can't find their own account.
+    const normalizedEmail = String(email).trim().toLowerCase();
+
     // Check if user exists
-    let user = await prisma.user.findUnique({ where: { email } });
+    let user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     let isNewUser = false;
     let pin = '';
     if (!user) {
@@ -40,7 +45,7 @@ registerRouter.post('/', async (req: Request, res: Response) => {
       pin = String(Math.floor(1000 + Math.random() * 9000));
       const pinHash = await bcrypt.hash(pin, 12);
       user = await prisma.user.create({
-        data: { email, phone, name, passwordHash, pinHash },
+        data: { email: normalizedEmail, phone, name, passwordHash, pinHash },
       });
       isNewUser = true;
     } else {

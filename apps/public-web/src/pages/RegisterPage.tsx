@@ -50,12 +50,11 @@ export default function RegisterPage() {
   const [couponChecking, setCouponChecking] = useState(false);
   const [showTACModal, setShowTACModal] = useState(false);
   const [tacAccepted, setTacAccepted] = useState(false);
-  const [tacScrolledToBottom, setTacScrolledToBottom] = useState(false);
-  const tacContentRef = useRef<HTMLDivElement>(null);
   const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [companySearch, setCompanySearch] = useState('');
   const [companyDropdownOpen, setCompanyDropdownOpen] = useState(false);
   const companyFieldRef = useRef<HTMLDivElement>(null);
+  const [showOptionalDetails, setShowOptionalDetails] = useState(false);
 
   useEffect(() => {
     api.getCompanies().then((res) => {
@@ -79,18 +78,7 @@ export default function RegisterPage() {
     return () => document.removeEventListener('mousedown', onClickOutside);
   }, []);
 
-  const handleTacScroll = () => {
-    const el = tacContentRef.current;
-    if (el) {
-      const atBottom = el.scrollHeight - el.scrollTop <= el.clientHeight + 10;
-      if (atBottom && !tacScrolledToBottom) {
-        setTacScrolledToBottom(true);
-      }
-    }
-  };
-
   const handleAcceptTAC = async () => {
-    if (!tacScrolledToBottom) return;
     setTacAccepted(true);
     setShowTACModal(false);
   };
@@ -408,6 +396,14 @@ export default function RegisterPage() {
             <p className="hero-body text-brand-navy/60 text-sm">Fill in your details to join the race</p>
           </div>
 
+          {new Date() < new Date('2026-09-21T23:59:59+05:30') && (
+            <div className="mb-4 rounded-xl px-4 py-3 text-center" style={{ background: 'rgba(245,130,32,0.1)', border: '1px solid rgba(245,130,32,0.3)' }}>
+              <p className="hero-body text-sm font-bold" style={{ color: '#F5821F' }}>
+                🎉 Use code <span className="font-mono tracking-wide">ISA25</span> for 25% off — ends 21st Sept!
+              </p>
+            </div>
+          )}
+
           {error && (
             <div className="hero-body bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm mb-4">
               {error}
@@ -585,57 +581,71 @@ export default function RegisterPage() {
                 </div>
               )}
             </div>
-            <div>
-              <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1">Emergency Contact Name</label>
-              <input
-                type="text"
-                value={form.emergencyContact}
-                onChange={(e) => setForm({ ...form, emergencyContact: e.target.value })}
-                className="w-full px-3 py-2 bg-brand-cream border border-brand-navy/15 rounded-lg text-brand-navy placeholder-brand-navy/30 focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition"
-                placeholder="Optional — e.g. spouse, parent, friend"
-              />
-            </div>
-            <div>
-              <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1">Emergency Contact Phone</label>
-              <input
-                type="tel"
-                value={form.emergencyPhone}
-                onChange={(e) => setForm({ ...form, emergencyPhone: e.target.value })}
-                className="w-full px-3 py-2 bg-brand-cream border border-brand-navy/15 rounded-lg text-brand-navy placeholder-brand-navy/30 focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition"
-                placeholder="Optional"
-              />
-            </div>
-            <div>
-              <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1">Blood Group</label>
-              <select
-                value={form.bloodGroup}
-                onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })}
-                className="w-full px-3 py-2 bg-brand-cream border border-brand-navy/15 rounded-lg text-brand-navy focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition"
-              >
-                <option value="">Select</option>
-                <option value="A+">A+</option>
-                <option value="A-">A-</option>
-                <option value="B+">B+</option>
-                <option value="B-">B-</option>
-                <option value="O+">O+</option>
-                <option value="O-">O-</option>
-                <option value="AB+">AB+</option>
-                <option value="AB-">AB-</option>
-              </select>
-            </div>
           </div>
 
-          <div className="mb-4">
-            <label className="hero-body flex items-center gap-3 bg-brand-cream border border-brand-navy/10 rounded-lg px-3 py-2.5 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={form.bloodDonation}
-                onChange={(e) => setForm({ ...form, bloodDonation: e.target.checked })}
-                className="w-4 h-4 rounded border-brand-navy/30 text-brand-orange focus:ring-brand-orange"
-              />
-              <span className="text-sm text-brand-navy/80">I am interested in blood donation</span>
-            </label>
-          </div>
+          <button
+            type="button"
+            onClick={() => setShowOptionalDetails((v) => !v)}
+            className="hero-body flex items-center gap-1.5 text-xs font-semibold text-brand-navy/60 hover:text-brand-navy mb-4"
+          >
+            {showOptionalDetails ? '− Hide' : '+ Add'} emergency contact &amp; blood group (optional)
+          </button>
+
+          {showOptionalDetails && (
+            <>
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div>
+                  <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1">Emergency Contact Name</label>
+                  <input
+                    type="text"
+                    value={form.emergencyContact}
+                    onChange={(e) => setForm({ ...form, emergencyContact: e.target.value })}
+                    className="w-full px-3 py-2 bg-brand-cream border border-brand-navy/15 rounded-lg text-brand-navy placeholder-brand-navy/30 focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition"
+                    placeholder="e.g. spouse, parent, friend"
+                  />
+                </div>
+                <div>
+                  <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1">Emergency Contact Phone</label>
+                  <input
+                    type="tel"
+                    value={form.emergencyPhone}
+                    onChange={(e) => setForm({ ...form, emergencyPhone: e.target.value })}
+                    className="w-full px-3 py-2 bg-brand-cream border border-brand-navy/15 rounded-lg text-brand-navy placeholder-brand-navy/30 focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition"
+                  />
+                </div>
+                <div>
+                  <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1">Blood Group</label>
+                  <select
+                    value={form.bloodGroup}
+                    onChange={(e) => setForm({ ...form, bloodGroup: e.target.value })}
+                    className="w-full px-3 py-2 bg-brand-cream border border-brand-navy/15 rounded-lg text-brand-navy focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition"
+                  >
+                    <option value="">Select</option>
+                    <option value="A+">A+</option>
+                    <option value="A-">A-</option>
+                    <option value="B+">B+</option>
+                    <option value="B-">B-</option>
+                    <option value="O+">O+</option>
+                    <option value="O-">O-</option>
+                    <option value="AB+">AB+</option>
+                    <option value="AB-">AB-</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <label className="hero-body flex items-center gap-3 bg-brand-cream border border-brand-navy/10 rounded-lg px-3 py-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={form.bloodDonation}
+                    onChange={(e) => setForm({ ...form, bloodDonation: e.target.checked })}
+                    className="w-4 h-4 rounded border-brand-navy/30 text-brand-orange focus:ring-brand-orange"
+                  />
+                  <span className="text-sm text-brand-navy/80">I am interested in blood donation</span>
+                </label>
+              </div>
+            </>
+          )}
 
           <div className="grid grid-cols-2 gap-3 mb-4">
             <div>
@@ -728,8 +738,6 @@ export default function RegisterPage() {
             </div>
 
             <div
-              ref={tacContentRef}
-              onScroll={handleTacScroll}
               className="hero-body flex-1 overflow-y-auto p-6 space-y-5 text-sm text-brand-navy/80"
             >
               <div>
@@ -814,11 +822,6 @@ export default function RegisterPage() {
                 </p>
               </div>
 
-              {!tacScrolledToBottom && (
-                <p className="text-center text-xs text-amber-600 animate-pulse">
-                  Scroll down to read all terms...
-                </p>
-              )}
             </div>
 
             <div className="p-6 border-t border-brand-navy/10">
@@ -831,10 +834,9 @@ export default function RegisterPage() {
                 </button>
                 <button
                   onClick={handleAcceptTAC}
-                  disabled={!tacScrolledToBottom}
-                  className="flex-1 py-3 bg-brand-orange text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl font-bold transition-all"
+                  className="flex-1 py-3 bg-brand-orange text-white hover:opacity-90 rounded-xl font-bold transition-all"
                 >
-                  {tacScrolledToBottom ? 'Accept & Proceed' : 'Scroll to read first'}
+                  Accept & Proceed
                 </button>
               </div>
             </div>

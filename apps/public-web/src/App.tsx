@@ -101,7 +101,7 @@ function HomePage() {
   const [showSponsorModal, setShowSponsorModal] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
   return (
-    <div className="hero-root min-h-screen overflow-hidden flex flex-col">
+    <div className="hero-root min-h-screen overflow-hidden flex flex-col pb-16">
       {/* Decorative background layers */}
       <div className="hero-grain" />
 
@@ -135,7 +135,7 @@ function HomePage() {
           <p className="hero-kicker text-[9px] sm:text-[11px] font-bold tracking-[0.35em] uppercase" style={{ color: '#1B2A5B', opacity: 0.45 }}>
             Presents
           </p>
-          <Logo size="h-9 sm:h-12" />
+          <Logo size="h-14 sm:h-20" />
           <p className="hero-kicker text-[10px] sm:text-sm font-extrabold tracking-[0.15em] uppercase mt-1" style={{ color: '#1B2A5B', opacity: 0.6 }}>
             Indore Software Association
           </p>
@@ -301,6 +301,31 @@ function HomePage() {
       {showBulkModal && <BulkInquiryModal onClose={() => setShowBulkModal(false)} />}
 
       <Footer />
+
+      {/* Sticky Register/Login bar — stays pinned while scrolling, on both
+          mobile and desktop, since the hero's own buttons scroll out of
+          view. pb-20 above on the root keeps the Footer from being hidden
+          behind it. */}
+      <div
+        className="fixed bottom-0 left-0 right-0 z-50 flex items-center justify-center gap-3 px-4 py-3 bg-white border-t"
+        style={{ borderColor: 'rgba(27,42,91,0.1)', boxShadow: '0 -4px 16px rgba(0,0,0,0.06)' }}
+      >
+        <a
+          href={RUNNER_APP_URL}
+          className="hero-body inline-flex items-center justify-center gap-1.5 px-5 py-2.5 rounded-full border-2 text-sm font-bold hover:bg-brand-navy/5 transition"
+          style={{ borderColor: 'rgba(27,42,91,0.25)', color: '#1B2A5B' }}
+        >
+          Login
+        </a>
+        <a
+          href="/register"
+          className="hero-body inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold text-white hover:opacity-90 transition"
+          style={{ background: '#F5821F' }}
+        >
+          Register Now
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
+        </a>
+      </div>
     </div>
   );
 }

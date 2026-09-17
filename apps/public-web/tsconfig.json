@@ -26,6 +26,5 @@
       "@isa/socket-client": ["../../packages/socket-client/src"]
     }
   },
-  "include": ["src"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "include": ["src"]
 }

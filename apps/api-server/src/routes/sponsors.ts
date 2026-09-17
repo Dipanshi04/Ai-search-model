@@ -5,7 +5,9 @@ import multer from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 import path from 'path';
+import sharp from 'sharp';
 import { PACKAGE_ROOT } from '../config/paths.js';
+import { logger } from '../config/logger.js';
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -16,6 +18,25 @@ const upload = multer({
     else cb(new Error('Only PNG, JPG, WebP, SVG allowed'));
   }
 });
+
+// Sponsor logos render tiny (roughly 50-120px in the "OUR PARTNERS" grid,
+// slightly larger at ~100-200px in the generated share card) — but phone
+// camera exports routinely come in at 1500-2000px+. Left unresized, a
+// single logo upload has been observed costing over 1MB of avoidable
+// weight on every homepage load. 400px comfortably covers 2-3x retina
+// at the largest actual use with no visible quality loss. SVGs are
+// already vector/tiny and pass through untouched.
+async function resizeLogoBuffer(buffer: Buffer, mimetype: string): Promise<Buffer> {
+  if (mimetype === 'image/svg+xml') return buffer;
+  try {
+    return await sharp(buffer)
+      .resize({ width: 400, height: 400, fit: 'inside', withoutEnlargement: true })
+      .toBuffer();
+  } catch (error) {
+    logger.error('Sponsor logo resize failed, storing original:', error);
+    return buffer;
+  }
+}
 
 export const sponsorsRouter: Router = Router();
 
@@ -68,7 +89,8 @@ sponsorsRouter.post('/', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'
       const filename = `${uuidv4()}${ext}`;
       const uploadDir = path.join(PACKAGE_ROOT, 'uploads', 'sponsors');
       if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-      fs.writeFileSync(path.join(uploadDir, filename), req.file.buffer);
+      const resized = await resizeLogoBuffer(req.file.buffer, req.file.mimetype);
+      fs.writeFileSync(path.join(uploadDir, filename), resized);
       logoUrl = `/uploads/sponsors/${filename}`;
     }
 
@@ -116,7 +138,8 @@ sponsorsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGE
       const filename = `${uuidv4()}${ext}`;
       const uploadDir = path.join(PACKAGE_ROOT, 'uploads', 'sponsors');
       if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
-      fs.writeFileSync(path.join(uploadDir, filename), req.file.buffer);
+      const resized = await resizeLogoBuffer(req.file.buffer, req.file.mimetype);
+      fs.writeFileSync(path.join(uploadDir, filename), resized);
       logoUrl = `/uploads/sponsors/${filename}`;
     }
 

@@ -41,7 +41,23 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800;900&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <!-- Loaded non-blocking (media="print" trick) — a synchronous <link
+         rel="stylesheet"> here forces the browser to wait on a cross-origin
+         round-trip to fonts.googleapis.com before it can paint anything,
+         which was the single biggest chunk of First Contentful Paint on
+         slow connections. The swap to media="all" on load applies the
+         font once it's ready; the noscript fallback covers JS-disabled
+         crawlers/browsers. Font names are unaffected by this technique —
+         once loaded, text renders identically either way. -->
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800;900&family=Manrope:wght@400;500;600;700;800&display=swap"
+      media="print"
+      onload="this.media='all'"
+    />
+    <noscript>
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800;900&family=Manrope:wght@400;500;600;700;800&display=swap" />
+    </noscript>
 
     <!-- Structured data — read directly by search and AI crawlers without
          needing to execute the app's JS, unlike everything in #root. -->

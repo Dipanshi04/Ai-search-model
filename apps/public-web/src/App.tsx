@@ -1,14 +1,5 @@
 import { Routes, Route } from 'react-router-dom';
-import RegisterPage from './pages/RegisterPage';
-import HRPortalPage from './pages/HRPortalPage';
-import { HRForgotPasswordPage, HRResetPasswordPage } from './pages/HRForgotPasswordPage';
-import AboutPage from './pages/AboutPage';
-import ContactPage from './pages/ContactPage';
-import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
-import TermsPage from './pages/TermsPage';
-import TreeCounterPage from './pages/TreeCounterPage';
-import PaymentDetailsPage from './pages/PaymentDetailsPage';
-import HowItWorksPage from './pages/HowItWorksPage';
+import { lazy, Suspense } from 'react';
 import Footer from './components/Footer';
 import SponsorInquiryModal from './components/SponsorInquiryModal';
 import BulkInquiryModal from './components/BulkInquiryModal';
@@ -23,6 +14,22 @@ import imcLogo from './components/imc-logo.png';
 import mpPoliceLogo from './components/mp-police-logo.png';
 import solugenixLogo from './components/solugenix-logo.png';
 import { useEffect, useState } from "react";
+
+// Route-level code splitting — everything except the homepage itself is
+// lazy-loaded, so a homepage visitor's initial JS payload doesn't include
+// the Register form, HR portal, payment confirmation page, etc. Each
+// becomes its own chunk fetched only when that route is actually visited.
+const RegisterPage = lazy(() => import('./pages/RegisterPage'));
+const HRPortalPage = lazy(() => import('./pages/HRPortalPage'));
+const HRForgotPasswordPage = lazy(() => import('./pages/HRForgotPasswordPage').then((m) => ({ default: m.HRForgotPasswordPage })));
+const HRResetPasswordPage = lazy(() => import('./pages/HRForgotPasswordPage').then((m) => ({ default: m.HRResetPasswordPage })));
+const AboutPage = lazy(() => import('./pages/AboutPage'));
+const ContactPage = lazy(() => import('./pages/ContactPage'));
+const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
+const TermsPage = lazy(() => import('./pages/TermsPage'));
+const TreeCounterPage = lazy(() => import('./pages/TreeCounterPage'));
+const PaymentDetailsPage = lazy(() => import('./pages/PaymentDetailsPage'));
+const HowItWorksPage = lazy(() => import('./pages/HowItWorksPage'));
 
 // The runner app is a separate SPA (apps/runner-app) served under the same
 // domain in production (marathon.theisa.in/runner) but a different local
@@ -330,21 +337,35 @@ function HomePage() {
   );
 }
 
+// Minimal, brand-neutral placeholder shown only while a lazy route's own
+// chunk is still downloading — real pages render their own loading states
+// once mounted, so this just needs to avoid a blank screen for that gap.
+function RouteFallback() {
+  return (
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff' }}>
+      <div style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid rgba(27,42,91,0.15)', borderTopColor: '#1B2A5B', animation: 'spin 0.8s linear infinite' }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+}
+
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<HomePage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route path="/hr-portal" element={<HRPortalPage />} />
-      <Route path="/hr-forgot-password" element={<HRForgotPasswordPage />} />
-      <Route path="/hr-reset-password" element={<HRResetPasswordPage />} />
-      <Route path="/about" element={<AboutPage />} />
-      <Route path="/contact" element={<ContactPage />} />
-      <Route path="/privacy" element={<PrivacyPolicyPage />} />
-      <Route path="/terms" element={<TermsPage />} />
-      <Route path="/green" element={<TreeCounterPage />} />
-      <Route path="/details" element={<PaymentDetailsPage />} />
-      <Route path="/how-it-works" element={<HowItWorksPage />} />
-    </Routes>
+    <Suspense fallback={<RouteFallback />}>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/hr-portal" element={<HRPortalPage />} />
+        <Route path="/hr-forgot-password" element={<HRForgotPasswordPage />} />
+        <Route path="/hr-reset-password" element={<HRResetPasswordPage />} />
+        <Route path="/about" element={<AboutPage />} />
+        <Route path="/contact" element={<ContactPage />} />
+        <Route path="/privacy" element={<PrivacyPolicyPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/green" element={<TreeCounterPage />} />
+        <Route path="/details" element={<PaymentDetailsPage />} />
+        <Route path="/how-it-works" element={<HowItWorksPage />} />
+      </Routes>
+    </Suspense>
   );
 }

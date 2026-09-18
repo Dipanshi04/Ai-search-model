@@ -513,26 +513,17 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
       return;
     }
 
-    const requiredColumns = ['name', 'email', 'phone', 'category', 'gender'];
-    const csvHeaders = Object.keys(records[0] || {}).map(h => h.toLowerCase().trim());
+    // Normalized the same way as each row below (lowercase, no underscores/
+    // spaces) so "tshirtSize", "tshirt_size", "T Shirt Size", etc. are all
+    // recognized as present regardless of exactly how the CSV spells them.
+    const requiredColumns = ['name', 'email', 'phone', 'category', 'gender', 'tshirtsize'];
+    const csvHeaders = Object.keys(records[0] || {}).map(h => h.toLowerCase().replace(/[_\s]/g, ''));
     const missingColumns = requiredColumns.filter(col => !csvHeaders.includes(col));
     if (missingColumns.length > 0) {
+      const display = missingColumns.map(c => c === 'tshirtsize' ? 'tshirtSize' : c);
       res.status(400).json({
         success: false,
-        message: `Missing required columns: ${missingColumns.join(', ')}. Required: name, email, phone, category, gender`,
-      });
-      return;
-    }
-    // tshirtSize isn't part of requiredColumns above (rows still process
-    // without it) but the HR portal's CSV instructions tell HR it's
-    // required — so a CSV missing the column entirely is rejected here,
-    // same as the columns above. A per-row blank cell is still allowed
-    // through (flagged per-row below) since column presence and per-row
-    // completeness are different failure modes.
-    if (!csvHeaders.includes('tshirtsize') && !csvHeaders.includes('tshirt_size')) {
-      res.status(400).json({
-        success: false,
-        message: 'Missing required column: tshirtSize. Required: name, email, phone, category, gender, tshirtSize',
+        message: `Missing required columns: ${display.join(', ')}. Required: name, email, phone, category, gender, tshirtSize`,
       });
       return;
     }
@@ -557,15 +548,26 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
     let updated = 0;
 
     for (const record of records) {
-      const name = record.name?.trim();
-      const email = record.email?.trim().toLowerCase();
-      const phone = record.phone?.trim();
-      const gender = record.gender?.trim().toUpperCase();
-      const emergencyContact = record.emergencycontact?.trim() || record.emergency_contact?.trim() || null;
-      const emergencyPhone = record.emergencyphone?.trim() || record.emergency_phone?.trim() || null;
-      const bloodGroup = record.bloodgroup?.trim() || record.blood_group?.trim() || null;
-      const bloodDonation = record.blooddonation === 'true' || record.blood_donation === 'true' || record.blooddonation === 'TRUE' || record.blood_donation === 'TRUE';
-      const tshirtSize = record.tshirtsize?.trim() || record.tshirt_size?.trim() || null;
+      // csv-parse keeps each header's exact casing as the object key, so a
+      // "tshirtSize" column lands on record.tshirtSize, not record.tshirtsize
+      // — reading the wrong-case key silently returned undefined for every
+      // row regardless of the file's actual data. Normalizing keys to
+      // lowercase/no-separators once per row makes the lookup accept
+      // tshirtSize, tshirt_size, TSHIRTSIZE, etc. uniformly.
+      const norm: Record<string, string> = {};
+      for (const [k, v] of Object.entries(record)) {
+        norm[k.toLowerCase().replace(/[_\s]/g, '')] = v;
+      }
+
+      const name = norm.name?.trim();
+      const email = norm.email?.trim().toLowerCase();
+      const phone = norm.phone?.trim();
+      const gender = norm.gender?.trim().toUpperCase();
+      const emergencyContact = norm.emergencycontact?.trim() || null;
+      const emergencyPhone = norm.emergencyphone?.trim() || null;
+      const bloodGroup = norm.bloodgroup?.trim() || null;
+      const bloodDonation = norm.blooddonation?.trim().toLowerCase() === 'true';
+      const tshirtSize = norm.tshirtsize?.trim() || null;
 
       if (!name || !email || !phone || !gender) {
         results.push({ success: false, name: name || 'N/A', email: email || 'N/A', error: 'Missing required fields' });
@@ -587,7 +589,7 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
         FUN: 'RUN_3K',
         CHALLENGE: 'RUN_5K',
       };
-      let category = record.category?.trim().toUpperCase();
+      let category = norm.category?.trim().toUpperCase();
       if (!category) {
         results.push({ success: false, name, email, error: 'Missing required field: category' });
         continue;

@@ -401,6 +401,65 @@ hrRouter.post('/participants', hrAuth, async (req: Request, res: Response) => {
   }
 });
 
+// Lets HR fix a typo (name, phone, category, gender, t-shirt size, etc.) in
+// a participant they registered — added because HR previously had no way
+// to correct a bad CSV row or add-form entry short of asking an admin.
+// Scoped to bulkRegistrationId === hrId so HR can only touch their own
+// company's participants, never another company's or a publicly-registered one.
+hrRouter.put('/participants/:id', hrAuth, async (req: Request, res: Response) => {
+  try {
+    const hrId = (req as any).hr.userId;
+    const participant = await prisma.participant.findUnique({ where: { id: req.params.id as string } });
+    if (!participant || participant.bulkRegistrationId !== hrId) {
+      res.status(404).json({ success: false, message: 'Participant not found' });
+      return;
+    }
+
+    const {
+      name, phone, category, gender, emergencyContact, emergencyPhone, bloodGroup, bloodDonation, tshirtSize,
+    } = req.body as {
+      name?: string; phone?: string; category?: string; gender?: string;
+      emergencyContact?: string; emergencyPhone?: string; bloodGroup?: string;
+      bloodDonation?: boolean; tshirtSize?: string;
+    };
+
+    if (name !== undefined || phone !== undefined) {
+      await prisma.user.update({
+        where: { id: participant.userId },
+        data: {
+          ...(name !== undefined && { name: String(name).trim() }),
+          ...(phone !== undefined && { phone: String(phone).trim() }),
+        },
+      });
+    }
+
+    const updated = await prisma.participant.update({
+      where: { id: participant.id },
+      data: {
+        ...(category !== undefined && { category: category as any }),
+        ...(gender !== undefined && { gender: gender as any }),
+        ...(emergencyContact !== undefined && { emergencyContact }),
+        ...(emergencyPhone !== undefined && { emergencyPhone }),
+        ...(bloodGroup !== undefined && { bloodGroup }),
+        ...(bloodDonation !== undefined && { bloodDonation: Boolean(bloodDonation) }),
+        ...(tshirtSize !== undefined && { tshirtSize }),
+      },
+      include: { user: { select: { name: true, email: true, phone: true } } },
+    });
+
+    logger.info(`HR updated participant ${updated.bibNumber} (${req.params.id})`);
+
+    res.json({ success: true, data: updated });
+  } catch (error: any) {
+    if (error?.code === 'P2002') {
+      res.status(409).json({ success: false, message: 'Another account already uses that phone number' });
+      return;
+    }
+    logger.error('HR update participant error:', error);
+    res.status(500).json({ success: false, message: 'Failed to update participant' });
+  }
+});
+
 hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Request, res: Response) => {
   try {
     const hrId = (req as any).hr.userId;
@@ -416,8 +475,16 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
       return;
     }
 
-    const usedCount = await prisma.participant.count({ where: { bulkRegistrationId: hrId } });
+    const existingParticipants = await prisma.participant.findMany({
+      where: { bulkRegistrationId: hrId },
+      include: { user: { select: { email: true } } },
+    });
+    const usedCount = existingParticipants.length;
     const remaining = bulkReg.numberOfRegistrations - usedCount;
+    // Keyed by lowercased email so a re-uploaded CSV updates an existing
+    // row (fixing a typo'd category/tshirtSize/etc.) instead of failing on
+    // the email's unique constraint or eating a registration slot again.
+    const existingByEmail = new Map(existingParticipants.map((p) => [p.user.email.toLowerCase(), p]));
 
     let records: Record<string, string>[];
     try {
@@ -433,11 +500,15 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
       return;
     }
 
-    if (records.length > remaining) {
+    const newRowCount = records.filter((r) => {
+      const email = r.email?.trim().toLowerCase();
+      return !email || !existingByEmail.has(email);
+    }).length;
+    if (newRowCount > remaining) {
       res.status(400).json({
         success: false,
-        message: `CSV has ${records.length} entries but only ${remaining} slot${remaining !== 1 ? 's' : ''} remaining.`,
-        data: { csvRows: records.length, remaining, used: usedCount, max: bulkReg.numberOfRegistrations },
+        message: `CSV has ${newRowCount} new entr${newRowCount !== 1 ? 'ies' : 'y'} but only ${remaining} slot${remaining !== 1 ? 's' : ''} remaining. Rows matching an already-registered email will update that entry instead of using a slot.`,
+        data: { csvRows: records.length, newRows: newRowCount, remaining, used: usedCount, max: bulkReg.numberOfRegistrations },
       });
       return;
     }
@@ -449,6 +520,19 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
       res.status(400).json({
         success: false,
         message: `Missing required columns: ${missingColumns.join(', ')}. Required: name, email, phone, category, gender`,
+      });
+      return;
+    }
+    // tshirtSize isn't part of requiredColumns above (rows still process
+    // without it) but the HR portal's CSV instructions tell HR it's
+    // required — so a CSV missing the column entirely is rejected here,
+    // same as the columns above. A per-row blank cell is still allowed
+    // through (flagged per-row below) since column presence and per-row
+    // completeness are different failure modes.
+    if (!csvHeaders.includes('tshirtsize') && !csvHeaders.includes('tshirt_size')) {
+      res.status(400).json({
+        success: false,
+        message: 'Missing required column: tshirtSize. Required: name, email, phone, category, gender, tshirtSize',
       });
       return;
     }
@@ -468,8 +552,9 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
       return;
     }
 
-    const results: { success: boolean; name: string; email: string; bibNumber?: string; pin?: string; error?: string }[] = [];
+    const results: { success: boolean; name: string; email: string; bibNumber?: string; pin?: string; error?: string; updated?: boolean }[] = [];
     let created = 0;
+    let updated = 0;
 
     for (const record of records) {
       const name = record.name?.trim();
@@ -484,6 +569,10 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
 
       if (!name || !email || !phone || !gender) {
         results.push({ success: false, name: name || 'N/A', email: email || 'N/A', error: 'Missing required fields' });
+        continue;
+      }
+      if (!tshirtSize) {
+        results.push({ success: false, name, email, error: 'Missing required field: tshirtSize' });
         continue;
       }
 
@@ -518,6 +607,26 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
       }
 
       try {
+        const existing = existingByEmail.get(email);
+        if (existing) {
+          await prisma.user.update({ where: { id: existing.userId }, data: { name, phone } });
+          const updatedParticipant = await prisma.participant.update({
+            where: { id: existing.id },
+            data: {
+              category: category as any,
+              gender: gender as any,
+              emergencyContact,
+              emergencyPhone,
+              bloodGroup,
+              bloodDonation,
+              tshirtSize,
+            },
+          });
+          results.push({ success: true, name, email, bibNumber: updatedParticipant.bibNumber, updated: true });
+          updated++;
+          continue;
+        }
+
         let user = await prisma.user.findUnique({ where: { email } });
         let isNewUser = false;
         let pin = '';
@@ -594,14 +703,15 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
       }
     }
 
-    logger.info(`HR CSV upload: ${created}/${records.length} created by ${bulkReg.hrEmail}`);
+    logger.info(`HR CSV upload: ${created} created, ${updated} updated, of ${records.length} rows by ${bulkReg.hrEmail}`);
 
     res.json({
       success: true,
       data: {
         total: records.length,
         created,
-        failed: records.length - created,
+        updated,
+        failed: records.length - created - updated,
         results,
       },
     });

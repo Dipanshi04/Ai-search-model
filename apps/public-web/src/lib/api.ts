@@ -179,6 +179,22 @@ class ApiClient {
     return response.json();
   }
 
+  async hrUpdateParticipant(id: string, data: {
+    name?: string; phone?: string; category?: string; gender?: string;
+    emergencyContact?: string; emergencyPhone?: string; bloodGroup?: string;
+    bloodDonation?: boolean; tshirtSize?: string;
+  }) {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const hrToken = localStorage.getItem('hr_token');
+    if (hrToken) headers['Authorization'] = `Bearer ${hrToken}`;
+    const response = await fetch(`${API_URL}/api/v1/hr/participants/${id}`, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify(data),
+    });
+    return response.json();
+  }
+
   async hrUploadCSV(file: File) {
     const formData = new FormData();
     formData.append('file', file);

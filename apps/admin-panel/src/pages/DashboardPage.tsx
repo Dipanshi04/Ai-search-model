@@ -10,7 +10,11 @@ interface Stats {
   running: number;
   finished: number;
   byCategory: { category: string; _count: { category: number } }[];
+  byTshirtSize: { tshirtSize: string; _count: { tshirtSize: number } }[];
+  missingTshirtSize: number;
 }
+
+const TSHIRT_SIZE_ORDER = ['S', 'M', 'L', 'XL', 'XXL', '3XL'];
 
 interface RaceStatus {
   event: any;
@@ -113,6 +117,16 @@ export default function DashboardPage() {
     name: c.category.replace('RUN_', '') + 'K',
     value: c._count.category,
   }));
+
+  const tshirtData = (stats?.byTshirtSize || [])
+    .map((t) => ({ size: t.tshirtSize, value: t._count.tshirtSize }))
+    .sort((a, b) => {
+      const ai = TSHIRT_SIZE_ORDER.indexOf(a.size);
+      const bi = TSHIRT_SIZE_ORDER.indexOf(b.size);
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    });
+  const tshirtTotal = tshirtData.reduce((sum, t) => sum + t.value, 0);
+  const missingTshirtSize = stats?.missingTshirtSize || 0;
 
   const funnelData = [
     { name: 'Registered', value: total, fill: '#6366f1' },
@@ -245,6 +259,34 @@ export default function DashboardPage() {
             </BarChart>
           </ResponsiveContainer>
         </div>
+      </div>
+
+      {/* T-Shirt Sizes */}
+      <div className="glass rounded-[2rem] border border-white/20 shadow-sm p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-slate-500">T-Shirt Sizes</h3>
+          <span className="text-xs text-slate-400">{tshirtTotal} with a size on file</span>
+        </div>
+        {tshirtData.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
+            {tshirtData.map((t) => (
+              <div key={t.size} className="rounded-2xl bg-white/60 border border-white/40 px-4 py-3 text-center">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{t.size}</p>
+                <p className="text-2xl font-bold text-slate-950 mt-1">{t.value}</p>
+              </div>
+            ))}
+            {missingTshirtSize > 0 && (
+              <div className="rounded-2xl bg-amber-50 border border-amber-200 px-4 py-3 text-center">
+                <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Missing</p>
+                <p className="text-2xl font-bold text-amber-700 mt-1">{missingTshirtSize}</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-16 text-slate-400 text-sm">
+            No t-shirt sizes on file yet
+          </div>
+        )}
       </div>
 
       {/* Upcoming Events */}

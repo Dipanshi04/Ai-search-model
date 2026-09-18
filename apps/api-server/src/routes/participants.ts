@@ -38,7 +38,7 @@ participantsRouter.get('/stats/summary', async (req, res) => {
       return;
     }
 
-    const [total, checkedIn, running, finished, byCategory] = await Promise.all([
+    const [total, checkedIn, running, finished, byCategory, byTshirtSize, missingTshirtSize] = await Promise.all([
       prisma.participant.count({ where: { eventId: targetEventId } }),
       prisma.participant.count({ where: { eventId: targetEventId, checkedIn: true } }),
       prisma.participant.count({ where: { eventId: targetEventId, status: 'RUNNING' } }),
@@ -50,11 +50,17 @@ participantsRouter.get('/stats/summary', async (req, res) => {
         where: { eventId: targetEventId },
         _count: { category: true },
       }),
+      prisma.participant.groupBy({
+        by: ['tshirtSize'],
+        where: { eventId: targetEventId, tshirtSize: { not: null } },
+        _count: { tshirtSize: true },
+      }),
+      prisma.participant.count({ where: { eventId: targetEventId, tshirtSize: null } }),
     ]);
 
     res.json({
       success: true,
-      data: { total, checkedIn, running, finished, byCategory },
+      data: { total, checkedIn, running, finished, byCategory, byTshirtSize, missingTshirtSize },
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch participant stats' });
@@ -198,6 +204,18 @@ participantsRouter.post('/', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANA
       const pinHash = await hashPassword(pin);
       user = await prisma.user.update({ where: { id: user.id }, data: { pinHash } });
       isNewUser = true;
+    }
+
+    const existingParticipant = await prisma.participant.findFirst({
+      where: { userId: user.id, eventId: event.id },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (existingParticipant) {
+      res.status(409).json({
+        success: false,
+        message: `${user.name} is already registered for this event as BIB ${existingParticipant.bibNumber}. Edit that participant instead of adding a new one.`,
+      });
+      return;
     }
 
     const { bibCounter } = await prisma.event.update({

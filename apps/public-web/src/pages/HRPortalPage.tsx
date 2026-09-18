@@ -21,9 +21,18 @@ interface Participant {
   gender: string;
   status: string;
   paymentStatus: string;
+  tshirtSize: string | null;
+  bloodGroup: string | null;
+  emergencyContact: string | null;
+  emergencyPhone: string | null;
   createdAt: string;
   user: { name: string; email: string; phone: string };
 }
+
+const emptyEditForm = {
+  name: '', phone: '', category: 'RUN_3K', gender: 'MALE', tshirtSize: 'M', bloodGroup: '',
+  emergencyContact: '', emergencyPhone: '',
+};
 
 const emptyForm = {
   name: '', email: '', phone: '', category: 'RUN_3K', gender: 'MALE',
@@ -59,6 +68,10 @@ export default function HRPortalPage() {
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [editingParticipant, setEditingParticipant] = useState<Participant | null>(null);
+  const [editForm, setEditForm] = useState(emptyEditForm);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState('');
 
   useEffect(() => {
     if (token) {
@@ -137,6 +150,49 @@ export default function HRPortalPage() {
       }
     } catch (err: any) { setError(err.message || 'Registration failed'); }
     setLoading(false);
+  }
+
+  function openEditParticipant(p: Participant) {
+    setEditForm({
+      name: p.user.name,
+      phone: p.user.phone,
+      category: p.category,
+      gender: p.gender,
+      tshirtSize: p.tshirtSize || '',
+      bloodGroup: p.bloodGroup || '',
+      emergencyContact: p.emergencyContact || '',
+      emergencyPhone: p.emergencyPhone || '',
+    });
+    setEditError('');
+    setEditingParticipant(p);
+  }
+
+  async function handleEditSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingParticipant) return;
+    setEditSaving(true);
+    setEditError('');
+    try {
+      const res = await api.hrUpdateParticipant(editingParticipant.id, {
+        name: editForm.name,
+        phone: editForm.phone,
+        category: editForm.category,
+        gender: editForm.gender,
+        tshirtSize: editForm.tshirtSize || undefined,
+        bloodGroup: editForm.bloodGroup || undefined,
+        emergencyContact: editForm.emergencyContact || undefined,
+        emergencyPhone: editForm.emergencyPhone || undefined,
+      });
+      if (res.success) {
+        setEditingParticipant(null);
+        loadParticipants();
+      } else {
+        setEditError(res.message || 'Update failed');
+      }
+    } catch (err: any) {
+      setEditError(err.message || 'Update failed');
+    }
+    setEditSaving(false);
   }
 
   async function handleCSVUpload(e: React.FormEvent) {
@@ -306,6 +362,7 @@ export default function HRPortalPage() {
                       <th className="text-left px-4 py-3 text-brand-navy/50 font-semibold">Phone</th>
                       <th className="text-center px-4 py-3 text-brand-navy/50 font-semibold">Category</th>
                       <th className="text-center px-4 py-3 text-brand-navy/50 font-semibold">Status</th>
+                      <th className="text-right px-4 py-3 text-brand-navy/50 font-semibold">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -329,10 +386,15 @@ export default function HRPortalPage() {
                             'bg-brand-navy/10 text-brand-navy'
                           }`}>{p.status}</span>
                         </td>
+                        <td className="px-4 py-3 text-right">
+                          <button onClick={() => openEditParticipant(p)} className="text-brand-orange hover:text-brand-orange/80 text-xs font-semibold">
+                            Edit
+                          </button>
+                        </td>
                       </tr>
                     ))}
                     {participants.length === 0 && (
-                      <tr><td colSpan={6} className="px-4 py-8 text-center text-brand-navy/50">No participants registered yet</td></tr>
+                      <tr><td colSpan={7} className="px-4 py-8 text-center text-brand-navy/50">No participants registered yet</td></tr>
                     )}
                   </tbody>
                 </table>
@@ -444,6 +506,7 @@ export default function HRPortalPage() {
               </div>
               <div className="hero-body px-8 py-7">
                 <p className="text-sm text-brand-navy/70 mb-2">CSV must have columns: <strong>name, email, phone, category, gender, tshirtSize. Accepted categories: RUN_3K, RUN_5K</strong>.</p>
+                <p className="text-sm text-brand-navy/70 mb-2">Made a mistake? Fix the row and re-upload the same CSV — a row whose <strong>email</strong> already matches someone you registered will update that entry instead of creating a duplicate, and won't use up another slot.</p>
 
                 <form onSubmit={handleCSVUpload} className="space-y-5">
                   <div>
@@ -472,6 +535,7 @@ export default function HRPortalPage() {
                   <div className="mt-8 space-y-3">
                     <div className="flex gap-3 text-sm">
                       <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 font-medium">Created: {csvResult.created}</span>
+                      {csvResult.updated > 0 && <span className="px-3 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">Updated: {csvResult.updated}</span>}
                       {csvResult.failed > 0 && <span className="px-3 py-1 rounded-full bg-red-100 text-red-700 font-medium">Failed: {csvResult.failed}</span>}
                       <span className="px-3 py-1 rounded-full bg-brand-navy/10 text-brand-navy font-medium">Total: {csvResult.total}</span>
                     </div>
@@ -497,7 +561,9 @@ export default function HRPortalPage() {
                                   {r.success ? (r.pin || 'Already set') : '-'}
                                 </td>
                                 <td className="px-3 py-2">
-                                  {r.success ? <span className="text-emerald-700 font-medium">Success</span> : <span className="text-red-600">{r.error}</span>}
+                                  {r.success
+                                    ? <span className={r.updated ? 'text-blue-700 font-medium' : 'text-emerald-700 font-medium'}>{r.updated ? 'Updated' : 'Created'}</span>
+                                    : <span className="text-red-600">{r.error}</span>}
                                 </td>
                               </tr>
                             ))}
@@ -511,6 +577,92 @@ export default function HRPortalPage() {
             </div>
           )}
         </div>
+
+        {editingParticipant && (
+          <div className="fixed inset-0 bg-brand-navy/40 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+            <div className="bg-white rounded-2xl w-full max-w-lg shadow-lg border border-brand-navy/10 overflow-hidden">
+              <div className="flex items-center justify-between px-6 pt-5 pb-2">
+                <h3 className="hero-title text-lg font-bold text-brand-navy">
+                  Edit {editingParticipant.bibNumber}
+                </h3>
+                <button onClick={() => setEditingParticipant(null)}
+                  className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-brand-cream text-brand-navy/40 hover:text-brand-navy/70 transition">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <form onSubmit={handleEditSubmit} className="hero-body px-6 pb-6 pt-3 space-y-4">
+                {editError && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-2.5 rounded-xl text-sm">{editError}</div>}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-brand-navy/60 mb-1.5">Name</label>
+                    <input value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                      required className="w-full px-4 py-2.5 bg-brand-cream border border-brand-navy/15 rounded-xl text-brand-navy text-sm focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none transition" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-brand-navy/60 mb-1.5">Phone</label>
+                    <input value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
+                      required className="w-full px-4 py-2.5 bg-brand-cream border border-brand-navy/15 rounded-xl text-brand-navy text-sm focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none transition" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-brand-navy/60 mb-1.5">Category</label>
+                    <select value={editForm.category} onChange={e => setEditForm({ ...editForm, category: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-brand-cream border border-brand-navy/15 rounded-xl text-brand-navy text-sm focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none transition">
+                      <option value="RUN_3K">3K</option>
+                      <option value="RUN_5K">5K</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-brand-navy/60 mb-1.5">Gender</label>
+                    <select value={editForm.gender} onChange={e => setEditForm({ ...editForm, gender: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-brand-cream border border-brand-navy/15 rounded-xl text-brand-navy text-sm focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none transition">
+                      <option value="MALE">Male</option>
+                      <option value="FEMALE">Female</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-brand-navy/60 mb-1.5">T-Shirt</label>
+                    <select value={editForm.tshirtSize} onChange={e => setEditForm({ ...editForm, tshirtSize: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-brand-cream border border-brand-navy/15 rounded-xl text-brand-navy text-sm focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none transition">
+                      <option value="">—</option>
+                      <option value="S">S</option>
+                      <option value="M">M</option>
+                      <option value="L">L</option>
+                      <option value="XL">XL</option>
+                      <option value="XXL">XXL</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-brand-navy/60 mb-1.5">Emergency Contact</label>
+                    <input value={editForm.emergencyContact} onChange={e => setEditForm({ ...editForm, emergencyContact: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-brand-cream border border-brand-navy/15 rounded-xl text-brand-navy text-sm focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none transition" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-brand-navy/60 mb-1.5">Emergency Phone</label>
+                    <input value={editForm.emergencyPhone} onChange={e => setEditForm({ ...editForm, emergencyPhone: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-brand-cream border border-brand-navy/15 rounded-xl text-brand-navy text-sm focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none transition" />
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-2">
+                  <button type="submit" disabled={editSaving}
+                    className="flex-1 px-4 py-2.5 bg-brand-orange hover:opacity-90 text-white rounded-xl text-sm font-bold disabled:opacity-50 transition">
+                    {editSaving ? 'Saving...' : 'Save Changes'}
+                  </button>
+                  <button type="button" onClick={() => setEditingParticipant(null)}
+                    className="px-4 py-2.5 bg-white border border-brand-navy/20 text-brand-navy rounded-xl text-sm font-medium hover:bg-brand-cream transition">
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
         <Footer />
       </main>
     </div>

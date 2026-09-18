@@ -254,6 +254,7 @@ function HomePage() {
               <p className="hero-kicker text-xs sm:text-sm font-bold uppercase tracking-wide text-white mb-2">Retail Price</p>
               <p className="hero-body text-sm sm:text-base text-white/80">3 KM — <span className="font-bold text-white">₹299</span></p>
               <p className="hero-body text-sm sm:text-base text-white/80">5 KM — <span className="font-bold text-white">₹499</span></p>
+              <p className="hero-body text-xs sm:text-sm font-bold mt-2" style={{ color: '#10b981' }}>Every rupee helps us plant a tree 🌱</p>
             </div>
             <button
               type="button"

@@ -35,7 +35,7 @@ const FAQS = [
   },
   {
     q: 'How does the tree-planting work?',
-    a: 'For every 5 kilometers run by all participants combined — across both 3K and 5K categories — we plant one tree in partnership with reforestation organizations. You can follow the live tree counter on our Green Mission page.',
+    a: 'For every 5 kilometers run by all participants combined — across both 3K and 5K categories — we plant one tree in partnership with reforestation organizations. Every rupee from your registration fee also goes toward this mission. You can follow the live tree counter on our Green Mission page.',
   },
 ];
 

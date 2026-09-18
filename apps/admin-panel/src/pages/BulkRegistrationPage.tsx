@@ -35,6 +35,8 @@ export default function BulkRegistrationPage() {
   const [companyId, setCompanyId] = useState('');
   const [companyDropdownOpen, setCompanyDropdownOpen] = useState(false);
   const companyFieldRef = useRef<HTMLDivElement>(null);
+  const [resetResult, setResetResult] = useState<{ hrEmail: string; password: string } | null>(null);
+  const [resettingId, setResettingId] = useState<string | null>(null);
 
   useEffect(() => { fetchRegistrations(); }, []);
 
@@ -108,6 +110,23 @@ export default function BulkRegistrationPage() {
       alert(e.message || 'Failed to save');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleResetPassword(reg: BulkRegistration) {
+    if (!confirm(`Generate a new password for ${reg.hrName} (${reg.hrEmail})? Their current password will stop working.`)) return;
+    setResettingId(reg.id);
+    try {
+      const res = await api.resetBulkRegistrationPassword(reg.id);
+      if (res.success && res.data) {
+        setResetResult({ hrEmail: res.data.hrEmail, password: res.data.password });
+      } else {
+        alert(res.message || 'Failed to reset password');
+      }
+    } catch (e: any) {
+      alert(e.message || 'Failed to reset password');
+    } finally {
+      setResettingId(null);
     }
   }
 
@@ -231,6 +250,13 @@ export default function BulkRegistrationPage() {
                 </td>
                 <td className="px-5 py-4 text-right space-x-3">
                   <button onClick={() => openEdit(reg)} className="text-violet-700 hover:text-violet-900 text-xs">Edit</button>
+                  <button
+                    onClick={() => handleResetPassword(reg)}
+                    disabled={resettingId === reg.id}
+                    className="text-amber-600 hover:text-amber-700 text-xs disabled:opacity-50"
+                  >
+                    {resettingId === reg.id ? 'Resetting...' : 'Reset Password'}
+                  </button>
                   <button onClick={() => handleDelete(reg.id)} className="text-red-500 hover:text-red-600 text-xs">Delete</button>
                 </td>
               </tr>
@@ -423,6 +449,40 @@ export default function BulkRegistrationPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {resetResult && (
+        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="glass rounded-[2rem] w-[28rem] border border-white/20 shadow-lg overflow-hidden">
+            <div className="px-8 pt-6 pb-2">
+              <h3 className="text-xl font-bold text-slate-950">Password Reset</h3>
+              <p className="text-sm text-slate-500 mt-1">
+                Share this with <strong className="text-slate-700">{resetResult.hrEmail}</strong> — it won't be shown again.
+              </p>
+            </div>
+            <div className="px-8 py-6">
+              <div className="flex items-center justify-between gap-3 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl">
+                <span className="font-mono text-lg font-bold text-slate-950 tracking-wide">{resetResult.password}</span>
+                <button
+                  type="button"
+                  onClick={() => navigator.clipboard.writeText(resetResult.password)}
+                  className="text-xs font-medium text-violet-700 hover:text-violet-900 shrink-0"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+            <div className="px-8 pb-8">
+              <button
+                type="button"
+                onClick={() => setResetResult(null)}
+                className="w-full px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-medium transition"
+              >
+                Done
+              </button>
+            </div>
           </div>
         </div>
       )}

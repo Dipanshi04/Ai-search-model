@@ -236,6 +236,43 @@ bulkRegistrationRouter.put('/:id', async (req: Request, res: Response) => {
   }
 });
 
+// Admin-only fallback for when an HR forgets their password and can't (or
+// won't) use the self-service /hr/forgot-password email flow — mirrors the
+// participant reset-pin endpoint's pattern of generating a new credential
+// and returning it in plaintext so staff can read it out directly. Only
+// bulkRegistration.hrPasswordHash is updated, matching what HR login and
+// the email-based reset flow already check (see hr.ts's /login and
+// /reset-password) — the linked User row's passwordHash is untouched.
+bulkRegistrationRouter.post('/:id/reset-password', async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const { password } = req.body as { password?: string };
+
+    const bulkReg = await prisma.bulkRegistration.findUnique({ where: { id } });
+    if (!bulkReg) {
+      res.status(404).json({ success: false, message: 'Bulk registration not found' });
+      return;
+    }
+
+    if (password !== undefined && password.length < 6) {
+      res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+      return;
+    }
+
+    const newPassword = password || Math.random().toString(36).slice(-8);
+    const hrPasswordHash = await hashPassword(newPassword);
+
+    await prisma.bulkRegistration.update({ where: { id }, data: { hrPasswordHash } });
+
+    logger.info(`Admin reset HR password for bulk registration ${id} (${bulkReg.hrEmail})`);
+
+    res.json({ success: true, data: { password: newPassword, hrEmail: bulkReg.hrEmail } });
+  } catch (error) {
+    logger.error('Admin reset HR password error:', error);
+    res.status(500).json({ success: false, message: 'Failed to reset password' });
+  }
+});
+
 bulkRegistrationRouter.delete('/:id', async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;

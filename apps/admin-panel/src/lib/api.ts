@@ -340,6 +340,13 @@ class ApiClient {
     });
   }
 
+  async resetBulkRegistrationPassword(id: string, password?: string) {
+    return this.request<{ password: string; hrEmail: string }>(`/api/v1/bulk-registration/${id}/reset-password`, {
+      method: 'POST',
+      body: JSON.stringify(password ? { password } : {}),
+    });
+  }
+
   async deleteBulkRegistration(id: string) {
     return this.request<void>(`/api/v1/bulk-registration/${id}`, { method: 'DELETE' });
   }

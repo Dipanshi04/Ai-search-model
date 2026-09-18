@@ -308,12 +308,22 @@ function paint(ctx: CanvasRenderingContext2D, W: number, assets: PaintAssets): n
   }
 
   // ---- Name (bigger when there's no photo to fill the space) ----
-  // The gap has to clear the name font's own height (130px when there's
+  // The gap has to clear the name font's own height (98px when there's
   // no photo), not just a fixed offset, or it overlaps the row above.
-  y += hasPhoto ? 100 : 165;
+  y += hasPhoto ? 90 : 130;
   ctx.fillStyle = ORANGE;
-  ctx.font = `800 ${hasPhoto ? 72 : 130}px ${FONT_DISPLAY}`;
-  ctx.fillText(opts.name.toUpperCase(), W / 2, y);
+  const nameText = opts.name.toUpperCase();
+  let nameFontSize = hasPhoto ? 56 : 98;
+  const maxNameWidth = W - 120;
+  ctx.font = `800 ${nameFontSize}px ${FONT_DISPLAY}`;
+  // Long names (two+ words, some runners have very long full names) can
+  // still overflow the card at the base size — shrink until it fits
+  // rather than letting it run off the edges or overlap the sponsor grid.
+  while (nameFontSize > 32 && ctx.measureText(nameText).width > maxNameWidth) {
+    nameFontSize -= 4;
+    ctx.font = `800 ${nameFontSize}px ${FONT_DISPLAY}`;
+  }
+  ctx.fillText(nameText, W / 2, y);
 
   // ---- Date / time / venue ----
   y += 70;

@@ -13,6 +13,7 @@ import nrcGroupLogo from './components/nrc-group-logo.png';
 import imcLogo from './components/imc-logo.png';
 import mpPoliceLogo from './components/mp-police-logo.png';
 import solugenixLogo from './components/solugenix-logo.png';
+import cmEndorsementPoster from './components/cm-endorsement-poster.jpeg';
 import { useEffect, useState } from "react";
 
 // Route-level code splitting — everything except the homepage itself is
@@ -302,6 +303,15 @@ function HomePage() {
       <RaceRouteSection />
 
       <SponsorStrip />
+
+      <div className="hero-anim px-4 sm:px-8 pb-6 sm:pb-8 relative z-10 max-w-[1400px] mx-auto w-full" style={{ animationDelay: '600ms' }}>
+        <img
+          src={cmEndorsementPoster}
+          alt="Dr. Mohan Yadav, Hon. Chief Minister of MP — Run for Green Indore, Drug Free Indore, Safe Indore. 3K & 5K, 27 September 2026, 6:30 AM onwards, BBC Basketball Complex."
+          className="w-full h-auto rounded-2xl border shadow-sm"
+          style={{ borderColor: 'rgba(27,42,91,0.1)' }}
+        />
+      </div>
 
       <FAQSection />
 

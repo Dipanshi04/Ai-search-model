@@ -27,6 +27,8 @@ export default function ParticipantsPage() {
   const [editCategory, setEditCategory] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editTshirtSize, setEditTshirtSize] = useState('');
+  const [editEmergencyContact, setEditEmergencyContact] = useState('');
+  const [editEmergencyPhone, setEditEmergencyPhone] = useState('');
   const [detailsSaving, setDetailsSaving] = useState(false);
   const [detailsError, setDetailsError] = useState('');
   const [companies, setCompanies] = useState<any[]>([]);
@@ -162,6 +164,8 @@ export default function ParticipantsPage() {
     setEditCategory(viewParticipant.category || 'RUN_3K');
     setEditPhone(viewParticipant.user?.phone || '');
     setEditTshirtSize(viewParticipant.tshirtSize || '');
+    setEditEmergencyContact(viewParticipant.emergencyContact || '');
+    setEditEmergencyPhone(viewParticipant.emergencyPhone || '');
     setDetailsError('');
     setEditingDetails(true);
   };
@@ -171,7 +175,13 @@ export default function ParticipantsPage() {
     setDetailsError('');
     setDetailsSaving(true);
     try {
-      const res = await api.updateParticipant(viewParticipant.id, { category: editCategory, phone: editPhone, tshirtSize: editTshirtSize || null });
+      const res = await api.updateParticipant(viewParticipant.id, {
+        category: editCategory,
+        phone: editPhone,
+        tshirtSize: editTshirtSize || null,
+        emergencyContact: editEmergencyContact || null,
+        emergencyPhone: editEmergencyPhone || null,
+      });
       if (res.success && res.data) {
         setViewParticipant(res.data);
         setEditingDetails(false);
@@ -483,6 +493,22 @@ export default function ParticipantsPage() {
                     <option value="XL">XL</option>
                     <option value="XXL">XXL</option>
                   </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Emergency Contact</label>
+                  <input
+                    value={editEmergencyContact}
+                    onChange={(e) => setEditEmergencyContact(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Emergency Phone</label>
+                  <input
+                    value={editEmergencyPhone}
+                    onChange={(e) => setEditEmergencyPhone(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
+                  />
                 </div>
                 <div className="flex gap-2 pt-1">
                   <button

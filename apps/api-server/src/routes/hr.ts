@@ -477,14 +477,18 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
 
     const existingParticipants = await prisma.participant.findMany({
       where: { bulkRegistrationId: hrId },
-      include: { user: { select: { email: true } } },
+      include: { user: { select: { email: true, phone: true } } },
     });
     const usedCount = existingParticipants.length;
     const remaining = bulkReg.numberOfRegistrations - usedCount;
-    // Keyed by lowercased email so a re-uploaded CSV updates an existing
-    // row (fixing a typo'd category/tshirtSize/etc.) instead of failing on
-    // the email's unique constraint or eating a registration slot again.
+    // Keyed by lowercased email AND by phone — either matching an existing
+    // row means a re-uploaded CSV updates it (fixing a typo'd category/
+    // tshirtSize/etc.) instead of failing on a unique-constraint or eating
+    // a registration slot again. Not keyed by BIB — the CSV never carries
+    // one, and BIB is meant to stay fixed once printed on a kit anyway.
     const existingByEmail = new Map(existingParticipants.map((p) => [p.user.email.toLowerCase(), p]));
+    const existingByPhone = new Map(existingParticipants.map((p) => [p.user.phone, p]));
+    const findExisting = (email: string, phone: string) => existingByEmail.get(email) || existingByPhone.get(phone);
 
     let records: Record<string, string>[];
     try {
@@ -502,7 +506,8 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
 
     const newRowCount = records.filter((r) => {
       const email = r.email?.trim().toLowerCase();
-      return !email || !existingByEmail.has(email);
+      const phone = r.phone?.trim();
+      return (!email && !phone) || !findExisting(email || '', phone || '');
     }).length;
     if (newRowCount > remaining) {
       res.status(400).json({
@@ -609,7 +614,7 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
       }
 
       try {
-        const existing = existingByEmail.get(email);
+        const existing = findExisting(email, phone);
         if (existing) {
           await prisma.user.update({ where: { id: existing.userId }, data: { name, phone } });
           const updatedParticipant = await prisma.participant.update({

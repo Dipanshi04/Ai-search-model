@@ -153,7 +153,8 @@ function wrapEmailTemplate(bodyHtml: string): string {
       </div>
 
       <div style="padding: 20px 24px 28px; text-align: center;">
-        <p style="margin: 0; font-size: 12px; color: rgba(27,42,91,0.5);">&copy; 2026 ISA Marathon. All rights reserved.</p>
+        <p style="margin: 0 0 6px; font-size: 12px; color: rgba(27,42,91,0.5);">&copy; 2026 ISA Marathon. All rights reserved.</p>
+        <p style="margin: 0; font-size: 11px; color: rgba(27,42,91,0.45);">Proud Tech Partner: <a href="https://www.liseinfotech.com" target="_blank" style="color: ${BRAND_NAVY}; font-weight: 700; text-decoration: none;">Lise Infotech</a></p>
       </div>
     </div>
   `;

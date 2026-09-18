@@ -24,9 +24,13 @@ export default function ParticipantsPage() {
   const [reminderSending, setReminderSending] = useState(false);
   const [reminderMessage, setReminderMessage] = useState('');
   const [editingDetails, setEditingDetails] = useState(false);
+  const [editName, setEditName] = useState('');
   const [editCategory, setEditCategory] = useState('');
+  const [editGender, setEditGender] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editTshirtSize, setEditTshirtSize] = useState('');
+  const [editBloodGroup, setEditBloodGroup] = useState('');
+  const [editBloodDonation, setEditBloodDonation] = useState(false);
   const [editEmergencyContact, setEditEmergencyContact] = useState('');
   const [editEmergencyPhone, setEditEmergencyPhone] = useState('');
   const [detailsSaving, setDetailsSaving] = useState(false);
@@ -161,9 +165,13 @@ export default function ParticipantsPage() {
 
   const startEditDetails = () => {
     if (!viewParticipant) return;
+    setEditName(viewParticipant.user?.name || '');
     setEditCategory(viewParticipant.category || 'RUN_3K');
+    setEditGender(viewParticipant.gender || 'MALE');
     setEditPhone(viewParticipant.user?.phone || '');
     setEditTshirtSize(viewParticipant.tshirtSize || '');
+    setEditBloodGroup(viewParticipant.bloodGroup || '');
+    setEditBloodDonation(!!viewParticipant.bloodDonation);
     setEditEmergencyContact(viewParticipant.emergencyContact || '');
     setEditEmergencyPhone(viewParticipant.emergencyPhone || '');
     setDetailsError('');
@@ -176,9 +184,13 @@ export default function ParticipantsPage() {
     setDetailsSaving(true);
     try {
       const res = await api.updateParticipant(viewParticipant.id, {
+        name: editName,
         category: editCategory,
+        gender: editGender,
         phone: editPhone,
         tshirtSize: editTshirtSize || null,
+        bloodGroup: editBloodGroup || null,
+        bloodDonation: editBloodDonation,
         emergencyContact: editEmergencyContact || null,
         emergencyPhone: editEmergencyPhone || null,
       });
@@ -461,15 +473,37 @@ export default function ParticipantsPage() {
                 )}
                 <p className="text-xs text-slate-400">BIB number can't be changed here.</p>
                 <div>
-                  <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Category</label>
-                  <select
-                    value={editCategory}
-                    onChange={(e) => setEditCategory(e.target.value)}
+                  <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Name</label>
+                  <input
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
                     className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
-                  >
-                    <option value="RUN_3K">3K</option>
-                    <option value="RUN_5K">5K</option>
-                  </select>
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Category</label>
+                    <select
+                      value={editCategory}
+                      onChange={(e) => setEditCategory(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
+                    >
+                      <option value="RUN_3K">3K</option>
+                      <option value="RUN_5K">5K</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Gender</label>
+                    <select
+                      value={editGender}
+                      onChange={(e) => setEditGender(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
+                    >
+                      <option value="MALE">Male</option>
+                      <option value="FEMALE">Female</option>
+                      <option value="NON_BINARY">Non-Binary</option>
+                    </select>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Phone</label>
@@ -479,21 +513,41 @@ export default function ParticipantsPage() {
                     className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">T-Shirt Size</label>
-                  <select
-                    value={editTshirtSize}
-                    onChange={(e) => setEditTshirtSize(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
-                  >
-                    <option value="">Not set</option>
-                    <option value="S">S</option>
-                    <option value="M">M</option>
-                    <option value="L">L</option>
-                    <option value="XL">XL</option>
-                    <option value="XXL">XXL</option>
-                  </select>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">T-Shirt Size</label>
+                    <select
+                      value={editTshirtSize}
+                      onChange={(e) => setEditTshirtSize(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
+                    >
+                      <option value="">Not set</option>
+                      <option value="S">S</option>
+                      <option value="M">M</option>
+                      <option value="L">L</option>
+                      <option value="XL">XL</option>
+                      <option value="XXL">XXL</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Blood Group</label>
+                    <input
+                      value={editBloodGroup}
+                      onChange={(e) => setEditBloodGroup(e.target.value)}
+                      placeholder="e.g. O+"
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
+                    />
+                  </div>
                 </div>
+                <label className="flex items-center gap-2 text-xs text-slate-600 font-medium">
+                  <input
+                    type="checkbox"
+                    checked={editBloodDonation}
+                    onChange={(e) => setEditBloodDonation(e.target.checked)}
+                    className="rounded border-slate-300"
+                  />
+                  Willing to donate blood
+                </label>
                 <div>
                   <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Emergency Contact</label>
                   <input

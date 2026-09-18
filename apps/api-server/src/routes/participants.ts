@@ -413,20 +413,26 @@ participantsRouter.get('/:id', async (req, res) => {
 
 participantsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'), async (req, res) => {
   try {
-    const { status, category, gender, companyId, bibNumber, emergencyContact, emergencyPhone, bloodGroup, tshirtSize, kitDistributed, foodDistributed, paymentStatus, phone } = req.body;
+    const { status, category, gender, companyId, bibNumber, emergencyContact, emergencyPhone, bloodGroup, bloodDonation, tshirtSize, kitDistributed, foodDistributed, paymentStatus, phone, name } = req.body;
     const participant = await prisma.participant.findUnique({ where: { id: req.params.id as string } });
     if (!participant) {
       res.status(404).json({ success: false, message: 'Participant not found' });
       return;
     }
 
-    // Phone lives on the linked User, not Participant — updated separately
-    // from the fields below. BIB number is intentionally never accepted
-    // from the admin-panel edit form (even though the field below still
-    // supports it for scripted/manual fixes) since it's already printed
-    // on kits and used as the runner's public identity.
-    if (phone !== undefined) {
-      await prisma.user.update({ where: { id: participant.userId }, data: { phone: String(phone).trim() } });
+    // Name and phone live on the linked User, not Participant — updated
+    // separately from the fields below. BIB number is intentionally never
+    // accepted from the admin-panel edit form (even though the field below
+    // still supports it for scripted/manual fixes) since it's already
+    // printed on kits and used as the runner's public identity.
+    if (phone !== undefined || name !== undefined) {
+      await prisma.user.update({
+        where: { id: participant.userId },
+        data: {
+          ...(phone !== undefined && { phone: String(phone).trim() }),
+          ...(name !== undefined && { name: String(name).trim() }),
+        },
+      });
     }
 
     const updated = await prisma.participant.update({
@@ -440,6 +446,7 @@ participantsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MA
         ...(emergencyContact !== undefined && { emergencyContact }),
         ...(emergencyPhone !== undefined && { emergencyPhone }),
         ...(bloodGroup !== undefined && { bloodGroup }),
+        ...(bloodDonation !== undefined && { bloodDonation: Boolean(bloodDonation) }),
         ...(tshirtSize !== undefined && { tshirtSize }),
         ...(kitDistributed !== undefined && { kitDistributed: Boolean(kitDistributed) }),
         ...(foodDistributed !== undefined && { foodDistributed: Boolean(foodDistributed) }),

@@ -1,6 +1,16 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 
+// datetime-local inputs need "YYYY-MM-DDTHH:mm" in the browser's local
+// time, not the ISO string (UTC, with seconds/zone) the API returns —
+// converting through Date keeps this in the viewer's own timezone.
+function toDatetimeLocal(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 export default function ParticipantsPage() {
   const [participants, setParticipants] = useState<any[]>([]);
   const [_loading, setLoading] = useState(true);
@@ -9,6 +19,7 @@ export default function ParticipantsPage() {
   const [category, setCategory] = useState('');
   const [status, setStatus] = useState('');
   const [tshirtSize, setTshirtSize] = useState('');
+  const [boardOnly, setBoardOnly] = useState(false);
   const [eventId, setEventId] = useState('');
   const [events, setEvents] = useState<any[]>([]);
   const [page, setPage] = useState(1);
@@ -33,6 +44,11 @@ export default function ParticipantsPage() {
   const [editBloodDonation, setEditBloodDonation] = useState(false);
   const [editEmergencyContact, setEditEmergencyContact] = useState('');
   const [editEmergencyPhone, setEditEmergencyPhone] = useState('');
+  const [editStatus, setEditStatus] = useState('');
+  const [editStartedAt, setEditStartedAt] = useState('');
+  const [editFinishedAt, setEditFinishedAt] = useState('');
+  const [editTotalDistance, setEditTotalDistance] = useState('');
+  const [editIsBoardMember, setEditIsBoardMember] = useState(false);
   const [detailsSaving, setDetailsSaving] = useState(false);
   const [detailsError, setDetailsError] = useState('');
   const [companies, setCompanies] = useState<any[]>([]);
@@ -40,6 +56,7 @@ export default function ParticipantsPage() {
   const [addForm, setAddForm] = useState({
     name: '', email: '', phone: '', category: 'RUN_3K', gender: 'MALE', companyId: '',
     tshirtSize: '', bloodGroup: '', emergencyContact: '', emergencyPhone: '', paymentStatus: 'COMPLETED',
+    isBoardMember: false,
   });
   const [addSaving, setAddSaving] = useState(false);
   const [addError, setAddError] = useState('');
@@ -61,6 +78,7 @@ export default function ParticipantsPage() {
     if (status) params.status = status;
     if (tshirtSize) params.tshirtSize = tshirtSize;
     if (eventId) params.eventId = eventId;
+    if (boardOnly) params.isBoardMember = 'true';
 
     const res = await api.getParticipants(params);
     if (res.success && res.data) {
@@ -83,12 +101,13 @@ export default function ParticipantsPage() {
 
   useEffect(() => {
     loadParticipants();
-  }, [page, category, status, tshirtSize, eventId, debouncedSearch]);
+  }, [page, category, status, tshirtSize, eventId, boardOnly, debouncedSearch]);
 
   function resetAddForm() {
     setAddForm({
       name: '', email: '', phone: '', category: 'RUN_3K', gender: 'MALE', companyId: '',
       tshirtSize: '', bloodGroup: '', emergencyContact: '', emergencyPhone: '', paymentStatus: 'COMPLETED',
+      isBoardMember: false,
     });
     setAddError('');
   }
@@ -114,6 +133,7 @@ export default function ParticipantsPage() {
         emergencyContact: addForm.emergencyContact || undefined,
         emergencyPhone: addForm.emergencyPhone || undefined,
         paymentStatus: addForm.paymentStatus,
+        isBoardMember: addForm.isBoardMember,
       };
       const res = await api.createParticipant(payload);
       if (!res.success) {
@@ -174,6 +194,11 @@ export default function ParticipantsPage() {
     setEditBloodDonation(!!viewParticipant.bloodDonation);
     setEditEmergencyContact(viewParticipant.emergencyContact || '');
     setEditEmergencyPhone(viewParticipant.emergencyPhone || '');
+    setEditStatus(viewParticipant.status || 'REGISTERED');
+    setEditStartedAt(toDatetimeLocal(viewParticipant.startedAt));
+    setEditFinishedAt(toDatetimeLocal(viewParticipant.finishedAt));
+    setEditTotalDistance(viewParticipant.totalDistance != null ? String(viewParticipant.totalDistance) : '');
+    setEditIsBoardMember(!!viewParticipant.isBoardMember);
     setDetailsError('');
     setEditingDetails(true);
   };
@@ -191,6 +216,11 @@ export default function ParticipantsPage() {
         tshirtSize: editTshirtSize || null,
         bloodGroup: editBloodGroup || null,
         bloodDonation: editBloodDonation,
+        status: editStatus,
+        startedAt: editStartedAt ? new Date(editStartedAt).toISOString() : null,
+        finishedAt: editFinishedAt ? new Date(editFinishedAt).toISOString() : null,
+        totalDistance: editTotalDistance === '' ? undefined : Number(editTotalDistance),
+        isBoardMember: editIsBoardMember,
         emergencyContact: editEmergencyContact || null,
         emergencyPhone: editEmergencyPhone || null,
       });
@@ -357,6 +387,15 @@ export default function ParticipantsPage() {
               <option key={ev.id} value={ev.id}>{ev.name}</option>
             ))}
           </select>
+          <label className="flex items-center gap-2 px-4 py-3 bg-white/80 border border-white/60 rounded-3xl text-slate-900 text-sm cursor-pointer">
+            <input
+              type="checkbox"
+              checked={boardOnly}
+              onChange={(e) => { setBoardOnly(e.target.checked); setPage(1); }}
+              className="rounded border-slate-300"
+            />
+            Board Members Only
+          </label>
         </div>
 
         <div className="overflow-x-auto rounded-[2rem] border border-white/20 bg-white/70">
@@ -377,7 +416,12 @@ export default function ParticipantsPage() {
               {participants.map((p) => (
                 <tr key={p.id} className="border-t border-slate-200/80 hover:bg-slate-100/60 transition-colors">
                   <td className="px-6 py-4 text-sm font-mono text-violet-700">{p.bibNumber}</td>
-                  <td className="px-6 py-4 text-sm text-slate-900">{p.user?.name}</td>
+                  <td className="px-6 py-4 text-sm text-slate-900">
+                    {p.user?.name}
+                    {p.isBoardMember && (
+                      <span className="ml-2 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full text-[10px] font-semibold uppercase tracking-wide align-middle">Board</span>
+                    )}
+                  </td>
                   <td className="px-6 py-4 text-sm text-slate-600">{p.user?.email}</td>
                   <td className="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">{p.user?.phone || '—'}</td>
                   <td className="px-6 py-4">
@@ -548,6 +592,15 @@ export default function ParticipantsPage() {
                   />
                   Willing to donate blood
                 </label>
+                <label className="flex items-center gap-2 text-xs text-slate-600 font-medium bg-amber-50 border border-amber-200 rounded-2xl px-3 py-2.5">
+                  <input
+                    type="checkbox"
+                    checked={editIsBoardMember}
+                    onChange={(e) => setEditIsBoardMember(e.target.checked)}
+                    className="rounded border-slate-300"
+                  />
+                  Board Member
+                </label>
                 <div>
                   <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Emergency Contact</label>
                   <input
@@ -564,6 +617,57 @@ export default function ParticipantsPage() {
                     className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
                   />
                 </div>
+
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide pt-2 border-t border-violet-200">Race Progress (manual override)</p>
+                <p className="text-xs text-slate-400">For runners with no GPS tracking — no phone, app issue, etc. Start/end time and distance are otherwise set automatically.</p>
+                <div>
+                  <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Status</label>
+                  <select
+                    value={editStatus}
+                    onChange={(e) => setEditStatus(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
+                  >
+                    <option value="REGISTERED">Registered</option>
+                    <option value="CHECKED_IN">Checked In</option>
+                    <option value="RUNNING">Running</option>
+                    <option value="PAUSED">Paused</option>
+                    <option value="FINISHED">Finished</option>
+                    <option value="DNF">DNF</option>
+                    <option value="DNS">DNS</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Start Time</label>
+                    <input
+                      type="datetime-local"
+                      value={editStartedAt}
+                      onChange={(e) => setEditStartedAt(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Finish Time</label>
+                    <input
+                      type="datetime-local"
+                      value={editFinishedAt}
+                      onChange={(e) => setEditFinishedAt(e.target.value)}
+                      className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Distance (km)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={editTotalDistance}
+                    onChange={(e) => setEditTotalDistance(e.target.value)}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
+                  />
+                </div>
+
                 <div className="flex gap-2 pt-1">
                   <button
                     onClick={handleSaveDetails}
@@ -879,17 +983,28 @@ export default function ParticipantsPage() {
                   />
                 </div>
               </div>
-              <div>
-                <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Payment</label>
-                <select
-                  value={addForm.paymentStatus}
-                  onChange={(e) => setAddForm({ ...addForm, paymentStatus: e.target.value })}
-                  className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
-                >
-                  <option value="COMPLETED">Mark as paid (e.g. cash at venue)</option>
-                  <option value="PENDING">Leave pending (runner pays online later)</option>
-                </select>
-              </div>
+              <label className="flex items-center gap-2 text-xs text-slate-600 font-medium bg-amber-50 border border-amber-200 rounded-2xl px-3 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={addForm.isBoardMember}
+                  onChange={(e) => setAddForm({ ...addForm, isBoardMember: e.target.checked })}
+                  className="rounded border-slate-300"
+                />
+                Board Member — free registration, tagged for tracking
+              </label>
+              {!addForm.isBoardMember && (
+                <div>
+                  <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Payment</label>
+                  <select
+                    value={addForm.paymentStatus}
+                    onChange={(e) => setAddForm({ ...addForm, paymentStatus: e.target.value })}
+                    className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
+                  >
+                    <option value="COMPLETED">Mark as paid (e.g. cash at venue)</option>
+                    <option value="PENDING">Leave pending (runner pays online later)</option>
+                  </select>
+                </div>
+              )}
               <div className="flex gap-3 pt-2">
                 <button
                   type="submit"

@@ -132,6 +132,7 @@ model Participant {
   tshirtSize      String?          @map("tshirt_size")
   kitDistributed  Boolean          @default(false) @map("kit_distributed")
   foodDistributed Boolean          @default(false) @map("food_distributed")
+  isBoardMember   Boolean          @default(false) @map("is_board_member")
   bulkRegistrationId String?       @map("bulk_registration_id")
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt

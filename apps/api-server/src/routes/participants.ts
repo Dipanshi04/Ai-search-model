@@ -8,6 +8,7 @@ import { sendPinEmail, sendPaymentReminderEmail, sendWelcomeEmail } from '../ser
 import { feeForCategory } from './payment.js';
 import { hashPassword } from '../utils/jwt.js';
 import { generateQRCode } from '../utils/qrcode.js';
+import { calculateTreesFromDistance, recalcTreeCounter } from '../services/greenMission.js';
 
 export const participantsRouter: Router = Router();
 
@@ -109,12 +110,14 @@ participantsRouter.get('/', async (req, res) => {
     const status = typeof req.query.status === 'string' ? req.query.status : undefined;
     const tshirtSize = typeof req.query.tshirtSize === 'string' ? req.query.tshirtSize : undefined;
     const eventId = typeof req.query.eventId === 'string' ? req.query.eventId : undefined;
+    const isBoardMember = req.query.isBoardMember === 'true' ? true : undefined;
 
     const where: any = {};
     if (eventId) where.eventId = eventId;
     if (category) where.category = category;
     if (status) where.status = status;
     if (tshirtSize) where.tshirtSize = tshirtSize;
+    if (isBoardMember !== undefined) where.isBoardMember = isBoardMember;
     if (search) {
       where.OR = [
         { bibNumber: { contains: search, mode: 'insensitive' } },
@@ -156,12 +159,13 @@ participantsRouter.post('/', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANA
     const {
       name, email, phone, category, gender, companyId, eventId: reqEventId,
       emergencyContact, emergencyPhone, bloodGroup, bloodDonation, tshirtSize,
-      paymentStatus,
+      paymentStatus, isBoardMember,
     } = req.body as {
       name: string; email: string; phone: string; category: string; gender: string;
       companyId?: string; eventId?: string;
       emergencyContact?: string; emergencyPhone?: string; bloodGroup?: string;
       bloodDonation?: boolean; tshirtSize?: string; paymentStatus?: 'COMPLETED' | 'PENDING';
+      isBoardMember?: boolean;
     };
 
     if (!name || !email || !phone || !category || !gender) {
@@ -224,7 +228,11 @@ participantsRouter.post('/', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANA
       select: { bibCounter: true },
     });
     const bibNumber = `ISA${bibCounter.toString().padStart(4, '0')}`;
-    const completed = paymentStatus !== 'PENDING';
+    // A board member's registration is always free and always confirmed —
+    // the payment-status choice in the form doesn't apply to them, same as
+    // how a normal entry's fee is derived from category rather than typed
+    // in directly.
+    const completed = isBoardMember ? true : paymentStatus !== 'PENDING';
 
     const participant = await prisma.participant.create({
       data: {
@@ -236,12 +244,13 @@ participantsRouter.post('/', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANA
         gender: gender as any,
         status: completed ? 'REGISTERED' : 'PENDING_PAYMENT',
         paymentStatus: completed ? 'COMPLETED' : 'PENDING',
-        paymentAmount: completed ? feeForCategory(category) : null,
+        paymentAmount: isBoardMember ? 0 : (completed ? feeForCategory(category) : null),
         emergencyContact: emergencyContact || null,
         emergencyPhone: emergencyPhone || null,
         bloodGroup: bloodGroup || null,
         bloodDonation: bloodDonation === true,
         tshirtSize: tshirtSize || null,
+        isBoardMember: isBoardMember === true,
       },
       include: { user: true, company: true },
     });
@@ -413,7 +422,7 @@ participantsRouter.get('/:id', async (req, res) => {
 
 participantsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'), async (req, res) => {
   try {
-    const { status, category, gender, companyId, bibNumber, emergencyContact, emergencyPhone, bloodGroup, bloodDonation, tshirtSize, kitDistributed, foodDistributed, paymentStatus, phone, name } = req.body;
+    const { status, category, gender, companyId, bibNumber, emergencyContact, emergencyPhone, bloodGroup, bloodDonation, tshirtSize, kitDistributed, foodDistributed, paymentStatus, phone, name, startedAt, finishedAt, totalDistance, isBoardMember } = req.body;
     const participant = await prisma.participant.findUnique({ where: { id: req.params.id as string } });
     if (!participant) {
       res.status(404).json({ success: false, message: 'Participant not found' });
@@ -435,6 +444,15 @@ participantsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MA
       });
     }
 
+    // Manual race-progress override — for runners staff track on paper
+    // (no phone, app crashed, GPS never connected) and enter after the
+    // fact. Mirrors what automatic GPS tracking does on finish (socket.ts /
+    // greenMission.ts's markRunnerFinished): recompute trees from distance
+    // and refresh the event counter, so a manually-finished runner counts
+    // toward the tree total the same as a GPS-tracked one.
+    const distanceForTrees = totalDistance !== undefined ? Number(totalDistance) : undefined;
+    const willBeFinished = status === 'FINISHED' || (status === undefined && participant.status === 'FINISHED' && finishedAt !== undefined);
+
     const updated = await prisma.participant.update({
       where: { id: req.params.id as string },
       data: {
@@ -450,6 +468,13 @@ participantsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MA
         ...(tshirtSize !== undefined && { tshirtSize }),
         ...(kitDistributed !== undefined && { kitDistributed: Boolean(kitDistributed) }),
         ...(foodDistributed !== undefined && { foodDistributed: Boolean(foodDistributed) }),
+        ...(isBoardMember !== undefined && { isBoardMember: Boolean(isBoardMember) }),
+        ...(startedAt !== undefined && { startedAt: startedAt ? new Date(startedAt) : null }),
+        ...(finishedAt !== undefined && { finishedAt: finishedAt ? new Date(finishedAt) : null }),
+        ...(distanceForTrees !== undefined && { totalDistance: distanceForTrees }),
+        ...(willBeFinished && {
+          treesCount: calculateTreesFromDistance(distanceForTrees ?? participant.totalDistance),
+        }),
         // Manual override for cash-at-venue payments and other edge cases —
         // see payment.ts's /:id/verify and /:id/reject for the normal flow
         // this sits alongside.
@@ -457,6 +482,10 @@ participantsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MA
       },
       include: { user: true, company: true },
     });
+
+    if (willBeFinished) {
+      await recalcTreeCounter(participant.eventId);
+    }
 
     res.json({ success: true, data: updated });
   } catch (error: any) {

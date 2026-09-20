@@ -53,6 +53,8 @@ export default function ParticipantsPage() {
   const [detailsError, setDetailsError] = useState('');
   const [companies, setCompanies] = useState<any[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [bulkReminderSending, setBulkReminderSending] = useState(false);
+  const [bulkReminderMessage, setBulkReminderMessage] = useState('');
   const [addForm, setAddForm] = useState({
     name: '', email: '', phone: '', category: 'RUN_3K', gender: 'MALE', companyId: '',
     tshirtSize: '', bloodGroup: '', emergencyContact: '', emergencyPhone: '', paymentStatus: 'COMPLETED',
@@ -148,6 +150,20 @@ export default function ParticipantsPage() {
       setAddError(e.message || 'Failed to add participant');
     }
     setAddSaving(false);
+  }
+
+  async function handleBulkReminders() {
+    const scope = eventId ? 'the selected event' : 'the current event';
+    if (!confirm(`Send a payment reminder email to everyone with a pending payment in ${scope}?`)) return;
+    setBulkReminderSending(true);
+    setBulkReminderMessage('');
+    try {
+      const res = await api.sendBulkPaymentReminders({ eventId: eventId || undefined });
+      setBulkReminderMessage(res.success ? (res.message || 'Reminders sent') : (res.message || 'Failed to send reminders'));
+    } catch (e: any) {
+      setBulkReminderMessage(e.message || 'Failed to send reminders');
+    }
+    setBulkReminderSending(false);
   }
 
   const handleDelete = async (id: string) => {
@@ -322,8 +338,18 @@ export default function ParticipantsPage() {
           >
             Export CSV
           </button>
+          <button
+            onClick={handleBulkReminders}
+            disabled={bulkReminderSending}
+            className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-3xl text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
+          >
+            {bulkReminderSending ? 'Sending...' : 'Remind All Unpaid'}
+          </button>
         </div>
       </div>
+      {bulkReminderMessage && (
+        <p className="text-xs text-slate-600 bg-white/70 border border-white/60 rounded-2xl px-4 py-2.5">{bulkReminderMessage}</p>
+      )}
 
       <div className="glass rounded-[2rem] border border-white/20 p-4 shadow-sm">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-4">

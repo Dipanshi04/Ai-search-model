@@ -559,6 +559,17 @@ participantsRouter.delete('/:id', authenticate, requireRole('SUPER_ADMIN'), asyn
   }
 });
 
+async function sendReminderTo(participant: {
+  bibNumber: string; category: string;
+  user: { name: string; email: string };
+  company: { status: string } | null;
+}): Promise<boolean> {
+  const baseAmount = feeForCategory(participant.category);
+  const isPremiumCompany = participant.company?.status === 'PREMIUM';
+  const amount = isPremiumCompany ? Math.round(baseAmount * 0.5) : baseAmount;
+  return sendPaymentReminderEmail(participant.user.email, participant.user.name, participant.bibNumber, amount);
+}
+
 // Manual only — an admin clicks a button for one participant at a time.
 // No automatic/scheduled reminders exist; this is deliberately a one-off.
 participantsRouter.post('/:id/send-payment-reminder', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'), async (req, res) => {
@@ -576,11 +587,7 @@ participantsRouter.post('/:id/send-payment-reminder', authenticate, requireRole(
       return;
     }
 
-    const baseAmount = feeForCategory(participant.category);
-    const isPremiumCompany = participant.company?.status === 'PREMIUM';
-    const amount = isPremiumCompany ? Math.round(baseAmount * 0.5) : baseAmount;
-
-    const sent = await sendPaymentReminderEmail(participant.user.email, participant.user.name, participant.bibNumber, amount);
+    const sent = await sendReminderTo(participant);
     if (!sent) {
       res.status(500).json({ success: false, message: 'Failed to send reminder email' });
       return;
@@ -589,6 +596,75 @@ participantsRouter.post('/:id/send-payment-reminder', authenticate, requireRole(
   } catch (error) {
     logger.error('Send payment reminder error:', error);
     res.status(500).json({ success: false, message: 'Failed to send payment reminder' });
+  }
+});
+
+// Bulk version of the above — a quick action for "remind everyone who
+// hasn't paid yet" instead of clicking through each one. Optional
+// participantIds narrows it to a specific selection; omitted, it targets
+// every non-COMPLETED registration for the given (or current) event. Still
+// manual/one-off like the single-participant version above, just triggered
+// once for many people instead of once per person.
+participantsRouter.post('/send-payment-reminders/bulk', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'), async (req, res) => {
+  try {
+    const { participantIds, eventId: reqEventId } = req.body as { participantIds?: string[]; eventId?: string };
+
+    let where: any;
+    if (Array.isArray(participantIds) && participantIds.length > 0) {
+      where = { id: { in: participantIds }, paymentStatus: { not: 'COMPLETED' } };
+    } else {
+      let eventId = reqEventId;
+      if (!eventId) {
+        const event = await prisma.event.findFirst({ where: { status: { in: ['ACTIVE', 'PAUSED'] } }, orderBy: { updatedAt: 'desc' } })
+          ?? await prisma.event.findFirst({ where: { status: 'UPCOMING' }, orderBy: { date: 'asc' } });
+        eventId = event?.id;
+      }
+      if (!eventId) {
+        res.status(400).json({ success: false, message: 'No event to send reminders for' });
+        return;
+      }
+      where = { eventId, paymentStatus: { not: 'COMPLETED' } };
+    }
+
+    const targets = await prisma.participant.findMany({
+      where,
+      select: {
+        bibNumber: true, category: true,
+        user: { select: { name: true, email: true } },
+        company: { select: { status: true } },
+      },
+    });
+
+    if (targets.length === 0) {
+      res.json({ success: true, data: { sent: 0, failed: 0, total: 0 }, message: 'Nobody to remind — everyone in scope is already paid.' });
+      return;
+    }
+
+    // Small concurrent batches rather than one-at-a-time (slow for a large
+    // list) or all-at-once (hammers the SMTP connection) — mirrors the
+    // batch size HR's CSV upload effectively achieves row-by-row, just
+    // parallelized here since there's no per-row validation to do first.
+    const BATCH_SIZE = 10;
+    let sentCount = 0;
+    let failedCount = 0;
+    for (let i = 0; i < targets.length; i += BATCH_SIZE) {
+      const batch = targets.slice(i, i + BATCH_SIZE);
+      const results = await Promise.allSettled(batch.map((p) => sendReminderTo(p)));
+      for (const r of results) {
+        if (r.status === 'fulfilled' && r.value) sentCount++;
+        else failedCount++;
+      }
+    }
+
+    logger.info(`Bulk payment reminders sent by ${req.user?.email}: ${sentCount}/${targets.length} (${failedCount} failed)`);
+    res.json({
+      success: true,
+      data: { sent: sentCount, failed: failedCount, total: targets.length },
+      message: `Sent ${sentCount} of ${targets.length} reminder${targets.length !== 1 ? 's' : ''}${failedCount > 0 ? ` (${failedCount} failed)` : ''}.`,
+    });
+  } catch (error) {
+    logger.error('Bulk send payment reminder error:', error);
+    res.status(500).json({ success: false, message: 'Failed to send bulk payment reminders' });
   }
 });
 

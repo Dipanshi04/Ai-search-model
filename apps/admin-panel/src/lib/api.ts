@@ -132,6 +132,13 @@ class ApiClient {
     return this.request<void>(`/api/v1/participants/${id}/send-payment-reminder`, { method: 'POST' });
   }
 
+  async sendBulkPaymentReminders(params: { participantIds?: string[]; eventId?: string }) {
+    return this.request<{ sent: number; failed: number; total: number }>('/api/v1/participants/send-payment-reminders/bulk', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
   async resetParticipantPin(id: string) {
     return this.request<{ pin: string; email: string }>(`/api/v1/participants/${id}/reset-pin`, {
       method: 'POST',

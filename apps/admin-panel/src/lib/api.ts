@@ -434,6 +434,13 @@ class ApiClient {
     });
   }
 
+  async recheckPayments(params: { bibNumber?: string; email?: string }) {
+    return this.request<any>('/api/v1/payments/recheck', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
   async previewPaymentReconcile(file: File) {
     const formData = new FormData();
     formData.append('file', file);

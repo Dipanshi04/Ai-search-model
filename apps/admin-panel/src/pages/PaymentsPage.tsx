@@ -54,6 +54,9 @@ export default function PaymentsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [reason, setReason] = useState('');
+  const [recheckQuery, setRecheckQuery] = useState('');
+  const [rechecking, setRechecking] = useState(false);
+  const [recheckMessage, setRecheckMessage] = useState('');
 
   useEffect(() => {
     load();
@@ -95,6 +98,31 @@ export default function PaymentsPage() {
     setBusyId(null);
     setRejectingId(null);
     setReason('');
+  }
+
+  async function handleRecheck() {
+    const query = recheckQuery.trim();
+    setRechecking(true);
+    setRecheckMessage('');
+    try {
+      const params = query
+        ? (query.includes('@') ? { email: query } : { bibNumber: query })
+        : {};
+      if (!query && !confirm('No BIB or email entered — this will sweep every already-paid participant and close out all their stray pending payments at once. Continue?')) {
+        setRechecking(false);
+        return;
+      }
+      const res = await api.recheckPayments(params);
+      if (res.success && res.data) {
+        setRecheckMessage(res.data.message);
+        if (res.data.closed > 0) await load();
+      } else {
+        setRecheckMessage(res.message || 'Recheck failed');
+      }
+    } catch (e: any) {
+      setRecheckMessage(e.message || 'Recheck failed');
+    }
+    setRechecking(false);
   }
 
   return (
@@ -158,6 +186,28 @@ export default function PaymentsPage() {
             <option key={p} value={p}>{p === 'ALL' ? 'All providers' : p}</option>
           ))}
         </select>
+      </div>
+
+      <div className="glass rounded-[2rem] border border-white/20 shadow-sm p-4">
+        <p className="text-xs font-semibold text-slate-600 mb-2">
+          Recheck &amp; Clean Up — closes out stray PENDING payments for a participant who's already marked paid
+        </p>
+        <div className="flex flex-wrap gap-2">
+          <input
+            value={recheckQuery}
+            onChange={(e) => setRecheckQuery(e.target.value)}
+            placeholder="BIB number or email (leave blank to sweep everyone)"
+            className="flex-1 min-w-[16rem] px-4 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
+          />
+          <button
+            onClick={handleRecheck}
+            disabled={rechecking}
+            className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-2xl text-sm font-semibold disabled:opacity-50"
+          >
+            {rechecking ? 'Rechecking...' : 'Recheck'}
+          </button>
+        </div>
+        {recheckMessage && <p className="text-xs text-slate-600 mt-2">{recheckMessage}</p>}
       </div>
 
       <div className="glass rounded-[2rem] border border-white/20 shadow-sm overflow-hidden">

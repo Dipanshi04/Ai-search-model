@@ -365,6 +365,87 @@ paymentRouter.post(
   }
 );
 
+// ---- Recheck & clean up stray PENDING payments ----
+// A participant can end up with several PENDING Payment rows from repeated
+// checkout attempts (see verifyPaymentById above — each attempt gets a
+// fresh order). Normally the row that actually completes closes out its
+// siblings automatically, but if the participant got marked paid some other
+// way (webhook landed on an attempt that then got manually corrected,
+// reconciled from CSV against a different row, etc.) the other PENDING
+// rows are never revisited by anything. This looks a participant up by BIB
+// or email and, if they're already paid, closes out whatever's left stuck
+// PENDING under them. With neither BIB nor email given, it sweeps every
+// participant in this state at once.
+paymentRouter.post(
+  '/recheck',
+  authenticate,
+  requireRole('SUPER_ADMIN', 'RACE_MANAGER'),
+  async (req: Request, res: Response) => {
+    try {
+      const { bibNumber, email } = req.body as { bibNumber?: string; email?: string };
+
+      let participantIds: string[] | undefined;
+      let matchedParticipant: { name: string; bibNumber: string } | null = null;
+
+      if (bibNumber || email) {
+        const participant = await prisma.participant.findFirst({
+          where: bibNumber
+            ? { bibNumber: bibNumber.trim() }
+            : { user: { email: email!.trim().toLowerCase() } },
+          include: { user: { select: { name: true } } },
+        });
+        if (!participant) {
+          res.status(404).json({ success: false, message: 'No participant found for that BIB number or email' });
+          return;
+        }
+        if (participant.paymentStatus !== 'COMPLETED') {
+          res.json({
+            success: true,
+            data: {
+              participant: { name: participant.user.name, bibNumber: participant.bibNumber },
+              closed: 0,
+              message: `${participant.user.name} (#${participant.bibNumber}) isn't marked paid yet — nothing to clean up. Use "Mark Paid" or the CSV reconcile tab if Cashfree shows they actually paid.`,
+            },
+          });
+          return;
+        }
+        participantIds = [participant.id];
+        matchedParticipant = { name: participant.user.name, bibNumber: participant.bibNumber };
+      } else {
+        const alreadyPaid = await prisma.participant.findMany({
+          where: { paymentStatus: 'COMPLETED' },
+          select: { id: true },
+        });
+        participantIds = alreadyPaid.map((p) => p.id);
+      }
+
+      const stray = await prisma.payment.updateMany({
+        where: {
+          participantId: { in: participantIds },
+          status: { in: ['PENDING', 'PROCESSING', 'CLAIMED'] },
+        },
+        data: { status: 'FAILED', failureReason: 'Superseded — participant already paid (cleaned up by recheck)' },
+      });
+
+      logger.info(`[Payment] Recheck by ${req.user?.email}: closed ${stray.count} stray pending payment(s)${matchedParticipant ? ` for ${matchedParticipant.bibNumber}` : ' (global sweep)'}`);
+
+      res.json({
+        success: true,
+        data: {
+          participant: matchedParticipant,
+          closed: stray.count,
+          message: matchedParticipant
+            ? `Closed out ${stray.count} stray pending payment${stray.count !== 1 ? 's' : ''} for ${matchedParticipant.name} (#${matchedParticipant.bibNumber}).`
+            : `Swept all paid participants — closed out ${stray.count} stray pending payment${stray.count !== 1 ? 's' : ''}.`,
+        },
+      });
+    } catch (error) {
+      logger.error('[Payment] recheck failed:', error);
+      res.status(500).json({ success: false, message: 'Failed to recheck payments' });
+    }
+  }
+);
+
 // ---- Legacy read (kept for the existing /payments/:registrationId callers) ----
 
 paymentRouter.get('/:registrationId', async (req: Request, res: Response) => {

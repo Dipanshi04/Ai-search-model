@@ -1,9 +1,13 @@
 import { Router, Request, Response } from 'express';
+import multer from 'multer';
+import { parse } from 'csv-parse/sync';
 import { prisma } from '../config/database.js';
 import { logger } from '../config/logger.js';
 import { authenticate } from '../middleware/auth.js';
 import { requireRole } from '../middleware/auth.js';
 import { sendWelcomeEmail } from '../services/email.js';
+
+const csvUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 // Server-owned fee table. Never trust a price from the client — a browser
 // can be edited, this file cannot.
@@ -17,6 +21,45 @@ export function feeForCategory(category: string): number {
 }
 
 export const paymentRouter: Router = Router();
+
+// Shared by the single-payment admin actions below and by the CSV
+// reconciliation endpoint (routes/payment-reconcile.ts) — one place that
+// knows what "marking a payment paid/failed by hand" actually does, so a
+// reconciled-from-CSV payment behaves identically to one clicked in the UI
+// (welcome email, closing out stray PENDING siblings, etc).
+export async function verifyPaymentById(paymentId: string, paidAt?: Date): Promise<{ alreadyVerified?: boolean }> {
+  const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
+  if (!payment) throw new Error('Payment not found');
+  if (payment.status === 'COMPLETED') return { alreadyVerified: true };
+
+  await prisma.payment.update({
+    where: { id: payment.id },
+    data: { status: 'COMPLETED', paidAt: paidAt || new Date() },
+  });
+
+  const participant = await prisma.participant.update({
+    where: { id: payment.participantId },
+    data: { paymentStatus: 'COMPLETED', status: 'REGISTERED' },
+    include: { user: { select: { name: true, email: true } } },
+  });
+
+  sendWelcomeEmail(participant.user.email, participant.user.name, participant.bibNumber, participant.category)
+    .catch((e) => logger.error('[Payment] Welcome email failed:', e));
+
+  prisma.payment.updateMany({
+    where: { participantId: payment.participantId, status: 'PENDING', id: { not: payment.id } },
+    data: { status: 'FAILED', failureReason: 'Superseded by a completed payment' },
+  }).catch((e) => logger.error('[Payment] Failed to close out superseded pending payments:', e));
+
+  return {};
+}
+
+export async function rejectPaymentById(paymentId: string, reason?: string): Promise<void> {
+  await prisma.payment.update({
+    where: { id: paymentId },
+    data: { status: 'FAILED', failureReason: reason || 'Rejected by admin' },
+  });
+}
 
 // ---- Admin list — every payment across every provider, filterable ----
 
@@ -79,31 +122,12 @@ paymentRouter.post(
         res.status(404).json({ success: false, message: 'Payment not found' });
         return;
       }
-      if (payment.status === 'COMPLETED') {
+
+      const result = await verifyPaymentById(payment.id);
+      if (result.alreadyVerified) {
         res.json({ success: true, data: { alreadyVerified: true } });
         return;
       }
-
-      await prisma.payment.update({
-        where: { id: payment.id },
-        data: { status: 'COMPLETED', paidAt: new Date() },
-      });
-
-      const participant = await prisma.participant.update({
-        where: { id: payment.participantId },
-        data: { paymentStatus: 'COMPLETED', status: 'REGISTERED' },
-        include: { user: { select: { name: true, email: true } } },
-      });
-
-      sendWelcomeEmail(participant.user.email, participant.user.name, participant.bibNumber, participant.category)
-        .catch((e) => logger.error('[Payment] Welcome email failed:', e));
-
-      // Same cleanup as the Cashfree webhook — close out any other stray
-      // PENDING attempts for this participant now that one has gone through.
-      prisma.payment.updateMany({
-        where: { participantId: payment.participantId, status: 'PENDING', id: { not: payment.id } },
-        data: { status: 'FAILED', failureReason: 'Superseded by a completed payment' },
-      }).catch((e) => logger.error('[Payment] Failed to close out superseded pending payments:', e));
 
       logger.info(`[Payment] ${payment.reference} verified by ${req.user?.email}`);
       res.json({ success: true });
@@ -121,14 +145,222 @@ paymentRouter.post(
   async (req: Request, res: Response) => {
     try {
       const { reason } = req.body;
-      const payment = await prisma.payment.update({
-        where: { id: req.params.id as string },
-        data: { status: 'FAILED', failureReason: reason || 'Rejected by admin' },
-      });
-      logger.info(`[Payment] ${payment.reference} rejected by ${req.user?.email}: ${reason || '(no reason given)'}`);
+      await rejectPaymentById(req.params.id as string, reason);
+      logger.info(`[Payment] ${req.params.id} rejected by ${req.user?.email}: ${reason || '(no reason given)'}`);
       res.json({ success: true });
     } catch (error) {
       res.status(500).json({ success: false, message: 'Failed to reject payment' });
+    }
+  }
+);
+
+// ---- Cashfree CSV reconciliation ----
+// Cashfree's own webhook normally keeps payments in sync automatically, but
+// a missed/failed webhook delivery can leave a payment stuck PENDING even
+// though Cashfree's own records show it succeeded or failed. Admin downloads
+// the settlement/transaction CSV from the Cashfree dashboard and uploads it
+// here to catch and fix those stragglers — preview first, apply only what's
+// selected, never silently auto-applied.
+
+interface ReconcileEntry {
+  orderId: string;
+  csvStatus: 'SUCCESS' | 'FAILED' | 'CANCELLED';
+  csvAmount: number | null;
+  transactionTime: string | null;
+  csvFailureReason: string | null;
+  paymentId: string | null;
+  dbStatus: string | null;
+  participant: { name: string; email: string; bibNumber: string } | null;
+  proposedAction: 'MARK_PAID' | 'MARK_FAILED' | null;
+  note: string;
+  conflict: boolean;
+}
+
+type CsvOutcome = { status: 'SUCCESS' | 'FAILED' | 'CANCELLED'; amount: number | null; time: string | null; reason: string | null };
+
+function parseReconcileCsv(buffer: Buffer): Map<string, CsvOutcome> {
+  const csvString = buffer.toString('utf-8');
+  const records: Record<string, string>[] = parse(csvString, { columns: true, skip_empty_lines: true, trim: true });
+
+  // Multiple rows can share one Order Id — a runner who retried after a
+  // dropped/failed attempt before succeeding. SUCCESS always wins as the
+  // order's real outcome; FAILED wins over a plain USER_DROPPED (a dropped
+  // attempt means the user simply cancelled, not a technical failure — see
+  // the CANCELLED branch below).
+  const byOrder = new Map<string, CsvOutcome>();
+
+  for (const row of records) {
+    const orderId = row['Order Id']?.trim();
+    const status = row['Transaction Status']?.trim().toUpperCase();
+    if (!orderId || !status) continue;
+
+    const existing = byOrder.get(orderId);
+    if (existing?.status === 'SUCCESS') continue; // already resolved for this order
+
+    if (status === 'SUCCESS') {
+      byOrder.set(orderId, {
+        status: 'SUCCESS',
+        amount: row['Transaction Amount'] ? Number(row['Transaction Amount']) : null,
+        // Cashfree exports "YYYY-MM-DD HH:mm:ss" in IST with no timezone
+        // marker — explicitly anchored to +05:30 here (rather than letting
+        // `new Date` assume the server's own timezone, which is UTC in
+        // production and would silently shift every paidAt by 5.5 hours).
+        time: row['Transaction Time'] ? new Date(`${row['Transaction Time'].replace(' ', 'T')}+05:30`).toISOString() : null,
+        reason: null,
+      });
+    } else if (status === 'FAILED') {
+      if (existing?.status !== 'FAILED') {
+        byOrder.set(orderId, { status: 'FAILED', amount: null, time: null, reason: row['Failure Reason'] || 'Payment failed' });
+      }
+    } else if (status === 'USER_DROPPED' && !existing) {
+      byOrder.set(orderId, { status: 'CANCELLED', amount: null, time: null, reason: 'Cancelled — user did not complete the payment' });
+    }
+  }
+
+  return byOrder;
+}
+
+async function buildReconcileReport(buffer: Buffer): Promise<ReconcileEntry[]> {
+  const byOrder = parseReconcileCsv(buffer);
+
+  const references = Array.from(byOrder.keys());
+  const payments = await prisma.payment.findMany({
+    where: { reference: { in: references } },
+    include: { participant: { select: { bibNumber: true, user: { select: { name: true, email: true } } } } },
+  });
+  const byReference = new Map(payments.map((p) => [p.reference as string, p]));
+
+  const report: ReconcileEntry[] = [];
+  for (const [orderId, csv] of byOrder) {
+    const payment = byReference.get(orderId);
+    const participant = payment
+      ? { name: payment.participant.user.name, email: payment.participant.user.email, bibNumber: payment.participant.bibNumber }
+      : null;
+
+    let proposedAction: ReconcileEntry['proposedAction'] = null;
+    let note: string;
+    let conflict = false;
+
+    if (!payment) {
+      note = 'No matching payment found for this order id';
+    } else if (payment.status === 'COMPLETED') {
+      if (csv.status === 'SUCCESS') {
+        note = 'Already reconciled — no action needed';
+      } else {
+        note = `DB shows COMPLETED but Cashfree shows ${csv.status} — review before touching this one`;
+        conflict = true;
+      }
+    } else if (payment.status === 'FAILED') {
+      if (csv.status !== 'SUCCESS') {
+        note = 'Already reconciled — no action needed';
+      } else {
+        note = 'DB shows FAILED but Cashfree shows SUCCESS — payment actually went through';
+        proposedAction = 'MARK_PAID';
+        conflict = true;
+      }
+    } else {
+      // PENDING / PROCESSING / CLAIMED — the normal case a missed webhook leaves behind
+      if (csv.status === 'SUCCESS') {
+        proposedAction = 'MARK_PAID';
+        note = 'Cashfree confirms payment succeeded — webhook likely missed';
+      } else if (csv.status === 'FAILED') {
+        proposedAction = 'MARK_FAILED';
+        note = 'Cashfree confirms payment failed';
+      } else {
+        proposedAction = 'MARK_FAILED';
+        note = 'User cancelled the payment (dropped before completing) — not a technical failure';
+      }
+    }
+
+    report.push({
+      orderId,
+      csvStatus: csv.status,
+      csvAmount: csv.amount,
+      transactionTime: csv.time,
+      csvFailureReason: csv.reason,
+      paymentId: payment?.id || null,
+      dbStatus: payment?.status || null,
+      participant,
+      proposedAction,
+      note,
+      conflict,
+    });
+  }
+
+  // Actionable and conflicting rows first — an admin skimming this wants to
+  // see what needs a decision before the long tail of already-reconciled rows.
+  report.sort((a, b) => {
+    const score = (r: ReconcileEntry) => (r.conflict ? 0 : r.proposedAction ? 1 : 2);
+    return score(a) - score(b);
+  });
+
+  return report;
+}
+
+paymentRouter.post(
+  '/reconcile/preview',
+  authenticate,
+  requireRole('SUPER_ADMIN', 'RACE_MANAGER'),
+  csvUpload.single('file'),
+  async (req: Request, res: Response) => {
+    try {
+      if (!req.file) {
+        res.status(400).json({ success: false, message: 'No CSV file uploaded' });
+        return;
+      }
+      const report = await buildReconcileReport(req.file.buffer);
+      res.json({
+        success: true,
+        data: {
+          entries: report,
+          summary: {
+            total: report.length,
+            actionable: report.filter((r) => r.proposedAction).length,
+            conflicts: report.filter((r) => r.conflict).length,
+            unmatched: report.filter((r) => !r.paymentId).length,
+          },
+        },
+      });
+    } catch (error) {
+      logger.error('[Payment] reconcile preview failed:', error);
+      res.status(400).json({ success: false, message: 'Could not parse this CSV. Check it\'s the Cashfree transactions export.' });
+    }
+  }
+);
+
+paymentRouter.post(
+  '/reconcile/apply',
+  authenticate,
+  requireRole('SUPER_ADMIN', 'RACE_MANAGER'),
+  async (req: Request, res: Response) => {
+    try {
+      const { updates } = req.body as {
+        updates: { paymentId: string; action: 'MARK_PAID' | 'MARK_FAILED'; reason?: string; paidAt?: string }[];
+      };
+      if (!Array.isArray(updates) || updates.length === 0) {
+        res.status(400).json({ success: false, message: 'No updates provided' });
+        return;
+      }
+
+      const results: { paymentId: string; success: boolean; error?: string }[] = [];
+      for (const u of updates) {
+        try {
+          if (u.action === 'MARK_PAID') {
+            await verifyPaymentById(u.paymentId, u.paidAt ? new Date(u.paidAt) : undefined);
+          } else {
+            await rejectPaymentById(u.paymentId, u.reason);
+          }
+          results.push({ paymentId: u.paymentId, success: true });
+        } catch (err: any) {
+          results.push({ paymentId: u.paymentId, success: false, error: err.message || 'Failed' });
+        }
+      }
+
+      logger.info(`[Payment] Reconciliation applied by ${req.user?.email}: ${results.filter((r) => r.success).length}/${results.length} updated`);
+      res.json({ success: true, data: { results } });
+    } catch (error) {
+      logger.error('[Payment] reconcile apply failed:', error);
+      res.status(500).json({ success: false, message: 'Failed to apply updates' });
     }
   }
 );

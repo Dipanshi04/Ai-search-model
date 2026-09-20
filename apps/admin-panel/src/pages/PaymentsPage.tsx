@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
+import PaymentReconcileTab from '../components/PaymentReconcileTab';
 
 interface PaymentRow {
   id: string;
@@ -44,6 +45,7 @@ function timeAgo(iso: string): string {
 }
 
 export default function PaymentsPage() {
+  const [tab, setTab] = useState<'list' | 'reconcile'>('list');
   const [payments, setPayments] = useState<PaymentRow[]>([]);
   const [summary, setSummary] = useState<{ total: number; completed: number; failed: number; pending: number } | null>(null);
   const [loading, setLoading] = useState(true);
@@ -102,6 +104,27 @@ export default function PaymentsPage() {
         <p className="text-sm text-slate-500 mt-1">Every payment attempt, across every provider — Cashfree is the live one.</p>
       </div>
 
+      <div className="flex gap-2 border-b border-slate-200">
+        {[
+          { key: 'list' as const, label: 'All Payments' },
+          { key: 'reconcile' as const, label: 'Reconcile from CSV' },
+        ].map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`px-4 py-2.5 text-sm font-semibold border-b-2 -mb-px transition-colors ${
+              tab === t.key ? 'border-violet-600 text-violet-700' : 'border-transparent text-slate-500 hover:text-slate-700'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {tab === 'reconcile' && <PaymentReconcileTab />}
+
+      {tab === 'list' && (
+      <>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {[
           { label: 'Total Payments', value: summary?.total ?? '—', color: 'text-slate-700', bg: 'bg-slate-50' },
@@ -208,6 +231,8 @@ export default function PaymentsPage() {
           </div>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }

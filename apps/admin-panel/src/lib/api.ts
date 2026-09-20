@@ -434,6 +434,26 @@ class ApiClient {
     });
   }
 
+  async previewPaymentReconcile(file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const headers: Record<string, string> = {};
+    if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
+    const response = await fetch(`${API_URL}/api/v1/payments/reconcile/preview`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    return response.json();
+  }
+
+  async applyPaymentReconcile(updates: { paymentId: string; action: 'MARK_PAID' | 'MARK_FAILED'; reason?: string; paidAt?: string }[]) {
+    return this.request<any>('/api/v1/payments/reconcile/apply', {
+      method: 'POST',
+      body: JSON.stringify({ updates }),
+    });
+  }
+
   async getSettings(eventId: string) {
     return this.request<Record<string, any>>(`/api/v1/settings/${eventId}`);
   }

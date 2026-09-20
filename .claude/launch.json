@@ -10,17 +10,6 @@
       ],
       "port": 3000,
       "autoPort": false
-    },
-    {
-      "name": "admin-panel",
-      "runtimeExecutable": "pnpm",
-      "runtimeArgs": [
-        "--filter",
-        "@isa/admin-panel",
-        "dev"
-      ],
-      "port": 3003,
-      "autoPort": false
     }
   ]
 }

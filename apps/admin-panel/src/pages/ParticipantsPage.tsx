@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { api } from '../lib/api';
+import { api, type EmailCleanupReport } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -14,6 +15,7 @@ function toDatetimeLocal(iso: string | null | undefined): string {
 }
 
 export default function ParticipantsPage() {
+  const { user: currentAdmin } = useAuth();
   const [participants, setParticipants] = useState<any[]>([]);
   const [_loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -60,6 +62,13 @@ export default function ParticipantsPage() {
   const [showSharedContacts, setShowSharedContacts] = useState(false);
   const [sharedContacts, setSharedContacts] = useState<Awaited<ReturnType<typeof api.getSharedContacts>>['data'] | null>(null);
   const [sharedContactsLoading, setSharedContactsLoading] = useState(false);
+  const [showEmailCleanup, setShowEmailCleanup] = useState(false);
+  const [emailCleanup, setEmailCleanup] = useState<EmailCleanupReport | null>(null);
+  const [emailCleanupLoading, setEmailCleanupLoading] = useState(false);
+  const [emailCleanupMessage, setEmailCleanupMessage] = useState('');
+  const [cleanupKeep, setCleanupKeep] = useState<Record<string, string>>({});
+  const [cleanupNames, setCleanupNames] = useState<Record<string, string>>({});
+  const [cleanupSelected, setCleanupSelected] = useState<Record<string, string[]>>({});
   const [addForm, setAddForm] = useState({
     name: '', email: '', phone: '', category: 'RUN_3K', gender: 'MALE', companyId: '',
     tshirtSize: '', bloodGroup: '', emergencyContact: '', emergencyPhone: '', paymentStatus: 'COMPLETED',
@@ -186,6 +195,88 @@ export default function ParticipantsPage() {
       console.error('Failed to fetch shared contacts:', e);
     }
     setSharedContactsLoading(false);
+  }
+
+  function cleanupGroupKey(group: EmailCleanupReport['duplicateRegistrationGroups'][number]) {
+    return JSON.stringify([group.email, group.eventId]);
+  }
+
+  function installCleanupReport(report: EmailCleanupReport) {
+    setEmailCleanup(report);
+    const keeps: Record<string, string> = {};
+    const names: Record<string, string> = {};
+    for (const group of report.duplicateRegistrationGroups) {
+      const key = cleanupGroupKey(group);
+      keeps[key] = group.recommendedKeepId;
+      names[key] = group.participants.find((p) => p.id === group.recommendedKeepId)?.name || '';
+    }
+    setCleanupKeep(keeps);
+    setCleanupNames(names);
+    setCleanupSelected({});
+  }
+
+  async function toggleEmailCleanup() {
+    if (showEmailCleanup) {
+      setShowEmailCleanup(false);
+      return;
+    }
+    setShowEmailCleanup(true);
+    setEmailCleanupLoading(true);
+    setEmailCleanupMessage('');
+    try {
+      const res = await api.getEmailCleanupReport();
+      if (res.success && res.data) installCleanupReport(res.data);
+    } catch (e: any) {
+      setEmailCleanupMessage(e.message || 'Failed to load email cleanup report');
+    }
+    setEmailCleanupLoading(false);
+  }
+
+  async function normalizeEmails() {
+    if (!confirm('Convert every user email to lowercase? Case-colliding participant accounts will be combined, but their BIB registrations will only be listed for manual review.')) return;
+    setEmailCleanupLoading(true);
+    setEmailCleanupMessage('');
+    try {
+      const res = await api.normalizeParticipantEmails();
+      if (res.success && res.data) {
+        installCleanupReport(res.data.report);
+        const skipped = res.data.skipped.length ? ` ${res.data.skipped.length} admin/HR conflict(s) were skipped.` : '';
+        setEmailCleanupMessage(`${res.data.normalized} email(s) converted; ${res.data.mergedAccounts} case-duplicate account(s) combined.${skipped}`);
+        setSharedContacts(null);
+      }
+    } catch (e: any) {
+      setEmailCleanupMessage(e.message || 'Failed to normalize emails');
+    }
+    setEmailCleanupLoading(false);
+  }
+
+  async function mergeCleanupGroup(group: EmailCleanupReport['duplicateRegistrationGroups'][number]) {
+    const key = cleanupGroupKey(group);
+    const keepParticipantId = cleanupKeep[key];
+    const duplicateParticipantIds = (cleanupSelected[key] || []).filter((id) => id !== keepParticipantId);
+    const correctName = cleanupNames[key]?.trim();
+    const keepBib = group.participants.find((p) => p.id === keepParticipantId)?.bibNumber;
+    if (!keepParticipantId || duplicateParticipantIds.length === 0 || !correctName) {
+      setEmailCleanupMessage('Choose the BIB to keep, select at least one duplicate BIB, and enter the correct name.');
+      return;
+    }
+    const removedBibs = group.participants.filter((p) => duplicateParticipantIds.includes(p.id)).map((p) => p.bibNumber);
+    if (!confirm(`Keep ${keepBib}, merge ${removedBibs.join(', ')} into it, and use the name "${correctName}"? Payments and GPS history will be moved before the duplicate registration records are removed.`)) return;
+
+    setEmailCleanupLoading(true);
+    setEmailCleanupMessage('');
+    try {
+      const res = await api.mergeDuplicateParticipants({ keepParticipantId, duplicateParticipantIds, correctName });
+      if (res.success && res.data) {
+        installCleanupReport(res.data.report);
+        setEmailCleanupMessage(`Kept ${res.data.keptBibNumber}; merged ${res.data.removedBibNumbers.join(', ')} successfully.`);
+        setSharedContacts(null);
+        loadParticipants();
+      }
+    } catch (e: any) {
+      setEmailCleanupMessage(e.message || 'Failed to merge duplicate BIB registrations');
+    }
+    setEmailCleanupLoading(false);
   }
 
   const handleDelete = async (id: string) => {
@@ -393,6 +484,14 @@ export default function ParticipantsPage() {
           >
             {showSharedContacts ? 'Hide Shared Contacts' : 'Find Duplicate Contacts'}
           </button>
+          {currentAdmin?.role === 'SUPER_ADMIN' && (
+            <button
+              onClick={toggleEmailCleanup}
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-3xl text-sm font-medium transition-colors shadow-sm"
+            >
+              {showEmailCleanup ? 'Hide Email Cleanup' : 'Email & BIB Cleanup'}
+            </button>
+          )}
         </div>
       </div>
       {bulkReminderMessage && (
@@ -428,6 +527,143 @@ export default function ParticipantsPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {showEmailCleanup && (
+        <div className="glass rounded-[2rem] border border-white/20 overflow-hidden shadow-sm">
+          <div className="px-6 py-4 border-b border-slate-100 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-800">Email and duplicate BIB cleanup</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Lowercase account emails first, then manually merge only registrations that are truly the same person.
+              </p>
+            </div>
+            <button
+              onClick={normalizeEmails}
+              disabled={emailCleanupLoading || !emailCleanup || (emailCleanup.uppercaseEmailCount === 0 && emailCleanup.caseCollisionGroups.length === 0)}
+              className="px-4 py-2 rounded-2xl bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold disabled:opacity-40"
+            >
+              Normalize all emails
+            </button>
+          </div>
+
+          {emailCleanupMessage && (
+            <p className="mx-6 mt-4 rounded-xl bg-violet-50 border border-violet-100 px-4 py-2 text-xs text-violet-800">{emailCleanupMessage}</p>
+          )}
+
+          {emailCleanupLoading && !emailCleanup ? (
+            <div className="p-8 text-center text-slate-500 text-sm">Loading cleanup report...</div>
+          ) : emailCleanup && (
+            <div className="p-6 space-y-5">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                  <p className="text-2xl font-bold text-slate-900">{emailCleanup.uppercaseEmailCount}</p>
+                  <p className="text-xs text-slate-500">emails need lowercase conversion</p>
+                </div>
+                <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                  <p className="text-2xl font-bold text-slate-900">{emailCleanup.caseCollisionGroups.length}</p>
+                  <p className="text-xs text-slate-500">case-colliding account groups</p>
+                </div>
+                <div className="rounded-2xl bg-slate-50 px-4 py-3">
+                  <p className="text-2xl font-bold text-slate-900">{emailCleanup.duplicateRegistrationGroups.length}</p>
+                  <p className="text-xs text-slate-500">email/event groups needing BIB review</p>
+                </div>
+              </div>
+
+              {emailCleanup.caseCollisionGroups.some((group) => !group.canAutoMerge) && (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+                  Some case collisions contain admin or HR credentials. They are reported but deliberately not auto-merged.
+                </div>
+              )}
+
+              {emailCleanup.duplicateRegistrationGroups.length === 0 ? (
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-5 text-sm text-emerald-800">
+                  No email/event group has more than one BIB registration.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {emailCleanup.duplicateRegistrationGroups.map((group) => {
+                    const key = cleanupGroupKey(group);
+                    const keepId = cleanupKeep[key] || group.recommendedKeepId;
+                    const selected = cleanupSelected[key] || [];
+                    return (
+                      <div key={key} className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <div className="flex flex-wrap items-center gap-2 mb-3">
+                          <span className="font-mono text-xs text-slate-600">{group.email}</span>
+                          <span className="text-xs text-slate-400">· {group.eventName}</span>
+                          {group.likelySamePerson ? (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">same-name candidate</span>
+                          ) : (
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600">shared email — review carefully</span>
+                          )}
+                        </div>
+
+                        <div className="space-y-2">
+                          {group.participants.map((participant) => {
+                            const isKeep = participant.id === keepId;
+                            const isSelected = selected.includes(participant.id);
+                            return (
+                              <div key={participant.id} className={`grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-xl px-3 py-2 ${isKeep ? 'bg-emerald-50 border border-emerald-100' : 'bg-slate-50'}`}>
+                                <input
+                                  type="radio"
+                                  name={`keep-${key}`}
+                                  checked={isKeep}
+                                  onChange={() => {
+                                    setCleanupKeep((current) => ({ ...current, [key]: participant.id }));
+                                    setCleanupNames((current) => ({ ...current, [key]: participant.name }));
+                                    setCleanupSelected((current) => ({ ...current, [key]: (current[key] || []).filter((id) => id !== participant.id) }));
+                                  }}
+                                  title="Keep this BIB"
+                                />
+                                <div className="min-w-0">
+                                  <p className="text-sm font-medium text-slate-900"><span className="font-mono text-violet-700">{participant.bibNumber}</span> · {participant.name}</p>
+                                  <p className="text-[11px] text-slate-500">{participant.status} · payment {participant.paymentStatus}</p>
+                                </div>
+                                {isKeep ? (
+                                  <span className="text-[10px] font-semibold text-emerald-700">KEEP</span>
+                                ) : (
+                                  <label className="flex items-center gap-1.5 text-[11px] text-red-700">
+                                    <input
+                                      type="checkbox"
+                                      checked={isSelected}
+                                      onChange={(e) => setCleanupSelected((current) => ({
+                                        ...current,
+                                        [key]: e.target.checked
+                                          ? [...(current[key] || []), participant.id]
+                                          : (current[key] || []).filter((id) => id !== participant.id),
+                                      }))}
+                                    />
+                                    Merge
+                                  </label>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                          <input
+                            value={cleanupNames[key] || ''}
+                            onChange={(e) => setCleanupNames((current) => ({ ...current, [key]: e.target.value }))}
+                            placeholder="Correct participant name"
+                            className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-violet-200"
+                          />
+                          <button
+                            onClick={() => mergeCleanupGroup(group)}
+                            disabled={emailCleanupLoading || selected.filter((id) => id !== keepId).length === 0 || !cleanupNames[key]?.trim()}
+                            className="rounded-xl bg-red-600 hover:bg-red-700 px-4 py-2 text-xs font-semibold text-white disabled:opacity-40"
+                          >
+                            Merge selected BIBs
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
         </div>

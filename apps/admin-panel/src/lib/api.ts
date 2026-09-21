@@ -13,6 +13,26 @@ interface ApiResponse<T> {
   summary?: { total: number; completed: number; failed: number; pending: number };
 }
 
+export interface EmailCleanupReport {
+  uppercaseEmailCount: number;
+  caseCollisionGroups: {
+    email: string;
+    canAutoMerge: boolean;
+    accounts: { id: string; email: string; name: string; phone: string; role: string; participantCount: number }[];
+  }[];
+  duplicateRegistrationGroups: {
+    email: string;
+    eventId: string;
+    eventName: string;
+    recommendedKeepId: string;
+    likelySamePerson: boolean;
+    participants: {
+      id: string; userId: string; bibNumber: string; name: string;
+      status: string; paymentStatus: string; createdAt: string;
+    }[];
+  }[];
+}
+
 class ApiClient {
   private token: string | null = null;
 
@@ -159,6 +179,34 @@ class ApiClient {
       totalSharedAccounts: number;
       totalAffectedParticipants: number;
     }>('/api/v1/participants/shared-contacts');
+  }
+
+  async getEmailCleanupReport() {
+    return this.request<EmailCleanupReport>('/api/v1/participants/email-cleanup');
+  }
+
+  async normalizeParticipantEmails() {
+    return this.request<{
+      normalized: number;
+      mergedAccounts: number;
+      skipped: { email: string; reason: string }[];
+      report: EmailCleanupReport;
+    }>('/api/v1/participants/email-cleanup/normalize', { method: 'POST' });
+  }
+
+  async mergeDuplicateParticipants(data: {
+    keepParticipantId: string;
+    duplicateParticipantIds: string[];
+    correctName: string;
+  }) {
+    return this.request<{
+      keptBibNumber: string;
+      removedBibNumbers: string[];
+      report: EmailCleanupReport;
+    }>('/api/v1/participants/email-cleanup/merge', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   }
 
   async getTreeCounter(eventId?: string) {

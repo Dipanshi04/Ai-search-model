@@ -12,6 +12,275 @@ import { calculateTreesFromDistance, recalcTreeCounter } from '../services/green
 
 export const participantsRouter: Router = Router();
 
+function normalizeEmail(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function normalizePersonName(value: string | null | undefined): string {
+  return String(value || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+async function buildEmailCleanupReport() {
+  const users = await prisma.user.findMany({
+    select: {
+      id: true, email: true, name: true, phone: true, role: true, createdAt: true,
+      participants: {
+        select: {
+          id: true, eventId: true, bibNumber: true, name: true, status: true,
+          paymentStatus: true, createdAt: true,
+          event: { select: { name: true } },
+        },
+        orderBy: { createdAt: 'asc' },
+      },
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  const usersByEmail = new Map<string, typeof users>();
+  for (const user of users) {
+    const email = normalizeEmail(user.email);
+    if (!usersByEmail.has(email)) usersByEmail.set(email, []);
+    usersByEmail.get(email)!.push(user);
+  }
+
+  const caseCollisionGroups = Array.from(usersByEmail.entries())
+    .filter(([, accounts]) => accounts.length > 1)
+    .map(([email, accounts]) => ({
+      email,
+      canAutoMerge: accounts.every((account) => account.role === 'PARTICIPANT'),
+      accounts: accounts.map((account) => ({
+        id: account.id,
+        email: account.email,
+        name: account.name,
+        phone: account.phone,
+        role: account.role,
+        participantCount: account.participants.length,
+      })),
+    }));
+
+  type Registration = (typeof users)[number]['participants'][number] & {
+    userId: string;
+    email: string;
+    accountName: string;
+  };
+  const registrationsByEmailAndEvent = new Map<string, Registration[]>();
+  for (const user of users) {
+    const email = normalizeEmail(user.email);
+    for (const participant of user.participants) {
+      const key = `${email}\u0000${participant.eventId}`;
+      if (!registrationsByEmailAndEvent.has(key)) registrationsByEmailAndEvent.set(key, []);
+      registrationsByEmailAndEvent.get(key)!.push({
+        ...participant,
+        userId: user.id,
+        email,
+        accountName: user.name,
+      });
+    }
+  }
+
+  const duplicateRegistrationGroups = Array.from(registrationsByEmailAndEvent.values())
+    .filter((participants) => participants.length > 1)
+    .map((participants) => {
+      const sorted = [...participants].sort((a, b) => {
+        const score = (p: Registration) =>
+          (p.paymentStatus === 'COMPLETED' ? 100 : 0) +
+          (p.status === 'FINISHED' ? 50 : 0) +
+          (p.status === 'RUNNING' || p.status === 'PAUSED' ? 20 : 0);
+        return score(b) - score(a) || a.createdAt.getTime() - b.createdAt.getTime();
+      });
+      const distinctNames = new Set(sorted.map((p) => normalizePersonName(p.name || p.accountName)).filter(Boolean));
+      return {
+        email: sorted[0]!.email,
+        eventId: sorted[0]!.eventId,
+        eventName: sorted[0]!.event.name,
+        recommendedKeepId: sorted[0]!.id,
+        likelySamePerson: distinctNames.size === 1,
+        participants: sorted.map((p) => ({
+          id: p.id,
+          userId: p.userId,
+          bibNumber: p.bibNumber,
+          name: p.name || p.accountName,
+          status: p.status,
+          paymentStatus: p.paymentStatus,
+          createdAt: p.createdAt,
+        })),
+      };
+    })
+    .sort((a, b) => Number(b.likelySamePerson) - Number(a.likelySamePerson) || a.email.localeCompare(b.email));
+
+  return {
+    uppercaseEmailCount: users.filter((user) => user.email !== normalizeEmail(user.email)).length,
+    caseCollisionGroups,
+    duplicateRegistrationGroups,
+  };
+}
+
+// Preview is intentionally separate from the mutating actions below. Shared
+// company/HR addresses often belong to several real runners, so matching an
+// email is evidence for review, not permission to delete every extra BIB.
+participantsRouter.get('/email-cleanup', authenticate, requireRole('SUPER_ADMIN'), async (_req, res) => {
+  try {
+    res.json({ success: true, data: await buildEmailCleanupReport() });
+  } catch (error) {
+    logger.error('Email cleanup report error:', error);
+    res.status(500).json({ success: false, message: 'Failed to build email cleanup report' });
+  }
+});
+
+participantsRouter.post('/email-cleanup/normalize', authenticate, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const users = await tx.user.findMany({
+        select: { id: true, email: true, role: true, createdAt: true, _count: { select: { participants: true } } },
+        orderBy: { createdAt: 'asc' },
+      });
+      const groups = new Map<string, typeof users>();
+      for (const user of users) {
+        const email = normalizeEmail(user.email);
+        if (!groups.has(email)) groups.set(email, []);
+        groups.get(email)!.push(user);
+      }
+
+      let normalized = 0;
+      let mergedAccounts = 0;
+      const skipped: { email: string; reason: string }[] = [];
+
+      for (const [email, accounts] of groups) {
+        if (accounts.length === 1) {
+          const account = accounts[0]!;
+          if (account.email !== email) {
+            await tx.user.update({ where: { id: account.id }, data: { email } });
+            normalized++;
+          }
+          continue;
+        }
+
+        // Never automatically collapse an admin/HR credential into another
+        // account. Those conflicts need an explicit credential decision.
+        if (!accounts.every((account) => account.role === 'PARTICIPANT')) {
+          skipped.push({ email, reason: 'Contains an admin or HR account' });
+          continue;
+        }
+
+        const sorted = [...accounts].sort((a, b) =>
+          b._count.participants - a._count.participants || a.createdAt.getTime() - b.createdAt.getTime()
+        );
+        const canonical = sorted[0]!;
+        const duplicateIds = sorted.slice(1).map((account) => account.id);
+        await tx.participant.updateMany({ where: { userId: { in: duplicateIds } }, data: { userId: canonical.id } });
+        await tx.user.deleteMany({ where: { id: { in: duplicateIds } } });
+        if (canonical.email !== email) {
+          await tx.user.update({ where: { id: canonical.id }, data: { email } });
+          normalized++;
+        }
+        mergedAccounts += duplicateIds.length;
+      }
+
+      return { normalized, mergedAccounts, skipped };
+    }, { timeout: 30_000 });
+
+    logger.info(`Email normalization by ${req.user?.email}: ${result.normalized} normalized, ${result.mergedAccounts} duplicate accounts merged`);
+    res.json({ success: true, data: { ...result, report: await buildEmailCleanupReport() } });
+  } catch (error) {
+    logger.error('Email normalization error:', error);
+    res.status(500).json({ success: false, message: 'Failed to normalize emails' });
+  }
+});
+
+participantsRouter.post('/email-cleanup/merge', authenticate, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const { keepParticipantId, duplicateParticipantIds, correctName } = req.body as {
+      keepParticipantId?: string;
+      duplicateParticipantIds?: string[];
+      correctName?: string;
+    };
+    const name = String(correctName || '').trim().replace(/\s+/g, ' ');
+    const duplicateIds = Array.from(new Set((duplicateParticipantIds || []).filter((id) => id && id !== keepParticipantId)));
+    if (!keepParticipantId || duplicateIds.length === 0 || !name) {
+      res.status(400).json({ success: false, message: 'Choose the BIB to keep, at least one duplicate BIB, and the correct name' });
+      return;
+    }
+
+    const ids = [keepParticipantId, ...duplicateIds];
+    const participants = await prisma.participant.findMany({
+      where: { id: { in: ids } },
+      include: { user: { select: { email: true } } },
+    });
+    if (participants.length !== ids.length) {
+      res.status(404).json({ success: false, message: 'One or more selected participants no longer exist' });
+      return;
+    }
+    const keep = participants.find((participant) => participant.id === keepParticipantId)!;
+    const sameEvent = participants.every((participant) => participant.eventId === keep.eventId);
+    const sameEmail = participants.every((participant) => normalizeEmail(participant.user.email) === normalizeEmail(keep.user.email));
+    if (!sameEvent || !sameEmail) {
+      res.status(400).json({ success: false, message: 'Only registrations with the same lowercase email and event can be merged' });
+      return;
+    }
+    if (participants.some((participant) => participant.user.email !== normalizeEmail(participant.user.email))) {
+      res.status(409).json({ success: false, message: 'Normalize emails before merging BIB registrations' });
+      return;
+    }
+
+    const statusRank: Record<string, number> = {
+      PENDING_PAYMENT: 0, REGISTERED: 1, CHECKED_IN: 2, DNS: 2,
+      RUNNING: 3, PAUSED: 3, DNF: 4, FINISHED: 5,
+    };
+    const bestStatus = [...participants].sort((a, b) => (statusRank[b.status] || 0) - (statusRank[a.status] || 0))[0]!.status;
+    const earliest = (values: (Date | null)[]) => {
+      const dates = values.filter((value): value is Date => value !== null);
+      return dates.length ? new Date(Math.min(...dates.map((value) => value.getTime()))) : null;
+    };
+    const completed = participants.some((participant) => participant.paymentStatus === 'COMPLETED');
+    const finishTimes = participants
+      .map((participant) => participant.finishTime)
+      .filter((value): value is number => value !== null);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.payment.updateMany({ where: { participantId: { in: duplicateIds } }, data: { participantId: keep.id } });
+      await tx.gpsLog.updateMany({ where: { participantId: { in: duplicateIds } }, data: { participantId: keep.id } });
+      await tx.participant.update({
+        where: { id: keep.id },
+        data: {
+          name,
+          status: bestStatus,
+          paymentStatus: completed ? 'COMPLETED' : keep.paymentStatus,
+          paymentAmount: Math.max(...participants.map((participant) => participant.paymentAmount || 0)) || null,
+          checkedIn: participants.some((participant) => participant.checkedIn),
+          checkedInAt: earliest(participants.map((participant) => participant.checkedInAt)),
+          startedAt: earliest(participants.map((participant) => participant.startedAt)),
+          finishedAt: earliest(participants.map((participant) => participant.finishedAt)),
+          totalDistance: Math.max(...participants.map((participant) => participant.totalDistance)),
+          finishTime: finishTimes.length ? Math.min(...finishTimes) : null,
+          treesCount: Math.max(...participants.map((participant) => participant.treesCount)),
+          kitDistributed: participants.some((participant) => participant.kitDistributed),
+          foodDistributed: participants.some((participant) => participant.foodDistributed),
+          bloodDonation: participants.some((participant) => participant.bloodDonation),
+          // A previously generated certificate contains the old BIB/name in
+          // the PDF itself. Clear it so the next download regenerates the
+          // certificate using the canonical BIB and corrected name.
+          certificateUrl: null,
+        },
+      });
+      await tx.participant.deleteMany({ where: { id: { in: duplicateIds } } });
+    }, { timeout: 30_000 });
+
+    await recalcTreeCounter(keep.eventId);
+    logger.info(`Participant merge by ${req.user?.email}: kept ${keep.bibNumber}, removed ${duplicateIds.length} duplicate BIB(s), name=${name}`);
+    res.json({
+      success: true,
+      data: {
+        keptBibNumber: keep.bibNumber,
+        removedBibNumbers: participants.filter((participant) => duplicateIds.includes(participant.id)).map((participant) => participant.bibNumber),
+        report: await buildEmailCleanupReport(),
+      },
+    });
+  } catch (error) {
+    logger.error('Participant merge error:', error);
+    res.status(500).json({ success: false, message: 'Failed to merge duplicate registrations' });
+  }
+});
+
 // Surfaces every login account (User) shared by more than one participant
 // — a shared HR/company contact email/phone is a common, legitimate bulk-
 // CSV pattern (family members or colleagues without individual emails),
@@ -169,6 +438,7 @@ participantsRouter.get('/', async (req, res) => {
     if (search) {
       where.OR = [
         { bibNumber: { contains: search, mode: 'insensitive' } },
+        { name: { contains: search, mode: 'insensitive' } },
         { user: { name: { contains: search, mode: 'insensitive' } } },
         { user: { email: { contains: search, mode: 'insensitive' } } },
         { user: { phone: { contains: search, mode: 'insensitive' } } },
@@ -731,6 +1001,7 @@ publicParticipantsRouter.get('/search', async (req, res) => {
       where: {
         OR: [
           { bibNumber: { contains: q as string, mode: 'insensitive' } },
+          { name: { contains: q as string, mode: 'insensitive' } },
           { user: { name: { contains: q as string, mode: 'insensitive' } } },
           { company: { name: { contains: q as string, mode: 'insensitive' } } },
         ],

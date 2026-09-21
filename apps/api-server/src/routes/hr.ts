@@ -507,21 +507,28 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
     }
     const emailCursor = new Map<string, number>();
     const phoneCursor = new Map<string, number>();
+    const consumedExistingIds = new Set<string>();
     function findExisting(email: string, phone: string): (typeof existingParticipants)[number] | undefined {
       const emailGroup = email ? existingByEmailGroup.get(email) : undefined;
       if (emailGroup) {
-        const idx = emailCursor.get(email) || 0;
+        let idx = emailCursor.get(email) || 0;
+        while (idx < emailGroup.length && consumedExistingIds.has(emailGroup[idx]!.id)) idx++;
+        emailCursor.set(email, idx + 1);
         if (idx < emailGroup.length) {
-          emailCursor.set(email, idx + 1);
-          return emailGroup[idx];
+          const match = emailGroup[idx]!;
+          consumedExistingIds.add(match.id);
+          return match;
         }
       }
       const phoneGroup = phone ? existingByPhoneGroup.get(phone) : undefined;
       if (phoneGroup) {
-        const idx = phoneCursor.get(phone) || 0;
+        let idx = phoneCursor.get(phone) || 0;
+        while (idx < phoneGroup.length && consumedExistingIds.has(phoneGroup[idx]!.id)) idx++;
+        phoneCursor.set(phone, idx + 1);
         if (idx < phoneGroup.length) {
-          phoneCursor.set(phone, idx + 1);
-          return phoneGroup[idx];
+          const match = phoneGroup[idx]!;
+          consumedExistingIds.add(match.id);
+          return match;
         }
       }
       return undefined;
@@ -541,28 +548,6 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
       return;
     }
 
-    // findExisting advances the positional cursors above as a side effect
-    // (each call consumes one slot from the matching group) — this dry-run
-    // pass over the same rows in the same order would otherwise exhaust
-    // those cursors before the real processing loop below ever sees them,
-    // making every row look "new". Reset both cursors right after so the
-    // real loop starts fresh.
-    const newRowCount = records.filter((r) => {
-      const email = r.email?.trim().toLowerCase();
-      const phone = r.phone?.trim();
-      return (!email && !phone) || !findExisting(email || '', phone || '');
-    }).length;
-    emailCursor.clear();
-    phoneCursor.clear();
-    if (newRowCount > remaining) {
-      res.status(400).json({
-        success: false,
-        message: `CSV has ${newRowCount} new entr${newRowCount !== 1 ? 'ies' : 'y'} but only ${remaining} slot${remaining !== 1 ? 's' : ''} remaining. Rows matching an already-registered email will update that entry instead of using a slot.`,
-        data: { csvRows: records.length, newRows: newRowCount, remaining, used: usedCount, max: bulkReg.numberOfRegistrations },
-      });
-      return;
-    }
-
     // Normalized the same way as each row below (lowercase, no underscores/
     // spaces) so "tshirtSize", "tshirt_size", "T Shirt Size", etc. are all
     // recognized as present regardless of exactly how the CSV spells them.
@@ -574,6 +559,60 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
       res.status(400).json({
         success: false,
         message: `Missing required columns: ${display.join(', ')}. Required: name, email, phone, category, gender, tshirtSize`,
+      });
+      return;
+    }
+
+    const categoryMap: Record<string, string> = {
+      STUDENT: 'RUN_3K',
+      PROFESSIONAL: 'RUN_5K',
+      GENERAL: 'RUN_5K',
+      '3K': 'RUN_3K',
+      '5K': 'RUN_5K',
+      '3KM': 'RUN_3K',
+      '5KM': 'RUN_5K',
+      FUN: 'RUN_3K',
+      CHALLENGE: 'RUN_5K',
+    };
+
+    function normalizeCsvRecord(record: Record<string, string>) {
+      const norm: Record<string, string> = {};
+      for (const [key, value] of Object.entries(record)) {
+        norm[key.toLowerCase().replace(/[_\s]/g, '')] = value;
+      }
+      return norm;
+    }
+
+    function isProcessableCsvRecord(norm: Record<string, string>): boolean {
+      const name = norm.name?.trim();
+      const email = norm.email?.trim().toLowerCase();
+      const phone = norm.phone?.trim();
+      const gender = norm.gender?.trim().toUpperCase();
+      const tshirtSize = norm.tshirtsize?.trim();
+      const rawCategory = norm.category?.trim().toUpperCase();
+      const category = rawCategory && (['RUN_3K', 'RUN_5K'].includes(rawCategory) ? rawCategory : categoryMap[rawCategory]);
+      return Boolean(name && email && phone && tshirtSize && category && gender && ['MALE', 'FEMALE'].includes(gender));
+    }
+
+    // Count only rows the processing loop can actually create. This uses the
+    // exact same header normalization and required/category/gender checks as
+    // the real import, so "Email"/"PHONE" work and invalid rows don't consume
+    // registration capacity they will never use.
+    const newRowCount = records.reduce((count, record) => {
+      const norm = normalizeCsvRecord(record);
+      if (!isProcessableCsvRecord(norm)) return count;
+      const email = norm.email!.trim().toLowerCase();
+      const phone = norm.phone!.trim();
+      return count + (findExisting(email, phone) ? 0 : 1);
+    }, 0);
+    emailCursor.clear();
+    phoneCursor.clear();
+    consumedExistingIds.clear();
+    if (newRowCount > remaining) {
+      res.status(400).json({
+        success: false,
+        message: `CSV has ${newRowCount} valid new entr${newRowCount !== 1 ? 'ies' : 'y'} but only ${remaining} slot${remaining !== 1 ? 's' : ''} remaining. Rows matching an existing registration update it without using another slot.`,
+        data: { csvRows: records.length, newRows: newRowCount, remaining, used: usedCount, max: bulkReg.numberOfRegistrations },
       });
       return;
     }
@@ -604,10 +643,7 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
       // row regardless of the file's actual data. Normalizing keys to
       // lowercase/no-separators once per row makes the lookup accept
       // tshirtSize, tshirt_size, TSHIRTSIZE, etc. uniformly.
-      const norm: Record<string, string> = {};
-      for (const [k, v] of Object.entries(record)) {
-        norm[k.toLowerCase().replace(/[_\s]/g, '')] = v;
-      }
+      const norm = normalizeCsvRecord(record);
 
       const name = norm.name?.trim();
       const email = norm.email?.trim().toLowerCase();
@@ -628,17 +664,6 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
         continue;
       }
 
-      const categoryMap: Record<string, string> = {
-        STUDENT: 'RUN_3K',
-        PROFESSIONAL: 'RUN_5K',
-        GENERAL: 'RUN_5K',
-        '3K': 'RUN_3K',
-        '5K': 'RUN_5K',
-        '3KM': 'RUN_3K',
-        '5KM': 'RUN_5K',
-        FUN: 'RUN_3K',
-        CHALLENGE: 'RUN_5K',
-      };
       let category = norm.category?.trim().toUpperCase();
       if (!category) {
         results.push({ success: false, name, email, error: 'Missing required field: category' });

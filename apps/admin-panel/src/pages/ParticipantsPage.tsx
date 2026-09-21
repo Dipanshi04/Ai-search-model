@@ -422,6 +422,7 @@ export default function ParticipantsPage() {
             <option value="L">L</option>
             <option value="XL">XL</option>
             <option value="XXL">XXL</option>
+            <option value="MISSING">Missing / Not Set</option>
           </select>
           <select
             value={eventId}

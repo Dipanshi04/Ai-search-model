@@ -42,6 +42,63 @@ bulkRegistrationRouter.get('/', async (_req: Request, res: Response) => {
   }
 });
 
+// T-shirt size breakdown per company, for bulk (HR-registered) participants
+// only — kit ordering needs "how many of each size for company X", not a
+// site-wide total (that's already on the Dashboard).
+bulkRegistrationRouter.get('/tshirt-report', async (_req: Request, res: Response) => {
+  try {
+    const participants = await prisma.participant.findMany({
+      where: { bulkRegistrationId: { not: null } },
+      select: {
+        tshirtSize: true,
+        company: { select: { name: true } },
+        bulkRegistration: { select: { companyName: true } },
+      },
+    });
+
+    const bySizeByCompany = new Map<string, Record<string, number>>();
+    const allSizes = new Set<string>();
+
+    for (const p of participants) {
+      const companyName = p.company?.name || p.bulkRegistration?.companyName || 'Unknown Company';
+      const size = p.tshirtSize || 'Not Set';
+      allSizes.add(size);
+      if (!bySizeByCompany.has(companyName)) bySizeByCompany.set(companyName, {});
+      const row = bySizeByCompany.get(companyName)!;
+      row[size] = (row[size] || 0) + 1;
+    }
+
+    // A stable, sensible column order — real sizes first (S→XXL), then
+    // whatever odd values a CSV/typo introduced, "Not Set" always last.
+    const SIZE_ORDER = ['S', 'M', 'L', 'XL', 'XXL', '3XL'];
+    const sizes = Array.from(allSizes).sort((a, b) => {
+      if (a === 'Not Set') return 1;
+      if (b === 'Not Set') return -1;
+      const ai = SIZE_ORDER.indexOf(a);
+      const bi = SIZE_ORDER.indexOf(b);
+      return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    });
+
+    const rows = Array.from(bySizeByCompany.entries())
+      .map(([companyName, counts]) => ({
+        companyName,
+        counts,
+        total: Object.values(counts).reduce((sum, n) => sum + n, 0),
+      }))
+      .sort((a, b) => b.total - a.total);
+
+    const grandTotal: Record<string, number> = {};
+    for (const size of sizes) {
+      grandTotal[size] = rows.reduce((sum, r) => sum + (r.counts[size] || 0), 0);
+    }
+
+    res.json({ success: true, data: { sizes, rows, grandTotal } });
+  } catch (error) {
+    logger.error('T-shirt report error:', error);
+    res.status(500).json({ success: false, message: 'Failed to build t-shirt report' });
+  }
+});
+
 bulkRegistrationRouter.post('/', async (req: Request, res: Response) => {
   try {
     const { companyName, hrName, hrEmail: hrEmailInput, hrPassword, numberOfRegistrations, notes, companyId } = req.body as {

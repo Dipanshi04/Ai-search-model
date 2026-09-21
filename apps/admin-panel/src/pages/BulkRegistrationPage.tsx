@@ -37,6 +37,13 @@ export default function BulkRegistrationPage() {
   const companyFieldRef = useRef<HTMLDivElement>(null);
   const [resetResult, setResetResult] = useState<{ hrEmail: string; password: string } | null>(null);
   const [resettingId, setResettingId] = useState<string | null>(null);
+  const [showTshirtReport, setShowTshirtReport] = useState(false);
+  const [tshirtReport, setTshirtReport] = useState<{
+    sizes: string[];
+    rows: { companyName: string; counts: Record<string, number>; total: number }[];
+    grandTotal: Record<string, number>;
+  } | null>(null);
+  const [tshirtReportLoading, setTshirtReportLoading] = useState(false);
 
   useEffect(() => { fetchRegistrations(); }, []);
 
@@ -68,6 +75,23 @@ export default function BulkRegistrationPage() {
     } catch (e) {
       console.error('Failed to fetch bulk registrations:', e);
     }
+  }
+
+  async function toggleTshirtReport() {
+    if (showTshirtReport) {
+      setShowTshirtReport(false);
+      return;
+    }
+    setShowTshirtReport(true);
+    if (tshirtReport) return; // already loaded once this session
+    setTshirtReportLoading(true);
+    try {
+      const res = await api.getBulkTshirtReport();
+      if (res.success && res.data) setTshirtReport(res.data);
+    } catch (e) {
+      console.error('Failed to fetch t-shirt report:', e);
+    }
+    setTshirtReportLoading(false);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -180,13 +204,71 @@ export default function BulkRegistrationPage() {
             Create HR credentials for companies to register participants in bulk
           </p>
         </div>
-        <button
-          onClick={openCreate}
-          className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-3xl text-sm font-medium shadow-sm"
-        >
-          Add New
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={toggleTshirtReport}
+            className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-3xl text-sm font-medium shadow-sm"
+          >
+            {showTshirtReport ? 'Hide T-Shirt Report' : 'T-Shirt Report'}
+          </button>
+          <button
+            onClick={openCreate}
+            className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-3xl text-sm font-medium shadow-sm"
+          >
+            Add New
+          </button>
+        </div>
       </div>
+
+      {showTshirtReport && (
+        <div className="glass rounded-[2rem] border border-white/20 overflow-hidden shadow-sm">
+          <div className="px-6 py-4 border-b border-slate-100">
+            <h3 className="text-sm font-semibold text-slate-700">T-Shirt Sizes by Company</h3>
+            <p className="text-xs text-slate-500 mt-0.5">Bulk (HR-registered) participants only</p>
+          </div>
+          {tshirtReportLoading ? (
+            <div className="p-8 text-center text-slate-500 text-sm">Loading...</div>
+          ) : !tshirtReport || tshirtReport.rows.length === 0 ? (
+            <div className="p-8 text-center text-slate-500 text-sm">No bulk-registered participants yet.</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-white/80">
+                  <tr>
+                    <th className="text-left px-5 py-3 text-slate-500 font-semibold">Company</th>
+                    {tshirtReport.sizes.map((size) => (
+                      <th key={size} className="text-center px-4 py-3 text-slate-500 font-semibold">{size}</th>
+                    ))}
+                    <th className="text-center px-4 py-3 text-slate-700 font-bold">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {tshirtReport.rows.map((row) => (
+                    <tr key={row.companyName} className="border-t border-white/10">
+                      <td className="px-5 py-3 text-slate-950 font-medium">{row.companyName}</td>
+                      {tshirtReport.sizes.map((size) => (
+                        <td key={size} className="text-center px-4 py-3 text-slate-700">{row.counts[size] || 0}</td>
+                      ))}
+                      <td className="text-center px-4 py-3 font-bold text-violet-700">{row.total}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-slate-200 bg-white/60">
+                    <td className="px-5 py-3 text-slate-950 font-bold">Total</td>
+                    {tshirtReport.sizes.map((size) => (
+                      <td key={size} className="text-center px-4 py-3 font-bold text-slate-950">{tshirtReport.grandTotal[size] || 0}</td>
+                    ))}
+                    <td className="text-center px-4 py-3 font-bold text-violet-700">
+                      {Object.values(tshirtReport.grandTotal).reduce((sum, n) => sum + n, 0)}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="glass rounded-2xl border border-white/20 px-5 py-4 flex items-center gap-3 bg-violet-50/50">
         <svg className="w-5 h-5 text-violet-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">

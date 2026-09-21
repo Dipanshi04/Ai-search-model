@@ -116,7 +116,8 @@ participantsRouter.get('/', async (req, res) => {
     if (eventId) where.eventId = eventId;
     if (category) where.category = category;
     if (status) where.status = status;
-    if (tshirtSize) where.tshirtSize = tshirtSize;
+    if (tshirtSize === 'MISSING') where.tshirtSize = null;
+    else if (tshirtSize) where.tshirtSize = tshirtSize;
     if (isBoardMember !== undefined) where.isBoardMember = isBoardMember;
     if (search) {
       where.OR = [

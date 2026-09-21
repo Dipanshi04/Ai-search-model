@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
 
+const API_URL = import.meta.env.VITE_API_URL || '';
+
 // datetime-local inputs need "YYYY-MM-DDTHH:mm" in the browser's local
 // time, not the ISO string (UTC, with seconds/zone) the API returns —
 // converting through Date keeps this in the viewer's own timezone.
@@ -534,9 +536,22 @@ export default function ParticipantsPage() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start justify-between mb-4">
-              <div>
-                <p className="text-xs font-mono text-violet-700">{viewParticipant.bibNumber}</p>
-                <h2 className="text-lg font-bold text-slate-950">{viewParticipant.user?.name}</h2>
+              <div className="flex items-center gap-3">
+                {viewParticipant.user?.avatarUrl ? (
+                  <img
+                    src={`${API_URL}${viewParticipant.user.avatarUrl}`}
+                    alt={viewParticipant.user?.name}
+                    className="w-14 h-14 rounded-full object-cover border border-slate-200 shrink-0"
+                  />
+                ) : (
+                  <div className="w-14 h-14 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 text-lg font-bold shrink-0">
+                    {viewParticipant.user?.name?.[0]?.toUpperCase() || '?'}
+                  </div>
+                )}
+                <div>
+                  <p className="text-xs font-mono text-violet-700">{viewParticipant.bibNumber}</p>
+                  <h2 className="text-lg font-bold text-slate-950">{viewParticipant.user?.name}</h2>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 {!editingDetails && (

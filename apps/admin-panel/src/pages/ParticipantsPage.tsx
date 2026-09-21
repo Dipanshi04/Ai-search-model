@@ -221,6 +221,26 @@ export default function ParticipantsPage() {
 
   const handleSaveDetails = async () => {
     if (!viewParticipant) return;
+
+    // A FINISHED status with no real distance, or a start-to-finish gap
+    // too short for an actual 3K/5K, is almost always a slip while testing
+    // this panel rather than an intended race result — require an explicit
+    // confirmation instead of silently writing it (this is what produced
+    // the ISA0892/ISA0784 0-distance, 15-second "finishes" in production).
+    if (editStatus === 'FINISHED') {
+      const distance = editTotalDistance === '' ? 0 : Number(editTotalDistance);
+      const elapsedMin = editStartedAt && editFinishedAt
+        ? (new Date(editFinishedAt).getTime() - new Date(editStartedAt).getTime()) / 60000
+        : null;
+      const looksReal = distance > 0.5 && (elapsedMin === null || elapsedMin >= 5);
+      if (!looksReal) {
+        const proceed = confirm(
+          `This finish looks like a test entry (distance ${distance}km${elapsedMin !== null ? `, ${elapsedMin.toFixed(1)} min` : ''}) rather than a real run. Save anyway?`
+        );
+        if (!proceed) return;
+      }
+    }
+
     setDetailsError('');
     setDetailsSaving(true);
     try {

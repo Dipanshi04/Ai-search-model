@@ -3,6 +3,7 @@ import { api } from '../lib/api';
 
 interface ReconcileEntry {
   orderId: string;
+  cashfreeOrderId: string | null;
   csvStatus: 'SUCCESS' | 'FAILED' | 'CANCELLED';
   csvAmount: number | null;
   transactionTime: string | null;
@@ -199,7 +200,9 @@ export default function PaymentReconcileTab() {
                     )}
                   </div>
                   <p className="text-xs text-slate-500 mt-1">{e.note}</p>
-                  <p className="text-[11px] text-slate-400 mt-0.5 font-mono">{e.orderId}</p>
+                  <p className="text-[11px] text-slate-400 mt-0.5 font-mono">
+                    order: {e.orderId}{e.cashfreeOrderId ? ` · cf order: ${e.cashfreeOrderId}` : ''}
+                  </p>
                 </div>
                 {e.csvAmount != null && <p className="text-sm font-bold text-slate-900 shrink-0">₹{e.csvAmount}</p>}
               </div>

@@ -5,6 +5,7 @@ import PaymentReconcileTab from '../components/PaymentReconcileTab';
 interface PaymentRow {
   id: string;
   reference: string | null;
+  externalRef: string | null;
   provider: 'RAZORPAY' | 'SHOWTIMEBRO' | 'CASHFREE';
   amount: number;
   currency: string;
@@ -233,6 +234,11 @@ export default function PaymentsPage() {
                   <p className="text-xs text-slate-500 mt-1">
                     {p.participant?.user?.email} &middot; {timeAgo(p.createdAt)}
                     {p.paidAt ? ` · paid ${timeAgo(p.paidAt)}` : ''}
+                  </p>
+                  <p className="text-[11px] font-mono text-slate-400 mt-1 flex flex-wrap gap-x-3">
+                    <span>id: {p.id}</span>
+                    {p.reference && <span>order: {p.reference}</span>}
+                    {p.externalRef && <span>cf order: {p.externalRef}</span>}
                   </p>
                   {p.status === 'FAILED' && p.failureReason && (
                     <p className="text-xs text-red-600 mt-1">Reason: {p.failureReason}</p>

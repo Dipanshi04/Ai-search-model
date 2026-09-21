@@ -164,6 +164,7 @@ paymentRouter.post(
 
 interface ReconcileEntry {
   orderId: string;
+  cashfreeOrderId: string | null;
   csvStatus: 'SUCCESS' | 'FAILED' | 'CANCELLED';
   csvAmount: number | null;
   transactionTime: string | null;
@@ -176,7 +177,7 @@ interface ReconcileEntry {
   conflict: boolean;
 }
 
-type CsvOutcome = { status: 'SUCCESS' | 'FAILED' | 'CANCELLED'; amount: number | null; time: string | null; reason: string | null };
+type CsvOutcome = { status: 'SUCCESS' | 'FAILED' | 'CANCELLED'; amount: number | null; time: string | null; reason: string | null; cashfreeOrderId: string | null };
 
 function parseReconcileCsv(buffer: Buffer): Map<string, CsvOutcome> {
   const csvString = buffer.toString('utf-8');
@@ -196,6 +197,7 @@ function parseReconcileCsv(buffer: Buffer): Map<string, CsvOutcome> {
 
     const existing = byOrder.get(orderId);
     if (existing?.status === 'SUCCESS') continue; // already resolved for this order
+    const cashfreeOrderId = row['Cashfree Order ID']?.trim() || existing?.cashfreeOrderId || null;
 
     if (status === 'SUCCESS') {
       byOrder.set(orderId, {
@@ -207,13 +209,14 @@ function parseReconcileCsv(buffer: Buffer): Map<string, CsvOutcome> {
         // production and would silently shift every paidAt by 5.5 hours).
         time: row['Transaction Time'] ? new Date(`${row['Transaction Time'].replace(' ', 'T')}+05:30`).toISOString() : null,
         reason: null,
+        cashfreeOrderId,
       });
     } else if (status === 'FAILED') {
       if (existing?.status !== 'FAILED') {
-        byOrder.set(orderId, { status: 'FAILED', amount: null, time: null, reason: row['Failure Reason'] || 'Payment failed' });
+        byOrder.set(orderId, { status: 'FAILED', amount: null, time: null, reason: row['Failure Reason'] || 'Payment failed', cashfreeOrderId });
       }
     } else if (status === 'USER_DROPPED' && !existing) {
-      byOrder.set(orderId, { status: 'CANCELLED', amount: null, time: null, reason: 'Cancelled — user did not complete the payment' });
+      byOrder.set(orderId, { status: 'CANCELLED', amount: null, time: null, reason: 'Cancelled — user did not complete the payment', cashfreeOrderId });
     }
   }
 
@@ -274,6 +277,7 @@ async function buildReconcileReport(buffer: Buffer): Promise<ReconcileEntry[]> {
 
     report.push({
       orderId,
+      cashfreeOrderId: csv.cashfreeOrderId,
       csvStatus: csv.status,
       csvAmount: csv.amount,
       transactionTime: csv.time,

@@ -356,6 +356,7 @@ hrRouter.post('/participants', hrAuth, async (req: Request, res: Response) => {
         companyId: bulkReg.companyId,
         bulkRegistrationId: hrId,
         bibNumber,
+        name,
         category: category as any,
         gender: gender as any,
         status: 'REGISTERED',
@@ -382,8 +383,8 @@ hrRouter.post('/participants', hrAuth, async (req: Request, res: Response) => {
 
     // Send welcome email and PIN email (async)
     if (isNewUser && pin) {
-      sendWelcomeEmail(user.email, user.name, bibNumber, category).catch((e) => logger.error('Welcome email failed:', e));
-      sendPinEmail(user.email, user.name, pin).catch((e) => logger.error('PIN email failed:', e));
+      sendWelcomeEmail(user.email, name, bibNumber, category).catch((e) => logger.error('Welcome email failed:', e));
+      sendPinEmail(user.email, name, pin).catch((e) => logger.error('PIN email failed:', e));
     }
 
     res.status(201).json({
@@ -423,19 +424,19 @@ hrRouter.put('/participants/:id', hrAuth, async (req: Request, res: Response) =>
       bloodDonation?: boolean; tshirtSize?: string;
     };
 
-    if (name !== undefined || phone !== undefined) {
-      await prisma.user.update({
-        where: { id: participant.userId },
-        data: {
-          ...(name !== undefined && { name: String(name).trim() }),
-          ...(phone !== undefined && { phone: String(phone).trim() }),
-        },
-      });
+    // Phone still lives on the shared User (it's the login identity), but
+    // name is participant-level — several real people can share one login
+    // account (a common bulk-CSV pattern), so writing name to User here
+    // would silently rename every sibling registered under that account,
+    // not just this one.
+    if (phone !== undefined) {
+      await prisma.user.update({ where: { id: participant.userId }, data: { phone: String(phone).trim() } });
     }
 
     const updated = await prisma.participant.update({
       where: { id: participant.id },
       data: {
+        ...(name !== undefined && { name: String(name).trim() }),
         ...(category !== undefined && { category: category as any }),
         ...(gender !== undefined && { gender: gender as any }),
         ...(emergencyContact !== undefined && { emergencyContact }),
@@ -478,17 +479,53 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
     const existingParticipants = await prisma.participant.findMany({
       where: { bulkRegistrationId: hrId },
       include: { user: { select: { email: true, phone: true } } },
+      orderBy: { createdAt: 'asc' },
     });
     const usedCount = existingParticipants.length;
     const remaining = bulkReg.numberOfRegistrations - usedCount;
-    // Keyed by lowercased email AND by phone — either matching an existing
-    // row means a re-uploaded CSV updates it (fixing a typo'd category/
-    // tshirtSize/etc.) instead of failing on a unique-constraint or eating
-    // a registration slot again. Not keyed by BIB — the CSV never carries
-    // one, and BIB is meant to stay fixed once printed on a kit anyway.
-    const existingByEmail = new Map(existingParticipants.map((p) => [p.user.email.toLowerCase(), p]));
-    const existingByPhone = new Map(existingParticipants.map((p) => [p.user.phone, p]));
-    const findExisting = (email: string, phone: string) => existingByEmail.get(email) || existingByPhone.get(phone);
+
+    // A shared HR/company contact email or phone across several different
+    // real people is common in these CSVs (family members, colleagues
+    // without individual emails) — so matching purely by email/phone can't
+    // tell WHICH of several siblings a given row is. Instead, group
+    // existing participants by email (oldest first — i.e. original upload
+    // order), and consume that group positionally as rows for the same
+    // email are encountered in this file, in order. A re-uploaded CSV with
+    // corrected names, in the same row order, then updates the *right*
+    // person each time regardless of what name either side currently has.
+    // Falls back to phone grouping only when there's no email group left
+    // to draw from. Never matched by BIB — the CSV doesn't carry one.
+    const existingByEmailGroup = new Map<string, typeof existingParticipants>();
+    const existingByPhoneGroup = new Map<string, typeof existingParticipants>();
+    for (const p of existingParticipants) {
+      const emailKey = p.user.email.toLowerCase();
+      if (!existingByEmailGroup.has(emailKey)) existingByEmailGroup.set(emailKey, []);
+      existingByEmailGroup.get(emailKey)!.push(p);
+      const phoneKey = p.user.phone;
+      if (!existingByPhoneGroup.has(phoneKey)) existingByPhoneGroup.set(phoneKey, []);
+      existingByPhoneGroup.get(phoneKey)!.push(p);
+    }
+    const emailCursor = new Map<string, number>();
+    const phoneCursor = new Map<string, number>();
+    function findExisting(email: string, phone: string): (typeof existingParticipants)[number] | undefined {
+      const emailGroup = email ? existingByEmailGroup.get(email) : undefined;
+      if (emailGroup) {
+        const idx = emailCursor.get(email) || 0;
+        if (idx < emailGroup.length) {
+          emailCursor.set(email, idx + 1);
+          return emailGroup[idx];
+        }
+      }
+      const phoneGroup = phone ? existingByPhoneGroup.get(phone) : undefined;
+      if (phoneGroup) {
+        const idx = phoneCursor.get(phone) || 0;
+        if (idx < phoneGroup.length) {
+          phoneCursor.set(phone, idx + 1);
+          return phoneGroup[idx];
+        }
+      }
+      return undefined;
+    }
 
     let records: Record<string, string>[];
     try {
@@ -504,11 +541,19 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
       return;
     }
 
+    // findExisting advances the positional cursors above as a side effect
+    // (each call consumes one slot from the matching group) — this dry-run
+    // pass over the same rows in the same order would otherwise exhaust
+    // those cursors before the real processing loop below ever sees them,
+    // making every row look "new". Reset both cursors right after so the
+    // real loop starts fresh.
     const newRowCount = records.filter((r) => {
       const email = r.email?.trim().toLowerCase();
       const phone = r.phone?.trim();
       return (!email && !phone) || !findExisting(email || '', phone || '');
     }).length;
+    emailCursor.clear();
+    phoneCursor.clear();
     if (newRowCount > remaining) {
       res.status(400).json({
         success: false,
@@ -616,10 +661,15 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
       try {
         const existing = findExisting(email, phone);
         if (existing) {
-          await prisma.user.update({ where: { id: existing.userId }, data: { name, phone } });
+          // Name lives on the Participant, not the shared User — several
+          // real people can share one login (that's the whole reason for
+          // the positional matching above), so updating user.name/phone
+          // here would silently rename or repin every sibling registered
+          // under the same account, not just this one row.
           const updatedParticipant = await prisma.participant.update({
             where: { id: existing.id },
             data: {
+              name,
               category: category as any,
               gender: gender as any,
               emergencyContact,
@@ -677,6 +727,7 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
             companyId: bulkReg.companyId,
             bulkRegistrationId: hrId,
             bibNumber,
+            name,
             category: category as any,
             gender: gender as any,
             status: 'REGISTERED',
@@ -698,8 +749,8 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
 
         // Send welcome email and PIN email (async)
         if (isNewUser && pin) {
-          sendWelcomeEmail(user.email, user.name, bibNumber, category).catch((e) => logger.error('Welcome email failed:', e));
-          sendPinEmail(user.email, user.name, pin).catch((e) => logger.error('PIN email failed:', e));
+          sendWelcomeEmail(user.email, name, bibNumber, category).catch((e) => logger.error('Welcome email failed:', e));
+          sendPinEmail(user.email, name, pin).catch((e) => logger.error('PIN email failed:', e));
         }
       } catch (err: any) {
         if (err.code === 'P2002') {

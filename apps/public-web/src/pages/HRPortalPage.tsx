@@ -17,6 +17,7 @@ interface HrProfile {
 interface Participant {
   id: string;
   bibNumber: string;
+  name: string | null;
   category: string;
   gender: string;
   status: string;
@@ -154,7 +155,7 @@ export default function HRPortalPage() {
 
   function openEditParticipant(p: Participant) {
     setEditForm({
-      name: p.user.name,
+      name: p.name || p.user.name,
       phone: p.user.phone,
       category: p.category,
       gender: p.gender,
@@ -369,7 +370,7 @@ export default function HRPortalPage() {
                     {participants.map(p => (
                       <tr key={p.id} className="border-t border-brand-navy/5 hover:bg-brand-cream transition-colors">
                         <td className="hero-tabular px-4 py-3 font-bold text-brand-orange">{p.bibNumber}</td>
-                        <td className="px-4 py-3 text-brand-navy">{p.user.name}</td>
+                        <td className="px-4 py-3 text-brand-navy">{p.name || p.user.name}</td>
                         <td className="px-4 py-3 text-brand-navy/70">{p.user.email}</td>
                         <td className="px-4 py-3 text-brand-navy/70">{p.user.phone}</td>
                         <td className="px-4 py-3 text-center">

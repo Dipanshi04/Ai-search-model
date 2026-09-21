@@ -12,6 +12,53 @@ import { calculateTreesFromDistance, recalcTreeCounter } from '../services/green
 
 export const participantsRouter: Router = Router();
 
+// Surfaces every login account (User) shared by more than one participant
+// — a shared HR/company contact email/phone is a common, legitimate bulk-
+// CSV pattern (family members or colleagues without individual emails),
+// but it means "869 registered" counts real, distinct race entries even
+// though some of those entries can't each log into the Runner App on
+// their own. This report is how to see the actual scope of that, and to
+// spot-check that names look right per person after the CSV/edit fixes.
+participantsRouter.get('/shared-contacts', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'), async (_req, res) => {
+  try {
+    const users = await prisma.user.findMany({
+      where: { participants: { some: {} } },
+      select: {
+        id: true, name: true, email: true, phone: true,
+        participants: {
+          select: {
+            id: true, bibNumber: true, name: true, category: true, status: true,
+            company: { select: { name: true } },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    });
+
+    const groups = users
+      .filter((u) => u.participants.length > 1)
+      .map((u) => ({
+        accountEmail: u.email,
+        accountPhone: u.phone,
+        accountName: u.name,
+        participants: u.participants,
+      }))
+      .sort((a, b) => b.participants.length - a.participants.length);
+
+    res.json({
+      success: true,
+      data: {
+        groups,
+        totalSharedAccounts: groups.length,
+        totalAffectedParticipants: groups.reduce((sum, g) => sum + g.participants.length, 0),
+      },
+    });
+  } catch (error) {
+    logger.error('Shared contacts report error:', error);
+    res.status(500).json({ success: false, message: 'Failed to build shared contacts report' });
+  }
+});
+
 participantsRouter.get('/stats/summary', async (req, res) => {
   try {
     const eventId = typeof req.query.eventId === 'string' ? req.query.eventId : undefined;
@@ -79,7 +126,7 @@ participantsRouter.get('/export/csv', authenticate, requireRole('SUPER_ADMIN', '
     const rows = participants.map((p) => [
       p.id,
       p.bibNumber,
-      p.user.name,
+      p.name || p.user.name,
       p.user.email,
       p.user.phone,
       p.company?.name ?? '',
@@ -241,6 +288,7 @@ participantsRouter.post('/', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANA
         userId: user.id,
         companyId: companyId || null,
         bibNumber,
+        name,
         category: category as any,
         gender: gender as any,
         status: completed ? 'REGISTERED' : 'PENDING_PAYMENT',
@@ -262,10 +310,10 @@ participantsRouter.post('/', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANA
     logger.info(`Admin manually added participant ${bibNumber} (${name}) by ${req.user?.email}`);
 
     if (isNewUser && pin) {
-      sendPinEmail(user.email, user.name, pin).catch((e) => logger.error('PIN email failed:', e));
+      sendPinEmail(user.email, name, pin).catch((e) => logger.error('PIN email failed:', e));
     }
     if (completed) {
-      sendWelcomeEmail(user.email, user.name, bibNumber, category).catch((e) => logger.error('Welcome email failed:', e));
+      sendWelcomeEmail(user.email, name, bibNumber, category).catch((e) => logger.error('Welcome email failed:', e));
     }
 
     res.status(201).json({ success: true, data: participant });
@@ -430,19 +478,18 @@ participantsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MA
       return;
     }
 
-    // Name and phone live on the linked User, not Participant — updated
-    // separately from the fields below. BIB number is intentionally never
-    // accepted from the admin-panel edit form (even though the field below
-    // still supports it for scripted/manual fixes) since it's already
-    // printed on kits and used as the runner's public identity.
-    if (phone !== undefined || name !== undefined) {
-      await prisma.user.update({
-        where: { id: participant.userId },
-        data: {
-          ...(phone !== undefined && { phone: String(phone).trim() }),
-          ...(name !== undefined && { name: String(name).trim() }),
-        },
-      });
+    // Phone lives on the linked User, not Participant — updated separately
+    // from the fields below. Name is participant-level, NOT on User —
+    // several real people can share one login account (a shared HR/company
+    // contact email is common in bulk CSV uploads), so writing name to
+    // User here would silently rename every sibling registered under that
+    // same account, not just the one being edited. BIB number is
+    // intentionally never accepted from the admin-panel edit form (even
+    // though the field below still supports it for scripted/manual fixes)
+    // since it's already printed on kits and used as the runner's public
+    // identity.
+    if (phone !== undefined) {
+      await prisma.user.update({ where: { id: participant.userId }, data: { phone: String(phone).trim() } });
     }
 
     // Manual race-progress override — for runners staff track on paper
@@ -457,6 +504,7 @@ participantsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MA
     const updated = await prisma.participant.update({
       where: { id: req.params.id as string },
       data: {
+        ...(name !== undefined && { name: String(name).trim() }),
         ...(status !== undefined && { status }),
         ...(category !== undefined && { category }),
         ...(gender !== undefined && { gender }),
@@ -521,7 +569,7 @@ participantsRouter.post('/:id/reset-pin', authenticate, requireRole('SUPER_ADMIN
       data: { pinHash },
     });
 
-    sendPinEmail(participant.user.email, participant.user.name, pin).catch((err) =>
+    sendPinEmail(participant.user.email, participant.name || participant.user.name, pin).catch((err) =>
       logger.error('Failed to email reset PIN:', err)
     );
 
@@ -561,14 +609,14 @@ participantsRouter.delete('/:id', authenticate, requireRole('SUPER_ADMIN'), asyn
 });
 
 async function sendReminderTo(participant: {
-  bibNumber: string; category: string;
+  bibNumber: string; category: string; name: string | null;
   user: { name: string; email: string };
   company: { status: string } | null;
 }): Promise<boolean> {
   const baseAmount = feeForCategory(participant.category);
   const isPremiumCompany = participant.company?.status === 'PREMIUM';
   const amount = isPremiumCompany ? Math.round(baseAmount * 0.5) : baseAmount;
-  return sendPaymentReminderEmail(participant.user.email, participant.user.name, participant.bibNumber, amount);
+  return sendPaymentReminderEmail(participant.user.email, participant.name || participant.user.name, participant.bibNumber, amount);
 }
 
 // Manual only — an admin clicks a button for one participant at a time.
@@ -630,7 +678,7 @@ participantsRouter.post('/send-payment-reminders/bulk', authenticate, requireRol
     const targets = await prisma.participant.findMany({
       where,
       select: {
-        bibNumber: true, category: true,
+        bibNumber: true, category: true, name: true,
         user: { select: { name: true, email: true } },
         company: { select: { status: true } },
       },

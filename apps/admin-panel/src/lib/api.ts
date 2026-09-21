@@ -150,6 +150,17 @@ class ApiClient {
     return this.request<any>(`/api/v1/participants/stats/summary${query}`);
   }
 
+  async getSharedContacts() {
+    return this.request<{
+      groups: {
+        accountEmail: string; accountPhone: string; accountName: string;
+        participants: { id: string; bibNumber: string; name: string | null; category: string; status: string; company: { name: string } | null }[];
+      }[];
+      totalSharedAccounts: number;
+      totalAffectedParticipants: number;
+    }>('/api/v1/participants/shared-contacts');
+  }
+
   async getTreeCounter(eventId?: string) {
     const query = eventId ? `?eventId=${eventId}` : '';
     return this.request<{ totalTrees: number; totalKm: number; totalCO2: number }>(`/api/v1/trees${query}`);

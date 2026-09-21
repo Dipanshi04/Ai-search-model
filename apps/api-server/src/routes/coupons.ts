@@ -52,6 +52,7 @@ couponsRouter.get('/:id/usages', authenticate, requireRole('SUPER_ADMIN', 'RACE_
           select: {
             bibNumber: true,
             category: true,
+            name: true,
             user: { select: { name: true, email: true } },
           },
         },

@@ -136,7 +136,7 @@ registerRouter.post('/', async (req: Request, res: Response) => {
       const resumed = await prisma.participant.update({
         where: { id: existingParticipant.id },
         data: {
-          category, gender, companyId: companyId ?? existingParticipant.companyId,
+          name, category, gender, companyId: companyId ?? existingParticipant.companyId,
           emergencyContact, emergencyPhone,
           bloodGroup: bloodGroup || null,
           bloodDonation: bloodDonation === true,
@@ -183,6 +183,7 @@ registerRouter.post('/', async (req: Request, res: Response) => {
         userId: user.id,
         companyId,
         bibNumber,
+        name,
         category,
         gender,
         status: 'PENDING_PAYMENT',

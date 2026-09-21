@@ -110,6 +110,13 @@ model Participant {
   userId          String           @map("user_id")
   companyId       String?          @map("company_id")
   bibNumber       String           @unique @map("bib_number")
+  // The runner's own name for THIS registration — independent of the
+  // linked User's name. Multiple participants can share one login (a
+  // shared HR/company contact email is common in bulk CSV uploads), so
+  // name can't live only on User without one person's edit silently
+  // overwriting every sibling registered under the same account. Falls
+  // back to user.name for older rows created before this field existed.
+  name            String?
   category        Category
   gender          Gender
   checkedIn       Boolean          @default(false) @map("checked_in")

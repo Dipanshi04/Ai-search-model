@@ -94,7 +94,7 @@ export async function generateCertificate(participantId: string): Promise<string
     <div class="title">Certificate of Completion</div>
     <div class="event-name">${participant.event.name}</div>
     <div class="cert-text">This is to certify that</div>
-    <div class="runner-name">${participant.user.name}</div>
+    <div class="runner-name">${participant.name || participant.user.name}</div>
     <div class="cert-text">successfully completed the ${participant.category.replace('RUN_', '').replace('_', ' ')} on ${new Date(participant.event.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
     <div class="details">
       <div class="detail-item">

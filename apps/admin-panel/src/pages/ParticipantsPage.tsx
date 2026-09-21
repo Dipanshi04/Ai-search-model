@@ -57,6 +57,9 @@ export default function ParticipantsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [bulkReminderSending, setBulkReminderSending] = useState(false);
   const [bulkReminderMessage, setBulkReminderMessage] = useState('');
+  const [showSharedContacts, setShowSharedContacts] = useState(false);
+  const [sharedContacts, setSharedContacts] = useState<Awaited<ReturnType<typeof api.getSharedContacts>>['data'] | null>(null);
+  const [sharedContactsLoading, setSharedContactsLoading] = useState(false);
   const [addForm, setAddForm] = useState({
     name: '', email: '', phone: '', category: 'RUN_3K', gender: 'MALE', companyId: '',
     tshirtSize: '', bloodGroup: '', emergencyContact: '', emergencyPhone: '', paymentStatus: 'COMPLETED',
@@ -168,6 +171,23 @@ export default function ParticipantsPage() {
     setBulkReminderSending(false);
   }
 
+  async function toggleSharedContacts() {
+    if (showSharedContacts) {
+      setShowSharedContacts(false);
+      return;
+    }
+    setShowSharedContacts(true);
+    if (sharedContacts) return; // already loaded once this session
+    setSharedContactsLoading(true);
+    try {
+      const res = await api.getSharedContacts();
+      if (res.success && res.data) setSharedContacts(res.data);
+    } catch (e) {
+      console.error('Failed to fetch shared contacts:', e);
+    }
+    setSharedContactsLoading(false);
+  }
+
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this participant?')) {
       try {
@@ -203,7 +223,7 @@ export default function ParticipantsPage() {
 
   const startEditDetails = () => {
     if (!viewParticipant) return;
-    setEditName(viewParticipant.user?.name || '');
+    setEditName(viewParticipant.name || viewParticipant.user?.name || '');
     setEditCategory(viewParticipant.category || 'RUN_3K');
     setEditGender(viewParticipant.gender || 'MALE');
     setEditPhone(viewParticipant.user?.phone || '');
@@ -367,10 +387,50 @@ export default function ParticipantsPage() {
           >
             {bulkReminderSending ? 'Sending...' : 'Remind All Unpaid'}
           </button>
+          <button
+            onClick={toggleSharedContacts}
+            className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-3xl text-sm font-medium transition-colors shadow-sm"
+          >
+            {showSharedContacts ? 'Hide Shared Contacts' : 'Find Duplicate Contacts'}
+          </button>
         </div>
       </div>
       {bulkReminderMessage && (
         <p className="text-xs text-slate-600 bg-white/70 border border-white/60 rounded-2xl px-4 py-2.5">{bulkReminderMessage}</p>
+      )}
+
+      {showSharedContacts && (
+        <div className="glass rounded-[2rem] border border-white/20 overflow-hidden shadow-sm">
+          <div className="px-6 py-4 border-b border-slate-100">
+            <h3 className="text-sm font-semibold text-slate-700">Shared Contact Accounts</h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Login accounts (email/phone) used by more than one participant — usually a shared HR/company contact.
+              {sharedContacts && ` ${sharedContacts.totalSharedAccounts} account${sharedContacts.totalSharedAccounts !== 1 ? 's' : ''}, ${sharedContacts.totalAffectedParticipants} participants affected.`}
+            </p>
+          </div>
+          {sharedContactsLoading ? (
+            <div className="p-8 text-center text-slate-500 text-sm">Loading...</div>
+          ) : !sharedContacts || sharedContacts.groups.length === 0 ? (
+            <div className="p-8 text-center text-slate-500 text-sm">No shared-contact accounts found.</div>
+          ) : (
+            <div className="divide-y divide-slate-100 max-h-[36rem] overflow-y-auto">
+              {sharedContacts.groups.map((g) => (
+                <div key={g.accountEmail} className="px-6 py-4">
+                  <p className="text-xs font-mono text-slate-500">{g.accountEmail} · {g.accountPhone}</p>
+                  <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {g.participants.map((p) => (
+                      <div key={p.id} className="flex items-center gap-2 text-sm bg-slate-50 rounded-xl px-3 py-2">
+                        <span className="font-mono text-violet-700 text-xs">{p.bibNumber}</span>
+                        <span className="text-slate-900 truncate">{p.name || '(no name set)'}</span>
+                        <span className="text-slate-400 text-xs ml-auto shrink-0">{p.category.replace('RUN_', '')}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
 
       <div className="glass rounded-[2rem] border border-white/20 p-4 shadow-sm">
@@ -466,7 +526,7 @@ export default function ParticipantsPage() {
                 <tr key={p.id} className="border-t border-slate-200/80 hover:bg-slate-100/60 transition-colors">
                   <td className="px-6 py-4 text-sm font-mono text-violet-700">{p.bibNumber}</td>
                   <td className="px-6 py-4 text-sm text-slate-900">
-                    {p.user?.name}
+                    {p.name || p.user?.name}
                     {p.isBoardMember && (
                       <span className="ml-2 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full text-[10px] font-semibold uppercase tracking-wide align-middle">Board</span>
                     )}
@@ -540,17 +600,17 @@ export default function ParticipantsPage() {
                 {viewParticipant.user?.avatarUrl ? (
                   <img
                     src={`${API_URL}${viewParticipant.user.avatarUrl}`}
-                    alt={viewParticipant.user?.name}
+                    alt={viewParticipant.name || viewParticipant.user?.name}
                     className="w-14 h-14 rounded-full object-cover border border-slate-200 shrink-0"
                   />
                 ) : (
                   <div className="w-14 h-14 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 text-lg font-bold shrink-0">
-                    {viewParticipant.user?.name?.[0]?.toUpperCase() || '?'}
+                    {(viewParticipant.name || viewParticipant.user?.name)?.[0]?.toUpperCase() || '?'}
                   </div>
                 )}
                 <div>
                   <p className="text-xs font-mono text-violet-700">{viewParticipant.bibNumber}</p>
-                  <h2 className="text-lg font-bold text-slate-950">{viewParticipant.user?.name}</h2>
+                  <h2 className="text-lg font-bold text-slate-950">{viewParticipant.name || viewParticipant.user?.name}</h2>
                 </div>
               </div>
               <div className="flex items-center gap-2">

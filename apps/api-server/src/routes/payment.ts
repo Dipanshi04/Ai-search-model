@@ -43,7 +43,7 @@ export async function verifyPaymentById(paymentId: string, paidAt?: Date): Promi
     include: { user: { select: { name: true, email: true } } },
   });
 
-  sendWelcomeEmail(participant.user.email, participant.user.name, participant.bibNumber, participant.category)
+  sendWelcomeEmail(participant.user.email, participant.name || participant.user.name, participant.bibNumber, participant.category)
     .catch((e) => logger.error('[Payment] Welcome email failed:', e));
 
   prisma.payment.updateMany({
@@ -81,6 +81,7 @@ paymentRouter.get(
             select: {
               bibNumber: true,
               category: true,
+              name: true,
               user: { select: { name: true, email: true, phone: true } },
             },
           },
@@ -229,7 +230,7 @@ async function buildReconcileReport(buffer: Buffer): Promise<ReconcileEntry[]> {
   const references = Array.from(byOrder.keys());
   const payments = await prisma.payment.findMany({
     where: { reference: { in: references } },
-    include: { participant: { select: { bibNumber: true, user: { select: { name: true, email: true } } } } },
+    include: { participant: { select: { bibNumber: true, name: true, user: { select: { name: true, email: true } } } } },
   });
   const byReference = new Map(payments.map((p) => [p.reference as string, p]));
 
@@ -237,7 +238,7 @@ async function buildReconcileReport(buffer: Buffer): Promise<ReconcileEntry[]> {
   for (const [orderId, csv] of byOrder) {
     const payment = byReference.get(orderId);
     const participant = payment
-      ? { name: payment.participant.user.name, email: payment.participant.user.email, bibNumber: payment.participant.bibNumber }
+      ? { name: payment.participant.name || payment.participant.user.name, email: payment.participant.user.email, bibNumber: payment.participant.bibNumber }
       : null;
 
     let proposedAction: ReconcileEntry['proposedAction'] = null;
@@ -402,19 +403,20 @@ paymentRouter.post(
           res.status(404).json({ success: false, message: 'No participant found for that BIB number or email' });
           return;
         }
+        const displayName = participant.name || participant.user.name;
         if (participant.paymentStatus !== 'COMPLETED') {
           res.json({
             success: true,
             data: {
-              participant: { name: participant.user.name, bibNumber: participant.bibNumber },
+              participant: { name: displayName, bibNumber: participant.bibNumber },
               closed: 0,
-              message: `${participant.user.name} (#${participant.bibNumber}) isn't marked paid yet — nothing to clean up. Use "Mark Paid" or the CSV reconcile tab if Cashfree shows they actually paid.`,
+              message: `${displayName} (#${participant.bibNumber}) isn't marked paid yet — nothing to clean up. Use "Mark Paid" or the CSV reconcile tab if Cashfree shows they actually paid.`,
             },
           });
           return;
         }
         participantIds = [participant.id];
-        matchedParticipant = { name: participant.user.name, bibNumber: participant.bibNumber };
+        matchedParticipant = { name: displayName, bibNumber: participant.bibNumber };
       } else {
         const alreadyPaid = await prisma.participant.findMany({
           where: { paymentStatus: 'COMPLETED' },

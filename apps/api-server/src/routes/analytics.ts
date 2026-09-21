@@ -149,7 +149,7 @@ analyticsRouter.get('/finish-times', async (req, res) => {
 
     const participants = await prisma.participant.findMany({
       where,
-      select: { finishTime: true, bibNumber: true, user: { select: { name: true } } },
+      select: { finishTime: true, bibNumber: true, name: true, user: { select: { name: true } } },
       orderBy: { finishTime: 'asc' },
       take: 100,
     });
@@ -159,7 +159,7 @@ analyticsRouter.get('/finish-times', async (req, res) => {
       data: participants.map((p) => ({
         rank: participants.indexOf(p) + 1,
         bibNumber: p.bibNumber,
-        name: p.user.name,
+        name: p.name || p.user.name,
         finishTime: p.finishTime,
       })),
     });

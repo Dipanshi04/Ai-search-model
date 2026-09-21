@@ -117,7 +117,7 @@ cashfreeRouter.post('/start', async (req: Request, res: Response) => {
         customer_id: participant.userId,
         customer_email: participant.user.email,
         customer_phone: participant.user.phone,
-        customer_name: participant.user.name,
+        customer_name: participant.name || participant.user.name,
       },
       order_meta: {
         return_url: `${returnBase}${returnSeparator}cf_order_id=${orderId}`,
@@ -166,6 +166,7 @@ cashfreeRouter.get('/status', async (req: Request, res: Response) => {
           select: {
             bibNumber: true,
             category: true,
+            name: true,
             user: { select: { name: true, avatarUrl: true } },
           },
         },
@@ -182,7 +183,7 @@ cashfreeRouter.get('/status', async (req: Request, res: Response) => {
         status: payment.status,
         bibNumber: payment.participant.bibNumber,
         category: payment.participant.category,
-        name: payment.participant.user.name,
+        name: payment.participant.name || payment.participant.user.name,
         avatarUrl: payment.participant.user.avatarUrl,
       },
     });
@@ -253,7 +254,7 @@ cashfreeRouter.post('/webhook', async (req: Request, res: Response) => {
         include: { user: { select: { name: true, email: true } } },
       });
 
-      sendWelcomeEmail(participant.user.email, participant.user.name, participant.bibNumber, participant.category)
+      sendWelcomeEmail(participant.user.email, participant.name || participant.user.name, participant.bibNumber, participant.category)
         .catch((e) => logger.error('[Payment] Welcome email failed:', e));
 
       // Credited only once the payment actually completes — not at

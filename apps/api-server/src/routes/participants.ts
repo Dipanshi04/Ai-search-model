@@ -321,6 +321,26 @@ participantsRouter.post('/bulk-update-by-bib', authenticate, requireRole('SUPER_
       return;
     }
 
+    // Two rows targeting the same BIB (e.g. two different people mistakenly
+    // given the same bibNumber) would otherwise just silently overwrite
+    // each other — whichever row processes last wins with no indication
+    // the first one's changes were lost. Reject upfront and name them
+    // instead, since the real fix is giving the second person their own
+    // BIB, not guessing which row the admin meant to win.
+    const bibCounts = new Map<string, number>();
+    for (const r of records) {
+      const bib = r.bibNumber?.trim();
+      if (bib) bibCounts.set(bib, (bibCounts.get(bib) || 0) + 1);
+    }
+    const duplicateBibs = Array.from(bibCounts.entries()).filter(([, count]) => count > 1).map(([bib]) => bib);
+    if (duplicateBibs.length > 0) {
+      res.status(400).json({
+        success: false,
+        message: `Same BIB appears more than once in this file: ${duplicateBibs.join(', ')}. Each row must target a different BIB — if two different people are involved, give the second one their own BIB first.`,
+      });
+      return;
+    }
+
     const results: { bibNumber: string; success: boolean; error?: string }[] = [];
     let updated = 0;
 
@@ -349,8 +369,12 @@ participantsRouter.post('/bulk-update-by-bib', authenticate, requireRole('SUPER_
         const tshirtSize = norm.tshirtsize?.trim();
         const bloodGroup = norm.bloodgroup?.trim();
         const emergencyContact = norm.emergencycontact?.trim();
-        const emergencyPhone = norm.emergencyphone?.trim();
+        // Accept a couple of real-world header spellings for the same
+        // column ("EmergencyMobileNumber" showed up in an actual upload) —
+        // normalized keys strip separators/case but not synonyms.
+        const emergencyPhone = norm.emergencyphone?.trim() || norm.emergencymobilenumber?.trim() || norm.emergencycontactnumber?.trim();
         const email = norm.email?.trim().toLowerCase();
+        const phone = norm.phone?.trim();
 
         // Email lives on the shared login account, not the participant —
         // several real people can share one account (a shared HR contact
@@ -358,10 +382,11 @@ participantsRouter.post('/bulk-update-by-bib', authenticate, requireRole('SUPER_
         // every sibling's login the same way name used to. Giving someone
         // their own real email means giving them their OWN account: if one
         // already exists for that email, this participant moves to it; if
-        // not, a fresh account is created (with a placeholder phone, since
-        // the real phone is likely still the shared one and can't be
-        // reused — a phone is unique per account) and mailed a fresh PIN
-        // so they can actually log in on their own.
+        // not, a fresh account is created — using the CSV's own phone
+        // column if given (this is their real number, not the old shared
+        // one), falling back to a placeholder only when no phone was
+        // provided at all — and mailed a fresh PIN so they can actually
+        // log in on their own.
         const currentUser = await prisma.user.findUnique({ where: { id: participant.userId } });
         if (email && currentUser && email !== currentUser.email) {
           if (!isValidEmail(email)) {
@@ -371,6 +396,9 @@ participantsRouter.post('/bulk-update-by-bib', authenticate, requireRole('SUPER_
           const targetUser = await prisma.user.findUnique({ where: { email } });
           if (targetUser) {
             await prisma.participant.update({ where: { id: participant.id }, data: { userId: targetUser.id } });
+            if (phone && phone !== targetUser.phone) {
+              await prisma.user.update({ where: { id: targetUser.id }, data: { phone } });
+            }
           } else {
             const pin = String(Math.floor(1000 + Math.random() * 9000));
             const passwordHash = await hashPassword('marathon2026');
@@ -378,7 +406,7 @@ participantsRouter.post('/bulk-update-by-bib', authenticate, requireRole('SUPER_
             const newUser = await prisma.user.create({
               data: {
                 email,
-                phone: `SPLIT-${participant.id}`,
+                phone: phone || `SPLIT-${participant.id}`,
                 name: name || participant.name || currentUser.name,
                 passwordHash,
                 pinHash,
@@ -388,6 +416,10 @@ participantsRouter.post('/bulk-update-by-bib', authenticate, requireRole('SUPER_
             sendPinEmail(email, name || participant.name || currentUser.name, pin)
               .catch((e) => logger.error('Fix-by-BIB split PIN email failed:', e));
           }
+        } else if (phone && currentUser && phone !== currentUser.phone) {
+          // No email change this row — just correcting the phone on the
+          // account this participant already has.
+          await prisma.user.update({ where: { id: currentUser.id }, data: { phone } });
         }
 
         await prisma.participant.update({

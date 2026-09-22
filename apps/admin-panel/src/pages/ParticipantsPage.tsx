@@ -62,6 +62,8 @@ export default function ParticipantsPage() {
   const [showSharedContacts, setShowSharedContacts] = useState(false);
   const [sharedContacts, setSharedContacts] = useState<Awaited<ReturnType<typeof api.getSharedContacts>>['data'] | null>(null);
   const [sharedContactsLoading, setSharedContactsLoading] = useState(false);
+  const [bibFixUploading, setBibFixUploading] = useState(false);
+  const [bibFixResult, setBibFixResult] = useState<{ total: number; updated: number; failed: number; results: { bibNumber: string; success: boolean; error?: string }[] } | null>(null);
   const [showEmailCleanup, setShowEmailCleanup] = useState(false);
   const [emailCleanup, setEmailCleanup] = useState<EmailCleanupReport | null>(null);
   const [emailCleanupLoading, setEmailCleanupLoading] = useState(false);
@@ -178,6 +180,23 @@ export default function ParticipantsPage() {
       setBulkReminderMessage(e.message || 'Failed to send reminders');
     }
     setBulkReminderSending(false);
+  }
+
+  async function handleBibFixUpload(file: File) {
+    setBibFixUploading(true);
+    setBibFixResult(null);
+    try {
+      const res = await api.bulkUpdateByBib(file);
+      if (res.success && res.data) {
+        setBibFixResult(res.data);
+        loadParticipants();
+      } else {
+        alert(res.message || 'Failed to process CSV');
+      }
+    } catch (e: any) {
+      alert(e.message || 'Failed to process CSV');
+    }
+    setBibFixUploading(false);
   }
 
   async function toggleSharedContacts() {
@@ -492,8 +511,39 @@ export default function ParticipantsPage() {
               {showEmailCleanup ? 'Hide Email Cleanup' : 'Email & BIB Cleanup'}
             </button>
           )}
+          {currentAdmin?.role === 'SUPER_ADMIN' && (
+            <label className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-3xl text-sm font-medium transition-colors shadow-sm cursor-pointer">
+              {bibFixUploading ? 'Uploading...' : 'Fix by BIB (CSV)'}
+              <input
+                type="file"
+                accept=".csv"
+                disabled={bibFixUploading}
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) handleBibFixUpload(file);
+                  e.target.value = '';
+                }}
+              />
+            </label>
+          )}
         </div>
       </div>
+      {bibFixResult && (
+        <div className="glass rounded-2xl border border-white/20 shadow-sm px-4 py-3 text-sm">
+          <p className="text-slate-700 font-medium">
+            Fix by BIB: {bibFixResult.updated} of {bibFixResult.total} updated
+            {bibFixResult.failed > 0 ? `, ${bibFixResult.failed} failed` : ''}.
+          </p>
+          {bibFixResult.results.some((r) => !r.success) && (
+            <ul className="mt-2 space-y-0.5 text-xs text-red-600">
+              {bibFixResult.results.filter((r) => !r.success).map((r, i) => (
+                <li key={i}>{r.bibNumber}: {r.error}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       {bulkReminderMessage && (
         <p className="text-xs text-slate-600 bg-white/70 border border-white/60 rounded-2xl px-4 py-2.5">{bulkReminderMessage}</p>
       )}

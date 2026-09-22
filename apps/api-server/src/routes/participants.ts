@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import multer from 'multer';
+import { parse } from 'csv-parse/sync';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../config/database.js';
 import { authenticate } from '../middleware/auth.js';
@@ -11,6 +13,8 @@ import { generateQRCode } from '../utils/qrcode.js';
 import { calculateTreesFromDistance, recalcTreeCounter } from '../services/greenMission.js';
 
 export const participantsRouter: Router = Router();
+
+const csvUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 function normalizeEmail(value: string): string {
   return value.trim().toLowerCase();
@@ -278,6 +282,100 @@ participantsRouter.post('/email-cleanup/merge', authenticate, requireRole('SUPER
   } catch (error) {
     logger.error('Participant merge error:', error);
     res.status(500).json({ success: false, message: 'Failed to merge duplicate registrations' });
+  }
+});
+
+// Bulk-corrects existing participants by BIB number — the precise fix for
+// data that's already wrong (e.g. a name overwritten by the shared-account
+// bug, before Participant.name existed) where matching by email/phone
+// can't disambiguate. BIB is the one identifier that's always unique and
+// already assigned, so admin cross-references their own source CSV against
+// the current BIB list and uploads exactly the corrections. Never creates
+// a participant or touches BIB/email — only updates the fields provided.
+participantsRouter.post('/bulk-update-by-bib', authenticate, requireRole('SUPER_ADMIN'), csvUpload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ success: false, message: 'No CSV file uploaded' });
+      return;
+    }
+
+    let records: Record<string, string>[];
+    try {
+      const csvString = req.file.buffer.toString('utf-8');
+      records = parse(csvString, { columns: true, skip_empty_lines: true, trim: true });
+    } catch {
+      res.status(400).json({ success: false, message: 'Invalid CSV format. Please check headers and formatting.' });
+      return;
+    }
+    if (records.length === 0) {
+      res.status(400).json({ success: false, message: 'CSV file is empty' });
+      return;
+    }
+
+    const csvHeaders = Object.keys(records[0] || {}).map((h) => h.toLowerCase().replace(/[_\s]/g, ''));
+    if (!csvHeaders.includes('bibnumber')) {
+      res.status(400).json({ success: false, message: 'Missing required column: bibNumber' });
+      return;
+    }
+
+    const results: { bibNumber: string; success: boolean; error?: string }[] = [];
+    let updated = 0;
+
+    for (const record of records) {
+      const norm: Record<string, string> = {};
+      for (const [k, v] of Object.entries(record)) {
+        norm[k.toLowerCase().replace(/[_\s]/g, '')] = v;
+      }
+
+      const bibNumber = norm.bibnumber?.trim();
+      if (!bibNumber) {
+        results.push({ bibNumber: '(blank)', success: false, error: 'Missing bibNumber' });
+        continue;
+      }
+
+      try {
+        const participant = await prisma.participant.findUnique({ where: { bibNumber } });
+        if (!participant) {
+          results.push({ bibNumber, success: false, error: 'No participant with this BIB number' });
+          continue;
+        }
+
+        const name = norm.name?.trim();
+        const category = norm.category?.trim().toUpperCase();
+        const gender = norm.gender?.trim().toUpperCase();
+        const tshirtSize = norm.tshirtsize?.trim();
+        const bloodGroup = norm.bloodgroup?.trim();
+        const emergencyContact = norm.emergencycontact?.trim();
+        const emergencyPhone = norm.emergencyphone?.trim();
+
+        await prisma.participant.update({
+          where: { id: participant.id },
+          data: {
+            ...(name && { name }),
+            ...(category && ['RUN_3K', 'RUN_5K'].includes(category) && { category: category as any }),
+            ...(gender && ['MALE', 'FEMALE', 'NON_BINARY'].includes(gender) && { gender: gender as any }),
+            ...(tshirtSize && { tshirtSize }),
+            ...(bloodGroup && { bloodGroup }),
+            ...(emergencyContact && { emergencyContact }),
+            ...(emergencyPhone && { emergencyPhone }),
+          },
+        });
+
+        results.push({ bibNumber, success: true });
+        updated++;
+      } catch (err: any) {
+        results.push({ bibNumber, success: false, error: err.message || 'Failed' });
+      }
+    }
+
+    logger.info(`Bulk update by BIB: ${updated}/${records.length} updated by ${req.user?.email}`);
+    res.json({
+      success: true,
+      data: { total: records.length, updated, failed: records.length - updated, results },
+    });
+  } catch (error) {
+    logger.error('Bulk update by BIB error:', error);
+    res.status(500).json({ success: false, message: 'Failed to process CSV' });
   }
 });
 

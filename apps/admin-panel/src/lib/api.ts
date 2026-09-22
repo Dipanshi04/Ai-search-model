@@ -209,6 +209,19 @@ class ApiClient {
     });
   }
 
+  async bulkUpdateByBib(file: File) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const headers: Record<string, string> = {};
+    if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
+    const response = await fetch(`${API_URL}/api/v1/participants/bulk-update-by-bib`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    return response.json();
+  }
+
   async getTreeCounter(eventId?: string) {
     const query = eventId ? `?eventId=${eventId}` : '';
     return this.request<{ totalTrees: number; totalKm: number; totalCO2: number }>(`/api/v1/trees${query}`);

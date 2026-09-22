@@ -3,6 +3,7 @@ import { prisma } from '../config/database.js';
 import { logger } from '../config/logger.js';
 import bcrypt from 'bcryptjs';
 import { generateQRCode } from '../utils/qrcode.js';
+import { isValidEmail } from '../utils/validation.js';
 import { sendPinEmail } from '../services/email.js';
 import multer from 'multer';
 import { v4 as uuidv4 } from 'uuid';
@@ -28,6 +29,10 @@ registerRouter.post('/', async (req: Request, res: Response) => {
 
     if (!name || !email || !phone || !category || !gender) {
       res.status(400).json({ success: false, message: 'Missing required fields' });
+      return;
+    }
+    if (!isValidEmail(email)) {
+      res.status(400).json({ success: false, message: 'Please enter a valid email address' });
       return;
     }
 

@@ -3,6 +3,7 @@ import { prisma } from '../config/database.js';
 import { logger } from '../config/logger.js';
 import { comparePassword, generateAccessToken, hashPassword, verifyToken, generateResetToken, verifyResetToken } from '../utils/jwt.js';
 import { generateQRCode } from '../utils/qrcode.js';
+import { isValidEmail } from '../utils/validation.js';
 import multer from 'multer';
 import { parse } from 'csv-parse/sync';
 import { sendPinEmail, sendWelcomeEmail } from '../services/email.js';
@@ -284,6 +285,10 @@ hrRouter.post('/participants', hrAuth, async (req: Request, res: Response) => {
 
     if (!name || !email || !phone || !category || !gender) {
       res.status(400).json({ success: false, message: 'Missing required fields: name, email, phone, category, gender' });
+      return;
+    }
+    if (!isValidEmail(email)) {
+      res.status(400).json({ success: false, message: `Invalid email: ${email}` });
       return;
     }
 
@@ -657,6 +662,10 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
 
       if (!name || !email || !phone || !gender) {
         results.push({ success: false, name: name || 'N/A', email: email || 'N/A', error: 'Missing required fields' });
+        continue;
+      }
+      if (!isValidEmail(email)) {
+        results.push({ success: false, name, email, error: `Invalid email: ${email}` });
         continue;
       }
       if (!tshirtSize) {

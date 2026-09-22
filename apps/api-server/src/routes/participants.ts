@@ -11,6 +11,7 @@ import { feeForCategory } from './payment.js';
 import { hashPassword } from '../utils/jwt.js';
 import { generateQRCode } from '../utils/qrcode.js';
 import { calculateTreesFromDistance, recalcTreeCounter } from '../services/greenMission.js';
+import { isValidEmail } from '../utils/validation.js';
 
 export const participantsRouter: Router = Router();
 
@@ -291,7 +292,9 @@ participantsRouter.post('/email-cleanup/merge', authenticate, requireRole('SUPER
 // can't disambiguate. BIB is the one identifier that's always unique and
 // already assigned, so admin cross-references their own source CSV against
 // the current BIB list and uploads exactly the corrections. Never creates
-// a participant or touches BIB/email — only updates the fields provided.
+// a new participant or changes BIB itself; an email column moves the
+// participant onto their own login account (see below) rather than
+// editing the shared one in place.
 participantsRouter.post('/bulk-update-by-bib', authenticate, requireRole('SUPER_ADMIN'), csvUpload.single('file'), async (req, res) => {
   try {
     if (!req.file) {
@@ -347,6 +350,45 @@ participantsRouter.post('/bulk-update-by-bib', authenticate, requireRole('SUPER_
         const bloodGroup = norm.bloodgroup?.trim();
         const emergencyContact = norm.emergencycontact?.trim();
         const emergencyPhone = norm.emergencyphone?.trim();
+        const email = norm.email?.trim().toLowerCase();
+
+        // Email lives on the shared login account, not the participant —
+        // several real people can share one account (a shared HR contact
+        // email/phone), so changing it in place would repoint (or corrupt)
+        // every sibling's login the same way name used to. Giving someone
+        // their own real email means giving them their OWN account: if one
+        // already exists for that email, this participant moves to it; if
+        // not, a fresh account is created (with a placeholder phone, since
+        // the real phone is likely still the shared one and can't be
+        // reused — a phone is unique per account) and mailed a fresh PIN
+        // so they can actually log in on their own.
+        const currentUser = await prisma.user.findUnique({ where: { id: participant.userId } });
+        if (email && currentUser && email !== currentUser.email) {
+          if (!isValidEmail(email)) {
+            results.push({ bibNumber, success: false, error: `Invalid email: ${email}` });
+            continue;
+          }
+          const targetUser = await prisma.user.findUnique({ where: { email } });
+          if (targetUser) {
+            await prisma.participant.update({ where: { id: participant.id }, data: { userId: targetUser.id } });
+          } else {
+            const pin = String(Math.floor(1000 + Math.random() * 9000));
+            const passwordHash = await hashPassword('marathon2026');
+            const pinHash = await hashPassword(pin);
+            const newUser = await prisma.user.create({
+              data: {
+                email,
+                phone: `SPLIT-${participant.id}`,
+                name: name || participant.name || currentUser.name,
+                passwordHash,
+                pinHash,
+              },
+            });
+            await prisma.participant.update({ where: { id: participant.id }, data: { userId: newUser.id } });
+            sendPinEmail(email, name || participant.name || currentUser.name, pin)
+              .catch((e) => logger.error('Fix-by-BIB split PIN email failed:', e));
+          }
+        }
 
         await prisma.participant.update({
           where: { id: participant.id },
@@ -364,7 +406,8 @@ participantsRouter.post('/bulk-update-by-bib', authenticate, requireRole('SUPER_
         results.push({ bibNumber, success: true });
         updated++;
       } catch (err: any) {
-        results.push({ bibNumber, success: false, error: err.message || 'Failed' });
+        const message = err.code === 'P2002' ? 'That email is already used by another account' : (err.message || 'Failed');
+        results.push({ bibNumber, success: false, error: message });
       }
     }
 
@@ -586,6 +629,10 @@ participantsRouter.post('/', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANA
 
     if (!name || !email || !phone || !category || !gender) {
       res.status(400).json({ success: false, message: 'Missing required fields: name, email, phone, category, gender' });
+      return;
+    }
+    if (!isValidEmail(email)) {
+      res.status(400).json({ success: false, message: `Invalid email: ${email}` });
       return;
     }
 

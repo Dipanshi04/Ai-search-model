@@ -181,6 +181,16 @@ class ApiClient {
     }>('/api/v1/participants/shared-contacts');
   }
 
+  async getOrphanedAccounts() {
+    return this.request<{ id: string; name: string; email: string; phone: string; createdAt: string }[]>(
+      '/api/v1/participants/orphaned-accounts'
+    );
+  }
+
+  async deleteOrphanedAccount(id: string) {
+    return this.request<void>(`/api/v1/participants/orphaned-accounts/${id}`, { method: 'DELETE' });
+  }
+
   async getEmailCleanupReport() {
     return this.request<EmailCleanupReport>('/api/v1/participants/email-cleanup');
   }

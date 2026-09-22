@@ -62,6 +62,10 @@ export default function ParticipantsPage() {
   const [showSharedContacts, setShowSharedContacts] = useState(false);
   const [sharedContacts, setSharedContacts] = useState<Awaited<ReturnType<typeof api.getSharedContacts>>['data'] | null>(null);
   const [sharedContactsLoading, setSharedContactsLoading] = useState(false);
+  const [showOrphanedAccounts, setShowOrphanedAccounts] = useState(false);
+  const [orphanedAccounts, setOrphanedAccounts] = useState<Awaited<ReturnType<typeof api.getOrphanedAccounts>>['data'] | null>(null);
+  const [orphanedAccountsLoading, setOrphanedAccountsLoading] = useState(false);
+  const [deletingOrphanId, setDeletingOrphanId] = useState<string | null>(null);
   const [bibFixUploading, setBibFixUploading] = useState(false);
   const [bibFixResult, setBibFixResult] = useState<{ total: number; updated: number; failed: number; results: { bibNumber: string; success: boolean; error?: string }[] } | null>(null);
   const [showEmailCleanup, setShowEmailCleanup] = useState(false);
@@ -214,6 +218,38 @@ export default function ParticipantsPage() {
       console.error('Failed to fetch shared contacts:', e);
     }
     setSharedContactsLoading(false);
+  }
+
+  async function toggleOrphanedAccounts() {
+    if (showOrphanedAccounts) {
+      setShowOrphanedAccounts(false);
+      return;
+    }
+    setShowOrphanedAccounts(true);
+    setOrphanedAccountsLoading(true);
+    try {
+      const res = await api.getOrphanedAccounts();
+      if (res.success && res.data) setOrphanedAccounts(res.data);
+    } catch (e) {
+      console.error('Failed to fetch orphaned accounts:', e);
+    }
+    setOrphanedAccountsLoading(false);
+  }
+
+  async function handleDeleteOrphan(id: string, email: string) {
+    if (!confirm(`Delete this unused account (${email})? This frees up its email/phone for reuse. Cannot be undone.`)) return;
+    setDeletingOrphanId(id);
+    try {
+      const res = await api.deleteOrphanedAccount(id);
+      if (res.success) {
+        setOrphanedAccounts((prev) => prev?.filter((o) => o.id !== id) || null);
+      } else {
+        alert(res.message || 'Failed to delete account');
+      }
+    } catch (e: any) {
+      alert(e.message || 'Failed to delete account');
+    }
+    setDeletingOrphanId(null);
   }
 
   function cleanupGroupKey(group: EmailCleanupReport['duplicateRegistrationGroups'][number]) {
@@ -505,6 +541,14 @@ export default function ParticipantsPage() {
           </button>
           {currentAdmin?.role === 'SUPER_ADMIN' && (
             <button
+              onClick={toggleOrphanedAccounts}
+              className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-3xl text-sm font-medium transition-colors shadow-sm"
+            >
+              {showOrphanedAccounts ? 'Hide Orphaned Accounts' : 'Find Orphaned Accounts'}
+            </button>
+          )}
+          {currentAdmin?.role === 'SUPER_ADMIN' && (
+            <button
               onClick={toggleEmailCleanup}
               className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-3xl text-sm font-medium transition-colors shadow-sm"
             >
@@ -575,6 +619,41 @@ export default function ParticipantsPage() {
                       </div>
                     ))}
                   </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {showOrphanedAccounts && (
+        <div className="glass rounded-[2rem] border border-white/20 overflow-hidden shadow-sm">
+          <div className="px-6 py-4 border-b border-slate-100">
+            <h3 className="text-sm font-semibold text-slate-700">Orphaned Accounts</h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Login accounts with zero participants attached — usually left behind by an interrupted account creation.
+              They silently lock their email/phone so it can't be reused elsewhere until deleted.
+            </p>
+          </div>
+          {orphanedAccountsLoading ? (
+            <div className="p-8 text-center text-slate-500 text-sm">Loading...</div>
+          ) : !orphanedAccounts || orphanedAccounts.length === 0 ? (
+            <div className="p-8 text-center text-slate-500 text-sm">No orphaned accounts found.</div>
+          ) : (
+            <div className="divide-y divide-slate-100 max-h-[36rem] overflow-y-auto">
+              {orphanedAccounts.map((o) => (
+                <div key={o.id} className="px-6 py-3 flex items-center gap-4">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-slate-900">{o.name}</p>
+                    <p className="text-xs font-mono text-slate-500">{o.email} · {o.phone}</p>
+                  </div>
+                  <button
+                    onClick={() => handleDeleteOrphan(o.id, o.email)}
+                    disabled={deletingOrphanId === o.id}
+                    className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-full text-xs font-semibold disabled:opacity-50 shrink-0"
+                  >
+                    {deletingOrphanId === o.id ? 'Deleting...' : 'Delete'}
+                  </button>
                 </div>
               ))}
             </div>

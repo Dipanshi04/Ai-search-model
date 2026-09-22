@@ -414,16 +414,24 @@ participantsRouter.post('/bulk-update-by-bib', authenticate, requireRole('SUPER_
             const pin = String(Math.floor(1000 + Math.random() * 9000));
             const passwordHash = await hashPassword('marathon2026');
             const pinHash = await hashPassword(pin);
-            const newUser = await prisma.user.create({
-              data: {
-                email,
-                phone: phone || `SPLIT-${participant.id}`,
-                name: name || participant.name || currentUser.name,
-                passwordHash,
-                pinHash,
-              },
+            // Creating the account and relinking the participant to it must
+            // happen together — if the relink ever failed after the account
+            // was created (a later validation error, a crash mid-request),
+            // the new account would be left dangling with no participant
+            // pointing to it, silently locking its email/phone forever with
+            // nothing in the participant list to reveal it exists.
+            await prisma.$transaction(async (tx) => {
+              const newUser = await tx.user.create({
+                data: {
+                  email,
+                  phone: phone || `SPLIT-${participant.id}`,
+                  name: name || participant.name || currentUser.name,
+                  passwordHash,
+                  pinHash,
+                },
+              });
+              await tx.participant.update({ where: { id: participant.id }, data: { userId: newUser.id } });
             });
-            await prisma.participant.update({ where: { id: participant.id }, data: { userId: newUser.id } });
             sendPinEmail(email, name || participant.name || currentUser.name, pin)
               .catch((e) => logger.error('Fix-by-BIB split PIN email failed:', e));
           }
@@ -466,6 +474,49 @@ participantsRouter.post('/bulk-update-by-bib', authenticate, requireRole('SUPER_
   } catch (error) {
     logger.error('Bulk update by BIB error:', error);
     res.status(500).json({ success: false, message: 'Failed to process CSV' });
+  }
+});
+
+// A User with zero participants is dead weight at best — at worst it's
+// silently squatting on an email or phone number that a real correction
+// needs, with nothing in the participant list to reveal it exists (that's
+// what caused Fix-by-BIB's "already used by another account" errors to be
+// so confusing). Only ever created by a bug (see the transaction added to
+// the account-split path above) or a manually-deleted participant that
+// left its user behind — never legitimate on its own, so listing +
+// deleting them is safe.
+participantsRouter.get('/orphaned-accounts', authenticate, requireRole('SUPER_ADMIN'), async (_req, res) => {
+  try {
+    const orphans = await prisma.user.findMany({
+      where: { participants: { none: {} }, role: 'PARTICIPANT' },
+      select: { id: true, name: true, email: true, phone: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json({ success: true, data: orphans });
+  } catch (error) {
+    logger.error('Orphaned accounts report error:', error);
+    res.status(500).json({ success: false, message: 'Failed to build orphaned accounts report' });
+  }
+});
+
+participantsRouter.delete('/orphaned-accounts/:id', authenticate, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.params.id as string } });
+    if (!user) {
+      res.status(404).json({ success: false, message: 'Account not found' });
+      return;
+    }
+    const stillHasParticipants = await prisma.participant.count({ where: { userId: user.id } });
+    if (stillHasParticipants > 0) {
+      res.status(409).json({ success: false, message: 'This account has participants attached — not an orphan, refusing to delete' });
+      return;
+    }
+    await prisma.user.delete({ where: { id: user.id } });
+    logger.info(`Orphaned account deleted by ${req.user?.email}: ${user.email} / ${user.phone}`);
+    res.json({ success: true });
+  } catch (error) {
+    logger.error('Orphaned account delete error:', error);
+    res.status(500).json({ success: false, message: 'Failed to delete account' });
   }
 });
 

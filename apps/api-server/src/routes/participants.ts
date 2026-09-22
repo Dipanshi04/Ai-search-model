@@ -394,11 +394,22 @@ participantsRouter.post('/bulk-update-by-bib', authenticate, requireRole('SUPER_
             continue;
           }
           const targetUser = await prisma.user.findUnique({ where: { email } });
+          const siblingCount = await prisma.participant.count({ where: { userId: currentUser.id } });
           if (targetUser) {
             await prisma.participant.update({ where: { id: participant.id }, data: { userId: targetUser.id } });
             if (phone && phone !== targetUser.phone) {
               await prisma.user.update({ where: { id: targetUser.id }, data: { phone } });
             }
+          } else if (siblingCount <= 1) {
+            // Nobody else shares this account — this is just a wrong email
+            // on an otherwise-correct, already-individual account (their
+            // phone is already their own real number), so correct it in
+            // place instead of manufacturing a new account that would
+            // collide with this one over that same phone number.
+            await prisma.user.update({
+              where: { id: currentUser.id },
+              data: { email, ...(phone && phone !== currentUser.phone && { phone }) },
+            });
           } else {
             const pin = String(Math.floor(1000 + Math.random() * 9000));
             const passwordHash = await hashPassword('marathon2026');
@@ -438,7 +449,11 @@ participantsRouter.post('/bulk-update-by-bib', authenticate, requireRole('SUPER_
         results.push({ bibNumber, success: true });
         updated++;
       } catch (err: any) {
-        const message = err.code === 'P2002' ? 'That email is already used by another account' : (err.message || 'Failed');
+        let message = err.message || 'Failed';
+        if (err.code === 'P2002') {
+          const field = err.meta?.target?.[0] || err.meta?.target || 'field';
+          message = `That ${field} is already used by another account`;
+        }
         results.push({ bibNumber, success: false, error: message });
       }
     }

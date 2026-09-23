@@ -209,6 +209,20 @@ class ApiClient {
     return response.json();
   }
 
+  async hrExportParticipantsCSV() {
+    const hrToken = localStorage.getItem('hr_token');
+    const headers: Record<string, string> = {};
+    if (hrToken) headers['Authorization'] = `Bearer ${hrToken}`;
+    const response = await fetch(`${API_URL}/api/v1/hr/participants/export/csv`, { headers });
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'my-participants.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  }
+
   async hrDownloadSampleCSV() {
     const hrToken = localStorage.getItem('hr_token');
     const headers: Record<string, string> = {};

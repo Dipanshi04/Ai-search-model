@@ -275,6 +275,43 @@ hrRouter.get('/participants', hrAuth, async (req: Request, res: Response) => {
   }
 });
 
+// HR's own CSV export — scoped to bulkRegistrationId === hrId, same as the
+// list endpoint above, so an HR account can only ever export the employees
+// they registered, never another company's.
+hrRouter.get('/participants/export/csv', hrAuth, async (req: Request, res: Response) => {
+  try {
+    const hrId = (req as any).hr.userId;
+    const participants = await prisma.participant.findMany({
+      where: { bulkRegistrationId: hrId },
+      include: { user: { select: { name: true, email: true, phone: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const headers = ['Bib Number', 'Name', 'Email', 'Phone', 'Category', 'Gender', 'T-Shirt Size', 'Blood Group', 'Status', 'Payment Status'];
+    const rows = participants.map((p) => [
+      p.bibNumber,
+      p.name || p.user.name,
+      p.user.email,
+      p.user.phone,
+      p.category === 'RUN_5K' ? '5K' : '3K',
+      p.gender,
+      p.tshirtSize || '',
+      p.bloodGroup || '',
+      p.status,
+      p.paymentStatus,
+    ]);
+
+    const csv = [headers.join(','), ...rows.map((r) => r.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=my-participants.csv');
+    res.send(csv);
+  } catch (error) {
+    logger.error('HR CSV export error:', error);
+    res.status(500).json({ success: false, message: 'Failed to export CSV' });
+  }
+});
+
 hrRouter.post('/participants', hrAuth, async (req: Request, res: Response) => {
   try {
     const hrId = (req as any).hr.userId;

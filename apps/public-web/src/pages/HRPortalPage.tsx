@@ -349,9 +349,19 @@ export default function HRPortalPage() {
 
           {tab === 'dashboard' && (
             <div className="bg-white rounded-2xl overflow-hidden shadow-sm border border-brand-navy/10">
-              <div className="hero-body px-4 py-3 border-b border-brand-navy/10 flex items-center justify-between">
+              <div className="hero-body px-4 py-3 border-b border-brand-navy/10 flex items-center justify-between flex-wrap gap-2">
                 <p className="text-sm text-brand-navy/50">{total} participants</p>
-                <p className="text-sm text-brand-navy/50">Page {page} of {totalPages}</p>
+                <div className="flex items-center gap-3">
+                  <p className="text-sm text-brand-navy/50">Page {page} of {totalPages}</p>
+                  <button
+                    type="button"
+                    onClick={() => api.hrExportParticipantsCSV()}
+                    disabled={total === 0}
+                    className="px-3 py-1.5 bg-brand-orange hover:opacity-90 text-white rounded-lg text-xs font-semibold disabled:opacity-40 transition"
+                  >
+                    Export CSV
+                  </button>
+                </div>
               </div>
               <div className="overflow-x-auto">
                 <table className="hero-body w-full text-sm">

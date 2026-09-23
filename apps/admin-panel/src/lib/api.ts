@@ -410,8 +410,9 @@ class ApiClient {
   async getBulkTshirtReport() {
     return this.request<{
       sizes: string[];
-      rows: { companyName: string; counts: Record<string, number>; total: number }[];
+      rows: { companyName: string; counts: Record<string, number>; categories: Record<string, number>; total: number }[];
       grandTotal: Record<string, number>;
+      categoryGrandTotal: Record<string, number>;
     }>('/api/v1/bulk-registration/tshirt-report');
   }
 

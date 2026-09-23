@@ -40,8 +40,9 @@ export default function BulkRegistrationPage() {
   const [showTshirtReport, setShowTshirtReport] = useState(false);
   const [tshirtReport, setTshirtReport] = useState<{
     sizes: string[];
-    rows: { companyName: string; counts: Record<string, number>; total: number }[];
+    rows: { companyName: string; counts: Record<string, number>; categories: Record<string, number>; total: number }[];
     grandTotal: Record<string, number>;
+    categoryGrandTotal: Record<string, number>;
   } | null>(null);
   const [tshirtReportLoading, setTshirtReportLoading] = useState(false);
 
@@ -225,6 +226,13 @@ export default function BulkRegistrationPage() {
           <div className="px-6 py-4 border-b border-slate-100">
             <h3 className="text-sm font-semibold text-slate-700">T-Shirt Sizes by Company</h3>
             <p className="text-xs text-slate-500 mt-0.5">Bulk (HR-registered) participants only</p>
+            {tshirtReport && (
+              <p className="text-xs text-slate-600 font-medium mt-2">
+                3K: <span className="text-violet-700 font-bold">{tshirtReport.categoryGrandTotal['3K'] || 0}</span>
+                {'  ·  '}
+                5K: <span className="text-violet-700 font-bold">{tshirtReport.categoryGrandTotal['5K'] || 0}</span>
+              </p>
+            )}
           </div>
           {tshirtReportLoading ? (
             <div className="p-8 text-center text-slate-500 text-sm">Loading...</div>
@@ -236,6 +244,8 @@ export default function BulkRegistrationPage() {
                 <thead className="bg-white/80">
                   <tr>
                     <th className="text-left px-5 py-3 text-slate-500 font-semibold">Company</th>
+                    <th className="text-center px-4 py-3 text-slate-500 font-semibold">3K</th>
+                    <th className="text-center px-4 py-3 text-slate-500 font-semibold">5K</th>
                     {tshirtReport.sizes.map((size) => (
                       <th key={size} className="text-center px-4 py-3 text-slate-500 font-semibold">{size}</th>
                     ))}
@@ -246,6 +256,8 @@ export default function BulkRegistrationPage() {
                   {tshirtReport.rows.map((row) => (
                     <tr key={row.companyName} className="border-t border-white/10">
                       <td className="px-5 py-3 text-slate-950 font-medium">{row.companyName}</td>
+                      <td className="text-center px-4 py-3 text-slate-700">{row.categories['3K'] || 0}</td>
+                      <td className="text-center px-4 py-3 text-slate-700">{row.categories['5K'] || 0}</td>
                       {tshirtReport.sizes.map((size) => (
                         <td key={size} className="text-center px-4 py-3 text-slate-700">{row.counts[size] || 0}</td>
                       ))}
@@ -256,6 +268,8 @@ export default function BulkRegistrationPage() {
                 <tfoot>
                   <tr className="border-t-2 border-slate-200 bg-white/60">
                     <td className="px-5 py-3 text-slate-950 font-bold">Total</td>
+                    <td className="text-center px-4 py-3 font-bold text-slate-950">{tshirtReport.categoryGrandTotal['3K'] || 0}</td>
+                    <td className="text-center px-4 py-3 font-bold text-slate-950">{tshirtReport.categoryGrandTotal['5K'] || 0}</td>
                     {tshirtReport.sizes.map((size) => (
                       <td key={size} className="text-center px-4 py-3 font-bold text-slate-950">{tshirtReport.grandTotal[size] || 0}</td>
                     ))}

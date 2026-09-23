@@ -51,21 +51,27 @@ bulkRegistrationRouter.get('/tshirt-report', async (_req: Request, res: Response
       where: { bulkRegistrationId: { not: null } },
       select: {
         tshirtSize: true,
+        category: true,
         company: { select: { name: true } },
         bulkRegistration: { select: { companyName: true } },
       },
     });
 
     const bySizeByCompany = new Map<string, Record<string, number>>();
+    const byCategoryByCompany = new Map<string, Record<string, number>>();
     const allSizes = new Set<string>();
 
     for (const p of participants) {
       const companyName = p.company?.name || p.bulkRegistration?.companyName || 'Unknown Company';
       const size = p.tshirtSize || 'Not Set';
+      const category = p.category.replace('RUN_', ''); // RUN_3K -> 3K, RUN_5K -> 5K
       allSizes.add(size);
       if (!bySizeByCompany.has(companyName)) bySizeByCompany.set(companyName, {});
       const row = bySizeByCompany.get(companyName)!;
       row[size] = (row[size] || 0) + 1;
+      if (!byCategoryByCompany.has(companyName)) byCategoryByCompany.set(companyName, {});
+      const catRow = byCategoryByCompany.get(companyName)!;
+      catRow[category] = (catRow[category] || 0) + 1;
     }
 
     // A stable, sensible column order — real sizes first (S→XXL), then
@@ -83,6 +89,7 @@ bulkRegistrationRouter.get('/tshirt-report', async (_req: Request, res: Response
       .map(([companyName, counts]) => ({
         companyName,
         counts,
+        categories: byCategoryByCompany.get(companyName) || {},
         total: Object.values(counts).reduce((sum, n) => sum + n, 0),
       }))
       .sort((a, b) => b.total - a.total);
@@ -92,7 +99,14 @@ bulkRegistrationRouter.get('/tshirt-report', async (_req: Request, res: Response
       grandTotal[size] = rows.reduce((sum, r) => sum + (r.counts[size] || 0), 0);
     }
 
-    res.json({ success: true, data: { sizes, rows, grandTotal } });
+    const categoryGrandTotal: Record<string, number> = { '3K': 0, '5K': 0 };
+    for (const r of rows) {
+      for (const [cat, n] of Object.entries(r.categories)) {
+        categoryGrandTotal[cat] = (categoryGrandTotal[cat] || 0) + n;
+      }
+    }
+
+    res.json({ success: true, data: { sizes, rows, grandTotal, categoryGrandTotal } });
   } catch (error) {
     logger.error('T-shirt report error:', error);
     res.status(500).json({ success: false, message: 'Failed to build t-shirt report' });

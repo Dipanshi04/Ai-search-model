@@ -66,6 +66,8 @@ export default function ParticipantsPage() {
   const [orphanedAccounts, setOrphanedAccounts] = useState<Awaited<ReturnType<typeof api.getOrphanedAccounts>>['data'] | null>(null);
   const [orphanedAccountsLoading, setOrphanedAccountsLoading] = useState(false);
   const [deletingOrphanId, setDeletingOrphanId] = useState<string | null>(null);
+  const [pinListRows, setPinListRows] = useState<{ bibNumber: string; name: string; pin: string }[] | null>(null);
+  const [pinListGenerating, setPinListGenerating] = useState(false);
   const [bibFixUploading, setBibFixUploading] = useState(false);
   const [bibFixResult, setBibFixResult] = useState<{ total: number; updated: number; failed: number; results: { bibNumber: string; success: boolean; error?: string }[] } | null>(null);
   const [showEmailCleanup, setShowEmailCleanup] = useState(false);
@@ -218,6 +220,42 @@ export default function ParticipantsPage() {
       console.error('Failed to fetch shared contacts:', e);
     }
     setSharedContactsLoading(false);
+  }
+
+  async function handleGeneratePinList() {
+    const scope = eventId
+      ? events.find((e) => e.id === eventId)?.name || 'the selected event'
+      : 'ALL events';
+    const confirmed = confirm(
+      `Generate fresh PINs for every participant in ${scope}? This REPLACES their current PIN — anyone who already knows their old PIN will need the new one instead. Each account also gets emailed its new PIN as a backup.`
+    );
+    if (!confirmed) return;
+    setPinListGenerating(true);
+    setPinListRows(null);
+    try {
+      const res = await api.bulkResetPins({ eventId: eventId || undefined });
+      if (res.success && res.data) {
+        setPinListRows(res.data.rows);
+      } else {
+        alert(res.message || 'Failed to generate PINs');
+      }
+    } catch (e: any) {
+      alert(e.message || 'Failed to generate PINs');
+    }
+    setPinListGenerating(false);
+  }
+
+  function downloadPinListCsv() {
+    if (!pinListRows) return;
+    const header = 'BIB Number,Name,PIN\n';
+    const body = pinListRows.map((r) => `${r.bibNumber},"${r.name.replace(/"/g, '""')}",${r.pin}`).join('\n');
+    const blob = new Blob([header + body], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'pin-list.csv';
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   async function toggleOrphanedAccounts() {
@@ -549,6 +587,15 @@ export default function ParticipantsPage() {
           )}
           {currentAdmin?.role === 'SUPER_ADMIN' && (
             <button
+              onClick={handleGeneratePinList}
+              disabled={pinListGenerating}
+              className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-3xl text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
+            >
+              {pinListGenerating ? 'Generating...' : 'Generate PIN List'}
+            </button>
+          )}
+          {currentAdmin?.role === 'SUPER_ADMIN' && (
+            <button
               onClick={toggleEmailCleanup}
               className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-3xl text-sm font-medium transition-colors shadow-sm"
             >
@@ -656,6 +703,57 @@ export default function ParticipantsPage() {
                   </button>
                 </div>
               ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {pinListRows && (
+        <div className="glass rounded-[2rem] border border-white/20 overflow-hidden shadow-sm">
+          <div className="px-6 py-4 border-b border-slate-100 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-700">PIN List</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {pinListRows.length} participant{pinListRows.length !== 1 ? 's' : ''} — freshly generated, shown once. Also emailed to each account as a backup.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={downloadPinListCsv}
+                className="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 text-white rounded-full text-xs font-semibold shrink-0"
+              >
+                Download CSV
+              </button>
+              <button
+                onClick={() => setPinListRows(null)}
+                className="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-full text-xs font-semibold shrink-0"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+          {pinListRows.length === 0 ? (
+            <div className="p-8 text-center text-slate-500 text-sm">No participants in scope.</div>
+          ) : (
+            <div className="max-h-[36rem] overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-white/80 sticky top-0">
+                  <tr>
+                    <th className="text-left px-5 py-3 text-slate-500 font-semibold">BIB</th>
+                    <th className="text-left px-5 py-3 text-slate-500 font-semibold">Name</th>
+                    <th className="text-left px-5 py-3 text-slate-500 font-semibold">PIN</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pinListRows.map((r) => (
+                    <tr key={r.bibNumber} className="border-t border-slate-100">
+                      <td className="px-5 py-2 font-mono text-violet-700">{r.bibNumber}</td>
+                      <td className="px-5 py-2 text-slate-900">{r.name}</td>
+                      <td className="px-5 py-2 font-mono font-bold text-slate-950">{r.pin}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

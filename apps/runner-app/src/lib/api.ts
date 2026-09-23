@@ -51,10 +51,10 @@ class ApiClient {
     return data;
   }
 
-  async login(email: string, pin: string) {
+  async login(identifier: { email?: string; bibNumber?: string }, pin: string) {
     return this.request<any>('/api/v1/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, pin }),
+      body: JSON.stringify({ ...identifier, pin }),
     });
   }
 

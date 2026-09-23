@@ -165,6 +165,13 @@ class ApiClient {
     });
   }
 
+  async bulkResetPins(params: { eventId?: string; participantIds?: string[] }) {
+    return this.request<{ rows: { bibNumber: string; name: string; pin: string }[]; accountsReset: number }>(
+      '/api/v1/participants/bulk-reset-pins',
+      { method: 'POST', body: JSON.stringify(params) }
+    );
+  }
+
   async getParticipantStats(eventId?: string) {
     const query = eventId ? `?eventId=${eventId}` : '';
     return this.request<any>(`/api/v1/participants/stats/summary${query}`);

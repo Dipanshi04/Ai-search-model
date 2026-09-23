@@ -10,12 +10,20 @@ interface LoginPageProps {
 }
 
 export default function LoginPage({ onLogin }: LoginPageProps) {
+  const [loginMode, setLoginMode] = useState<'email' | 'bib'>('email');
   const [email, setEmail] = useState('');
+  const [bibNumber, setBibNumber] = useState('');
   const [pin, setPin] = useState(['', '', '', '']);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+
+  // BIB always identifies exactly one participant — email/phone can be
+  // shared across several people in a bulk (HR/company) registration, so
+  // this is the more reliable option for anyone whose email isn't really
+  // "theirs" alone.
+  const identifier = loginMode === 'bib' ? { bibNumber: bibNumber.trim() } : { email };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -23,7 +31,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
     setLoading(true);
 
     try {
-      const res = await api.login(email, pin.join(''));
+      const res = await api.login(identifier, pin.join(''));
       if (res.success) {
         api.setToken(res.data.tokens.accessToken);
         onLogin();
@@ -131,31 +139,87 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
             </div>
           )}
 
+          <div style={{
+            display: 'flex',
+            marginBottom: '16px',
+            background: '#f1f5f9',
+            borderRadius: '12px',
+            padding: '4px',
+          }}>
+            {(['email', 'bib'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => { setLoginMode(mode); setError(''); setResetSent(false); }}
+                style={{
+                  flex: 1,
+                  padding: '10px',
+                  border: 'none',
+                  borderRadius: '9px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: loginMode === mode ? '#fff' : 'transparent',
+                  color: loginMode === mode ? '#1e293b' : '#64748b',
+                  boxShadow: loginMode === mode ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                  transition: 'all 0.15s',
+                }}
+              >
+                {mode === 'email' ? 'Email' : 'BIB Number'}
+              </button>
+            ))}
+          </div>
+
           <form onSubmit={handleSubmit}>
             <div style={{ marginBottom: '16px' }}>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => { setEmail(e.target.value); setError(''); setResetSent(false); }}
-                required
-                autoComplete="email"
-                autoCapitalize="none"
-                placeholder="Email"
-                style={{
-                  width: '100%',
-                  padding: '16px',
-                  background: '#f8fafc',
-                  border: '1.5px solid #e2e8f0',
-                  borderRadius: '14px',
-                  color: '#1e293b',
-                  fontSize: '15px',
-                  outline: 'none',
-                  transition: 'border-color 0.2s',
-                  boxSizing: 'border-box',
-                }}
-                onFocus={(e) => { e.target.style.borderColor = '#10b981'; }}
-                onBlur={(e) => { e.target.style.borderColor = '#e2e8f0'; }}
-              />
+              {loginMode === 'email' ? (
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => { setEmail(e.target.value); setError(''); setResetSent(false); }}
+                  required
+                  autoComplete="email"
+                  autoCapitalize="none"
+                  placeholder="Email"
+                  style={{
+                    width: '100%',
+                    padding: '16px',
+                    background: '#f8fafc',
+                    border: '1.5px solid #e2e8f0',
+                    borderRadius: '14px',
+                    color: '#1e293b',
+                    fontSize: '15px',
+                    outline: 'none',
+                    transition: 'border-color 0.2s',
+                    boxSizing: 'border-box',
+                  }}
+                  onFocus={(e) => { e.target.style.borderColor = '#10b981'; }}
+                  onBlur={(e) => { e.target.style.borderColor = '#e2e8f0'; }}
+                />
+              ) : (
+                <input
+                  type="text"
+                  value={bibNumber}
+                  onChange={(e) => { setBibNumber(e.target.value); setError(''); setResetSent(false); }}
+                  required
+                  autoCapitalize="characters"
+                  placeholder="BIB Number (e.g. ISA0123)"
+                  style={{
+                    width: '100%',
+                    padding: '16px',
+                    background: '#f8fafc',
+                    border: '1.5px solid #e2e8f0',
+                    borderRadius: '14px',
+                    color: '#1e293b',
+                    fontSize: '15px',
+                    outline: 'none',
+                    transition: 'border-color 0.2s',
+                    boxSizing: 'border-box',
+                  }}
+                  onFocus={(e) => { e.target.style.borderColor = '#10b981'; }}
+                  onBlur={(e) => { e.target.style.borderColor = '#e2e8f0'; }}
+                />
+              )}
             </div>
 
             <div style={{ marginBottom: '24px' }}>
@@ -176,7 +240,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
 
             <button
               type="submit"
-              disabled={loading || !email || pin.some(d => !d)}
+              disabled={loading || !(loginMode === 'email' ? email : bibNumber) || pin.some(d => !d)}
               style={{
                 width: '100%',
                 padding: '16px',
@@ -185,35 +249,37 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                 fontWeight: 700,
                 borderRadius: '14px',
                 border: 'none',
-                background: loading || !email || pin.some(d => !d) ? '#94d8b3' : '#10b981',
-                cursor: loading || !email || pin.some(d => !d) ? 'not-allowed' : 'pointer',
+                background: loading || !(loginMode === 'email' ? email : bibNumber) || pin.some(d => !d) ? '#94d8b3' : '#10b981',
+                cursor: loading || !(loginMode === 'email' ? email : bibNumber) || pin.some(d => !d) ? 'not-allowed' : 'pointer',
                 transition: 'background 0.2s',
-                boxShadow: loading || !email || pin.some(d => !d) ? 'none' : '0 4px 14px rgba(16,185,129,0.35)',
+                boxShadow: loading || !(loginMode === 'email' ? email : bibNumber) || pin.some(d => !d) ? 'none' : '0 4px 14px rgba(16,185,129,0.35)',
               }}
             >
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
 
-          <button
-            type="button"
-            onClick={handleResetPin}
-            disabled={resetLoading || !email}
-            style={{
-              display: 'block',
-              textAlign: 'center',
-              marginTop: '20px',
-              fontSize: '13px',
-              color: resetLoading || !email ? '#cbd5e1' : '#10b981',
-              background: 'none',
-              border: 'none',
-              cursor: resetLoading || !email ? 'not-allowed' : 'pointer',
-              fontWeight: 500,
-              width: '100%',
-            }}
-          >
-            {resetLoading ? 'Sending PIN...' : 'Reset PIN'}
-          </button>
+          {loginMode === 'email' && (
+            <button
+              type="button"
+              onClick={handleResetPin}
+              disabled={resetLoading || !email}
+              style={{
+                display: 'block',
+                textAlign: 'center',
+                marginTop: '20px',
+                fontSize: '13px',
+                color: resetLoading || !email ? '#cbd5e1' : '#10b981',
+                background: 'none',
+                border: 'none',
+                cursor: resetLoading || !email ? 'not-allowed' : 'pointer',
+                fontWeight: 500,
+                width: '100%',
+              }}
+            >
+              {resetLoading ? 'Sending PIN...' : 'Reset PIN'}
+            </button>
+          )}
         </div>
       </div>
 

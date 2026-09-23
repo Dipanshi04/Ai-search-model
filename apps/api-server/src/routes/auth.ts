@@ -31,16 +31,38 @@ authRouter.post(
   '/login',
   async (req: Request, res: Response) => {
     try {
-      const { email, pin } = req.body;
-      if (!email || !pin) {
-        res.status(400).json({ success: false, message: 'Email and PIN required' });
+      const { email, bibNumber, pin } = req.body;
+      if ((!email && !bibNumber) || !pin) {
+        res.status(400).json({ success: false, message: 'Email (or BIB number) and PIN required' });
         return;
       }
 
-      const user = await prisma.user.findUnique({
-        where: { email: String(email).trim().toLowerCase() },
-        select: { id: true, email: true, name: true, phone: true, pinHash: true, role: true },
-      });
+      // BIB always identifies exactly one participant, even when several
+      // people share one login account (a shared HR/company contact email
+      // is common in bulk registrations) — so logging in by BIB works for
+      // participants whose shared email makes email-based login ambiguous
+      // or just hard for them to remember, since it isn't necessarily
+      // theirs. Both paths land on the same underlying account either way.
+      let user;
+      if (bibNumber) {
+        const participant = await prisma.participant.findUnique({
+          where: { bibNumber: String(bibNumber).trim().toUpperCase() },
+          select: { userId: true },
+        });
+        if (!participant) {
+          res.status(401).json({ success: false, message: 'Invalid credentials' });
+          return;
+        }
+        user = await prisma.user.findUnique({
+          where: { id: participant.userId },
+          select: { id: true, email: true, name: true, phone: true, pinHash: true, role: true },
+        });
+      } else {
+        user = await prisma.user.findUnique({
+          where: { email: String(email).trim().toLowerCase() },
+          select: { id: true, email: true, name: true, phone: true, pinHash: true, role: true },
+        });
+      }
 
       if (!user) {
         res.status(401).json({ success: false, message: 'Invalid credentials' });
@@ -67,7 +89,7 @@ authRouter.post(
       const accessToken = generateAccessToken(tokenPayload);
       const refreshToken = generateRefreshToken(tokenPayload);
 
-      logger.info(`User logged in: ${email}`);
+      logger.info(`User logged in: ${user.email}${bibNumber ? ` (via BIB ${bibNumber})` : ''}`);
 
       res.json({
         success: true,

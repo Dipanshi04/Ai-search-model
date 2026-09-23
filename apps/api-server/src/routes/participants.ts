@@ -1095,6 +1095,71 @@ participantsRouter.post('/:id/reset-pin', authenticate, requireRole('SUPER_ADMIN
   }
 });
 
+// Generates a fresh PIN for every participant in scope and returns the
+// plaintext list (name, BIB, PIN) — the only way to ever see a list like
+// this, since PINs are bcrypt-hashed and the plaintext is normally
+// discarded right after the one email it's sent in. This necessarily
+// invalidates whatever PIN each account currently has.
+//
+// PIN lives on the shared User account, not the participant — several
+// participants can share one account (a shared HR/company contact email
+// in a bulk registration), so they'd already share one PIN today. This
+// regenerates once per distinct account, not once per participant, so
+// siblings sharing an account correctly end up with the same new PIN
+// rather than repeatedly invalidating each other's.
+participantsRouter.post('/bulk-reset-pins', authenticate, requireRole('SUPER_ADMIN'), async (req, res) => {
+  try {
+    const { eventId, participantIds } = req.body as { eventId?: string; participantIds?: string[] };
+
+    const where: any = {};
+    if (Array.isArray(participantIds) && participantIds.length > 0) {
+      where.id = { in: participantIds };
+    } else if (eventId) {
+      where.eventId = eventId;
+    }
+
+    const participants = await prisma.participant.findMany({
+      where,
+      select: { id: true, bibNumber: true, name: true, userId: true, user: { select: { name: true, email: true } } },
+      orderBy: { bibNumber: 'asc' },
+    });
+
+    if (participants.length === 0) {
+      res.json({ success: true, data: { rows: [], accountsReset: 0 } });
+      return;
+    }
+
+    const uniqueUserIds = Array.from(new Set(participants.map((p) => p.userId)));
+    const pinByUserId = new Map<string, string>();
+    for (const userId of uniqueUserIds) {
+      const pin = String(Math.floor(1000 + Math.random() * 9000));
+      const pinHash = await bcrypt.hash(pin, 12);
+      await prisma.user.update({ where: { id: userId }, data: { pinHash } });
+      pinByUserId.set(userId, pin);
+    }
+
+    const rows = participants.map((p) => ({
+      bibNumber: p.bibNumber,
+      name: p.name || p.user.name,
+      pin: pinByUserId.get(p.userId)!,
+    }));
+
+    // Best-effort — the on-screen/CSV list is the primary record; email is
+    // a backup so each account also has it in their inbox as usual.
+    for (const userId of uniqueUserIds) {
+      const owner = participants.find((p) => p.userId === userId)!;
+      sendPinEmail(owner.user.email, owner.name || owner.user.name, pinByUserId.get(userId)!)
+        .catch((err) => logger.error('Bulk PIN reset email failed:', err));
+    }
+
+    logger.info(`Bulk PIN reset by ${req.user?.email}: ${uniqueUserIds.length} accounts, ${participants.length} participants`);
+    res.json({ success: true, data: { rows, accountsReset: uniqueUserIds.length } });
+  } catch (error) {
+    logger.error('Bulk PIN reset error:', error);
+    res.status(500).json({ success: false, message: 'Failed to reset PINs' });
+  }
+});
+
 participantsRouter.delete('/:id', authenticate, requireRole('SUPER_ADMIN'), async (req, res) => {
   try {
     const participant = await prisma.participant.findUnique({ where: { id: req.params.id as string } });

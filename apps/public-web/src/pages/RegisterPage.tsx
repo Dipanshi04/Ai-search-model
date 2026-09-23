@@ -203,7 +203,12 @@ export default function RegisterPage() {
     cashfree.checkout({ paymentSessionId: res.data.paymentSessionId, redirectTarget: '_self' });
   };
 
-  const handleRetryPayment = () => startCashfreeCheckout(result?.participant?.id);
+  // Re-runs the full submit, not just startCashfreeCheckout — the runner may
+  // have corrected a field (e.g. an invalid phone Cashfree rejected) since
+  // the first attempt, and register.ts resumes/updates the existing
+  // participant by userId+eventId rather than creating a duplicate, so this
+  // is safe to call again with the current form values.
+  const handleRetryPayment = () => handleFormSubmit();
 
   // Live pricing preview shown on the form itself, before submitting —
   // mirrors the discount rule cashfree.ts enforces server-side (max of
@@ -617,10 +622,10 @@ export default function RegisterPage() {
             <button
               type="button"
               onClick={handleRetryPayment}
-              disabled={isSubmitting}
+              disabled={isSubmitting || !tacAccepted}
               className="w-full py-3 bg-brand-orange text-white hover:opacity-90 font-bold rounded-xl transition-all text-base disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {paymentLoading ? 'Redirecting...' : 'Retry Payment'}
+              {paymentLoading ? 'Redirecting...' : loading ? 'Retrying...' : 'Retry Payment'}
             </button>
           ) : (
             <button

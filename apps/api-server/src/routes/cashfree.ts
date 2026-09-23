@@ -443,6 +443,7 @@ cashfreeRouter.get('/status', async (req: Request, res: Response) => {
         category: payment.participant.category,
         name: payment.participant.name || payment.participant.user.name,
         avatarUrl: payment.participant.user.avatarUrl,
+        amount: payment.amount,
       },
     });
   } catch (error) {

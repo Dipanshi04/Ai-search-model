@@ -128,6 +128,9 @@ export default function RegisterPage() {
 
     const res = await api.register(payload);
     if (res.success) {
+      // Registration itself, not payment — fired here so it's counted even
+      // for the PENDING_PAYMENT case where a runner abandons checkout.
+      (window as any).fbq?.('track', 'CompleteRegistration');
       setResult(res.data);
       // Only ever available in this one response — the PIN is bcrypt-hashed
       // server-side immediately after this and the plaintext is discarded.

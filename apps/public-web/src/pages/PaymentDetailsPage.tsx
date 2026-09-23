@@ -29,7 +29,7 @@ export default function PaymentDetailsPage() {
     const params = new URLSearchParams(window.location.search);
     const cashfreeOrderId = params.get('cf_order_id');
 
-    function handlePollResult(res: { success: boolean; data?: { status?: string; bibNumber?: string; category?: string; name?: string; avatarUrl?: string | null } }) {
+    function handlePollResult(res: { success: boolean; data?: { status?: string; bibNumber?: string; category?: string; name?: string; avatarUrl?: string | null; amount?: number } }) {
       // A 404 body still comes back as a resolved response here, not a
       // thrown error — check `success` explicitly, or an unrecognized
       // order id would sit in "Confirming..." forever instead of ever
@@ -40,6 +40,7 @@ export default function PaymentDetailsPage() {
       }
       const status = res.data?.status;
       if (status === 'COMPLETED') {
+        (window as any).fbq?.('track', 'Purchase', { value: res.data?.amount || 0, currency: 'INR' });
         setBibNumber(res.data?.bibNumber || null);
         setRunnerName(res.data?.name || null);
         setCategory(res.data?.category || null);

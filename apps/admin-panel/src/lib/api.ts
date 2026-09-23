@@ -244,11 +244,12 @@ class ApiClient {
     return this.request<{ totalTrees: number; totalKm: number; totalCO2: number }>(`/api/v1/trees${query}`);
   }
 
-  async exportParticipantsCSV() {
+  async exportParticipantsCSV(params?: Record<string, string>) {
     const headers: Record<string, string> = {};
     if (this.token) headers['Authorization'] = `Bearer ${this.token}`;
+    const query = params ? '?' + new URLSearchParams(params).toString() : '';
 
-    const response = await fetch(`${API_URL}/api/v1/participants/export/csv`, { headers });
+    const response = await fetch(`${API_URL}/api/v1/participants/export/csv${query}`, { headers });
     const blob = await response.blob();
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');

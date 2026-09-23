@@ -594,7 +594,7 @@ participantsRouter.get('/stats/summary', async (req, res) => {
       return;
     }
 
-    const [total, checkedIn, running, finished, byCategory, byTshirtSize, missingTshirtSize] = await Promise.all([
+    const [total, checkedIn, running, finished, byCategory, byGender, byTshirtSize, missingTshirtSize] = await Promise.all([
       prisma.participant.count({ where: { eventId: targetEventId } }),
       prisma.participant.count({ where: { eventId: targetEventId, checkedIn: true } }),
       prisma.participant.count({ where: { eventId: targetEventId, status: 'RUNNING' } }),
@@ -607,6 +607,11 @@ participantsRouter.get('/stats/summary', async (req, res) => {
         _count: { category: true },
       }),
       prisma.participant.groupBy({
+        by: ['gender'],
+        where: { eventId: targetEventId },
+        _count: { gender: true },
+      }),
+      prisma.participant.groupBy({
         by: ['tshirtSize'],
         where: { eventId: targetEventId, tshirtSize: { not: null } },
         _count: { tshirtSize: true },
@@ -616,21 +621,57 @@ participantsRouter.get('/stats/summary', async (req, res) => {
 
     res.json({
       success: true,
-      data: { total, checkedIn, running, finished, byCategory, byTshirtSize, missingTshirtSize },
+      data: { total, checkedIn, running, finished, byCategory, byGender, byTshirtSize, missingTshirtSize },
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Failed to fetch participant stats' });
   }
 });
 
-participantsRouter.get('/export/csv', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'), async (_req, res) => {
+// Shared by the list endpoint and the CSV export below so a filtered export
+// always matches exactly what's on screen — previously export.csv ignored
+// every UI filter and always dumped the full participant table.
+function buildParticipantWhere(query: Record<string, unknown>) {
+  const search = typeof query.search === 'string' ? query.search : undefined;
+  const category = typeof query.category === 'string' ? query.category : undefined;
+  const status = typeof query.status === 'string' ? query.status : undefined;
+  const paymentStatus = typeof query.paymentStatus === 'string' ? query.paymentStatus : undefined;
+  const tshirtSize = typeof query.tshirtSize === 'string' ? query.tshirtSize : undefined;
+  const eventId = typeof query.eventId === 'string' ? query.eventId : undefined;
+  const companyId = typeof query.companyId === 'string' ? query.companyId : undefined;
+  const isBoardMember = query.isBoardMember === 'true' ? true : undefined;
+
+  const where: any = {};
+  if (eventId) where.eventId = eventId;
+  if (category) where.category = category;
+  if (status) where.status = status;
+  if (paymentStatus) where.paymentStatus = paymentStatus;
+  if (tshirtSize === 'MISSING') where.tshirtSize = null;
+  else if (tshirtSize) where.tshirtSize = tshirtSize;
+  if (companyId) where.companyId = companyId;
+  if (isBoardMember !== undefined) where.isBoardMember = isBoardMember;
+  if (search) {
+    where.OR = [
+      { bibNumber: { contains: search, mode: 'insensitive' } },
+      { name: { contains: search, mode: 'insensitive' } },
+      { user: { name: { contains: search, mode: 'insensitive' } } },
+      { user: { email: { contains: search, mode: 'insensitive' } } },
+      { user: { phone: { contains: search, mode: 'insensitive' } } },
+      { company: { name: { contains: search, mode: 'insensitive' } } },
+    ];
+  }
+  return where;
+}
+
+participantsRouter.get('/export/csv', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'), async (req, res) => {
   try {
     const participants = await prisma.participant.findMany({
+      where: buildParticipantWhere(req.query as Record<string, unknown>),
       include: { user: true, company: true },
       orderBy: { createdAt: 'desc' },
     });
 
-    const headers = ['ID', 'Bib Number', 'Name', 'Email', 'Phone', 'Company', 'Category', 'Gender', 'Status', 'Checked In', 'Total Distance', 'Finish Time'];
+    const headers = ['ID', 'Bib Number', 'Name', 'Email', 'Phone', 'Company', 'Category', 'Gender', 'Status', 'Payment Status', 'Checked In', 'Total Distance', 'Finish Time'];
     const rows = participants.map((p) => [
       p.id,
       p.bibNumber,
@@ -641,6 +682,7 @@ participantsRouter.get('/export/csv', authenticate, requireRole('SUPER_ADMIN', '
       p.category,
       p.gender,
       p.status,
+      p.paymentStatus,
       p.checkedIn ? 'Yes' : 'No',
       p.totalDistance,
       p.finishTime ?? '',
@@ -660,30 +702,7 @@ participantsRouter.get('/', async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
-    const search = typeof req.query.search === 'string' ? req.query.search : undefined;
-    const category = typeof req.query.category === 'string' ? req.query.category : undefined;
-    const status = typeof req.query.status === 'string' ? req.query.status : undefined;
-    const tshirtSize = typeof req.query.tshirtSize === 'string' ? req.query.tshirtSize : undefined;
-    const eventId = typeof req.query.eventId === 'string' ? req.query.eventId : undefined;
-    const isBoardMember = req.query.isBoardMember === 'true' ? true : undefined;
-
-    const where: any = {};
-    if (eventId) where.eventId = eventId;
-    if (category) where.category = category;
-    if (status) where.status = status;
-    if (tshirtSize === 'MISSING') where.tshirtSize = null;
-    else if (tshirtSize) where.tshirtSize = tshirtSize;
-    if (isBoardMember !== undefined) where.isBoardMember = isBoardMember;
-    if (search) {
-      where.OR = [
-        { bibNumber: { contains: search, mode: 'insensitive' } },
-        { name: { contains: search, mode: 'insensitive' } },
-        { user: { name: { contains: search, mode: 'insensitive' } } },
-        { user: { email: { contains: search, mode: 'insensitive' } } },
-        { user: { phone: { contains: search, mode: 'insensitive' } } },
-        { company: { name: { contains: search, mode: 'insensitive' } } },
-      ];
-    }
+    const where = buildParticipantWhere(req.query as Record<string, unknown>);
 
     const [participants, total] = await Promise.all([
       prisma.participant.findMany({

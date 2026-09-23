@@ -241,13 +241,11 @@ export default function RegisterPage() {
             <p className="hero-body text-brand-navy/60 text-sm">Fill in your details to join the race</p>
           </div>
 
-          {new Date() < new Date('2026-09-21T23:59:59+05:30') && (
-            <div className="mb-4 rounded-xl px-4 py-3 text-center" style={{ background: 'rgba(245,130,32,0.1)', border: '1px solid rgba(245,130,32,0.3)' }}>
-              <p className="hero-body text-sm font-bold" style={{ color: '#F5821F' }}>
-                🎉 Use code <span className="font-mono tracking-wide">ISA25</span> for 25% off — ends 21st Sept!
-              </p>
-            </div>
-          )}
+          <div className="mb-4 rounded-xl px-4 py-3 text-center" style={{ background: 'rgba(245,130,32,0.1)', border: '1px solid rgba(245,130,32,0.3)' }}>
+            <p className="hero-body text-sm font-bold" style={{ color: '#F5821F' }}>
+              🎉 Use code <span className="font-mono tracking-wide">ISA25</span> for 25% off!
+            </p>
+          </div>
 
           {error && (
             <div className="hero-body bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm mb-4">

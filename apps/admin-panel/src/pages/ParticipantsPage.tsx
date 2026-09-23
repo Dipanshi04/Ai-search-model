@@ -25,6 +25,7 @@ export default function ParticipantsPage() {
   const [tshirtSize, setTshirtSize] = useState('');
   const [boardOnly, setBoardOnly] = useState(false);
   const [eventId, setEventId] = useState('');
+  const [companyFilter, setCompanyFilter] = useState('');
   const [events, setEvents] = useState<any[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -96,13 +97,14 @@ export default function ParticipantsPage() {
 
   async function loadParticipants() {
     setLoading(true);
-    const params: Record<string, string> = { page: page.toString(), limit: '20' };
+    const params: Record<string, string> = { page: page.toString(), limit: '25' };
     if (debouncedSearch) params.search = debouncedSearch;
     if (category) params.category = category;
     if (status) params.status = status;
     if (tshirtSize) params.tshirtSize = tshirtSize;
     if (eventId) params.eventId = eventId;
     if (boardOnly) params.isBoardMember = 'true';
+    if (companyFilter) params.companyId = companyFilter;
 
     const res = await api.getParticipants(params);
     if (res.success && res.data) {
@@ -125,7 +127,7 @@ export default function ParticipantsPage() {
 
   useEffect(() => {
     loadParticipants();
-  }, [page, category, status, tshirtSize, eventId, boardOnly, debouncedSearch]);
+  }, [page, category, status, tshirtSize, eventId, boardOnly, companyFilter, debouncedSearch]);
 
   function resetAddForm() {
     setAddForm({
@@ -559,7 +561,17 @@ export default function ParticipantsPage() {
             Add Participant
           </button>
           <button
-            onClick={() => api.exportParticipantsCSV()}
+            onClick={() => {
+              const params: Record<string, string> = {};
+              if (debouncedSearch) params.search = debouncedSearch;
+              if (category) params.category = category;
+              if (status) params.status = status;
+              if (tshirtSize) params.tshirtSize = tshirtSize;
+              if (eventId) params.eventId = eventId;
+              if (boardOnly) params.isBoardMember = 'true';
+              if (companyFilter) params.companyId = companyFilter;
+              api.exportParticipantsCSV(params);
+            }}
             className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-3xl text-sm font-medium transition-colors shadow-sm"
           >
             Export CSV
@@ -957,6 +969,16 @@ export default function ParticipantsPage() {
             <option value="">All Events</option>
             {events.map((ev) => (
               <option key={ev.id} value={ev.id}>{ev.name}</option>
+            ))}
+          </select>
+          <select
+            value={companyFilter}
+            onChange={(e) => { setCompanyFilter(e.target.value); setPage(1); }}
+            className="px-4 py-3 bg-white/80 border border-white/60 rounded-3xl text-slate-900 text-sm outline-none"
+          >
+            <option value="">All Companies</option>
+            {companies.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
           <label className="flex items-center gap-2 px-4 py-3 bg-white/80 border border-white/60 rounded-3xl text-slate-900 text-sm cursor-pointer">

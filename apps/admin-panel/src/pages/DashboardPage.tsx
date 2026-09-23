@@ -10,9 +10,12 @@ interface Stats {
   running: number;
   finished: number;
   byCategory: { category: string; _count: { category: number } }[];
+  byGender: { gender: string; _count: { gender: number } }[];
   byTshirtSize: { tshirtSize: string; _count: { tshirtSize: number } }[];
   missingTshirtSize: number;
 }
+
+const GENDER_LABELS: Record<string, string> = { MALE: 'Male', FEMALE: 'Female', NON_BINARY: 'Non-Binary' };
 
 const TSHIRT_SIZE_ORDER = ['S', 'M', 'L', 'XL', 'XXL', '3XL'];
 
@@ -127,6 +130,12 @@ export default function DashboardPage() {
     });
   const tshirtTotal = tshirtData.reduce((sum, t) => sum + t.value, 0);
   const missingTshirtSize = stats?.missingTshirtSize || 0;
+
+  const genderData = (stats?.byGender || []).map((g) => ({
+    gender: g.gender,
+    label: GENDER_LABELS[g.gender] || g.gender,
+    value: g._count.gender,
+  }));
 
   const funnelData = [
     { name: 'Registered', value: total, fill: '#6366f1' },
@@ -285,6 +294,25 @@ export default function DashboardPage() {
         ) : (
           <div className="flex items-center justify-center h-16 text-slate-400 text-sm">
             No t-shirt sizes on file yet
+          </div>
+        )}
+      </div>
+
+      {/* Gender Breakdown */}
+      <div className="glass rounded-[2rem] border border-white/20 shadow-sm p-6">
+        <h3 className="text-sm font-semibold text-slate-500 mb-4">Gender</h3>
+        {genderData.length > 0 ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {genderData.map((g, i) => (
+              <div key={g.gender} className="rounded-2xl bg-white/60 border border-white/40 px-4 py-3 text-center">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{g.label}</p>
+                <p className="text-2xl font-bold mt-1" style={{ color: CHART_COLORS[i % CHART_COLORS.length] }}>{g.value}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="flex items-center justify-center h-16 text-slate-400 text-sm">
+            No registrations yet
           </div>
         )}
       </div>

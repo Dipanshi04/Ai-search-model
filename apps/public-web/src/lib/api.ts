@@ -61,7 +61,7 @@ class ApiClient {
   }
 
   async getCompanies() {
-    return this.request<{ id: string; name: string }[]>('/api/v1/participants/companies');
+    return this.request<{ id: string; name: string; status?: string }[]>('/api/v1/participants/companies');
   }
 
   async submitSponsorInquiry(data: { name: string; email: string; phone?: string; companyName: string; message?: string }) {

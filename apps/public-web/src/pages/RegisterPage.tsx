@@ -20,7 +20,6 @@ const CATEGORY_FEES = {
 type CategoryKey = keyof typeof CATEGORY_FEES;
 
 export default function RegisterPage() {
-  const [step, setStep] = useState<'form' | 'payment' | 'success'>('form');
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -48,9 +47,8 @@ export default function RegisterPage() {
   const [couponApplied, setCouponApplied] = useState<{ code: string; discountPercent: number } | null>(null);
   const [couponError, setCouponError] = useState('');
   const [couponChecking, setCouponChecking] = useState(false);
-  const [showTACModal, setShowTACModal] = useState(false);
   const [tacAccepted, setTacAccepted] = useState(false);
-  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
+  const [companies, setCompanies] = useState<{ id: string; name: string; status?: string }[]>([]);
   const [companySearch, setCompanySearch] = useState('');
   const [companyDropdownOpen, setCompanyDropdownOpen] = useState(false);
   const companyFieldRef = useRef<HTMLDivElement>(null);
@@ -78,11 +76,6 @@ export default function RegisterPage() {
     return () => document.removeEventListener('mousedown', onClickOutside);
   }, []);
 
-  const handleAcceptTAC = async () => {
-    setTacAccepted(true);
-    setShowTACModal(false);
-  };
-
   const handlePhotoInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const rawFile = e.target.files?.[0] || null;
     e.target.value = '';
@@ -97,7 +90,7 @@ export default function RegisterPage() {
   const handleSubmitForm = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!tacAccepted) {
-      setError('Please read and agree to the Terms & Conditions before registering.');
+      setError('Please agree to the Terms & Conditions before registering.');
       return;
     }
     await handleFormSubmit();
@@ -112,6 +105,11 @@ export default function RegisterPage() {
     }
   }, []);
 
+  // One continuous action: register, then immediately start the Cashfree
+  // checkout redirect — no separate "review & pay" screen in between. If
+  // registration succeeds but starting payment fails, the participant
+  // already exists, so we stay on this page and offer a "Retry Payment"
+  // button (handleRetryPayment) instead of resubmitting the whole form.
   const handleFormSubmit = async () => {
     setLoading(true);
     setError('');
@@ -127,28 +125,30 @@ export default function RegisterPage() {
       : { ...rest, companyName: companySearch.trim() };
 
     const res = await api.register(payload);
-    if (res.success) {
-      // Registration itself, not payment — fired here so it's counted even
-      // for the PENDING_PAYMENT case where a runner abandons checkout.
-      (window as any).fbq?.('track', 'CompleteRegistration');
-      setResult(res.data);
-      // Only ever available in this one response — the PIN is bcrypt-hashed
-      // server-side immediately after this and the plaintext is discarded.
-      // Stashed here so the post-payment confirmation page can show it.
-      if (res.data?.pin) {
-        sessionStorage.setItem('isa_runner_pin', res.data.pin);
-      }
-      // Best-effort — a failed photo upload shouldn't block registration
-      // itself, since a photo can always be added later from the Runner App.
-      const userId = res.data?.participant?.userId;
-      if (photo && userId) {
-        api.uploadRegistrationPhoto(userId, form.email, photo).catch(() => {});
-      }
-      setStep('payment');
-    } else {
+    if (!res.success) {
       setError(res.message || 'Registration failed');
+      setLoading(false);
+      return;
     }
+
+    // Registration itself, not payment — fired here so it's counted even
+    // for the rare case where the payment step below still fails.
+    (window as any).fbq?.('track', 'CompleteRegistration');
+    setResult(res.data);
+    // Only ever available in this one response — the PIN is bcrypt-hashed
+    // server-side immediately after this and the plaintext is discarded.
+    if (res.data?.pin) {
+      sessionStorage.setItem('isa_runner_pin', res.data.pin);
+    }
+    // Best-effort — a failed photo upload shouldn't block registration
+    // itself, since a photo can always be added later from the Runner App.
+    const userId = res.data?.participant?.userId;
+    if (photo && userId) {
+      api.uploadRegistrationPhoto(userId, form.email, photo).catch(() => {});
+    }
+
     setLoading(false);
+    await startCashfreeCheckout(res.data?.participant?.id);
   };
 
   const handleApplyCoupon = async () => {
@@ -174,11 +174,10 @@ export default function RegisterPage() {
   // Active payment path — Cashfree, a real gateway with a signed webhook,
   // so a payment completes automatically once it succeeds instead of
   // waiting on an admin to reconcile a sales report. See routes/cashfree.ts.
-  const handlePayCashfree = async () => {
+  const startCashfreeCheckout = async (participantId?: string) => {
     setPaymentLoading(true);
     setError('');
 
-    const participantId = result?.participant?.id;
     if (!participantId) {
       setError('Participant not found');
       setPaymentLoading(false);
@@ -204,186 +203,24 @@ export default function RegisterPage() {
     cashfree.checkout({ paymentSessionId: res.data.paymentSessionId, redirectTarget: '_self' });
   };
 
-  if (step === 'success') {
-    return (
-      <div className="min-h-screen bg-brand-cream flex flex-col relative">
-      <div className="hero-grain" />
-      <PageHeader />
-      <div className="flex-1 flex items-center justify-center px-4 py-8">
-        <div className="bg-white border border-brand-navy/10 shadow-sm p-8 sm:p-10 rounded-3xl max-w-md w-full text-center relative z-10">
-          <h2 className="hero-title text-2xl sm:text-3xl font-bold text-brand-navy mb-4">
-            Registration Complete!
-          </h2>
-          <p className="hero-body text-brand-navy/70 mb-6 sm:mb-8 text-base sm:text-lg">Welcome, {result.participant?.user?.name}</p>
+  const handleRetryPayment = () => startCashfreeCheckout(result?.participant?.id);
 
-          <div className="rounded-2xl p-5 sm:p-6 mb-4" style={{ background: '#1B2A5B' }}>
-            <p className="hero-body text-xs uppercase tracking-wide font-bold mb-2" style={{ color: '#F5821F' }}>Your BIB Number</p>
-            <p className="hero-tabular text-3xl sm:text-4xl font-black text-white tracking-wider">{result.participant?.bibNumber || result.bibNumber}</p>
-          </div>
-
-          <div className="bg-brand-cream border border-brand-navy/10 rounded-2xl p-5 sm:p-6 mb-4">
-            <p className="hero-body text-sm text-brand-navy/60 mb-2">Your 4-Digit Login PIN</p>
-            <p className="hero-title text-2xl sm:text-3xl font-bold text-emerald-600 tracking-widest">Sent to Email</p>
-          </div>
-
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-6">
-            <p className="hero-body text-emerald-700 text-sm">Payment confirmed! You're all set for race day.</p>
-          </div>
-
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 mb-6 text-left">
-            <p className="hero-body text-emerald-800 text-sm font-semibold mb-1">Check your email for your PIN</p>
-            <p className="hero-body text-emerald-700 text-xs">Use your email and the 4-digit PIN sent to you to log into the Runner App at <strong>localhost:3001</strong>.</p>
-          </div>
-
-          <p className="hero-body text-xs text-brand-navy/50 mb-6">
-            Save this BIB number. You will need it for check-in on race day.
-          </p>
-          <a href="/" className="inline-block bg-brand-orange text-white hover:opacity-90 transition px-6 sm:px-8 py-3 rounded-xl text-base font-bold">
-            Back to Home
-          </a>
-        </div>
-      </div>
-      <Footer />
-      </div>
-    );
-  }
-
-  if (step === 'payment') {
-    const payCategory: CategoryKey = result?.participant?.category === 'RUN_5K' ? 'RUN_5K' : 'RUN_3K';
-    const categoryFee = CATEGORY_FEES[payCategory];
-    const baseAmount = categoryFee?.amount || 299;
-    // Premium-company discount shows here, on the payment step itself —
-    // not on the registration form — matching what cashfree.ts actually
-    // charges. If a coupon is also entered, the runner gets whichever
-    // discount is bigger (never both stacked), same rule the server
-    // re-enforces independently at checkout.
-    const isPremiumCompany = result?.participant?.company?.status === 'PREMIUM';
-    const premiumPercent = isPremiumCompany ? 50 : 0;
-    const effectivePercent = couponApplied ? Math.max(couponApplied.discountPercent, premiumPercent) : premiumPercent;
-    const discountLabel = couponApplied && couponApplied.discountPercent >= premiumPercent
-      ? `Coupon ${couponApplied.code} (${couponApplied.discountPercent}% off)`
-      : isPremiumCompany
-        ? 'Premium Member Discount (50% off)'
-        : null;
-    return (
-      <div className="min-h-screen bg-brand-cream flex flex-col relative">
-      <div className="hero-grain" />
-      <PageHeader />
-      <div className="flex-1 flex items-center justify-center px-4 py-8">
-        <div className="bg-white border border-brand-navy/10 shadow-sm p-8 sm:p-10 rounded-3xl max-w-md w-full relative z-10">
-          <div className="text-center mb-6 sm:mb-8">
-            <h2 className="hero-title text-2xl sm:text-3xl font-bold text-brand-navy">Complete Payment</h2>
-          </div>
-
-          {error && (
-            <div className="hero-body bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm mb-6">
-              {error}
-            </div>
-          )}
-
-          <div className="hero-body bg-brand-cream border border-brand-navy/10 rounded-2xl p-5 sm:p-6 mb-6 sm:mb-8 space-y-3">
-            <div className="flex justify-between">
-              <span className="text-brand-navy/60">Name</span>
-              <span className="text-brand-navy font-medium">{result.participant?.user?.name}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-brand-navy/60">BIB Number</span>
-              <span className="hero-tabular text-brand-navy font-bold">{result.participant?.bibNumber || result.bibNumber}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-brand-navy/60">Category</span>
-              <span className="text-brand-navy">{categoryFee?.label || result.participant?.category}</span>
-            </div>
-            {effectivePercent > 0 ? (
-              <>
-                <div className="flex justify-between border-t border-brand-navy/10 pt-3 mt-3">
-                  <span className="text-brand-navy/60">Subtotal</span>
-                  <span className="text-brand-navy">Rs. {baseAmount}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-emerald-600">{discountLabel}</span>
-                  <span className="text-emerald-600">
-                    − Rs. {Math.round(baseAmount * effectivePercent / 100)}
-                  </span>
-                </div>
-                <div className="flex justify-between border-t border-brand-navy/10 pt-3">
-                  <span className="text-brand-navy font-medium">Amount</span>
-                  <span className="hero-title text-2xl sm:text-3xl font-bold text-brand-orange">
-                    Rs. {Math.round(baseAmount * (1 - effectivePercent / 100))}
-                  </span>
-                </div>
-              </>
-            ) : (
-              <div className="flex justify-between border-t border-brand-navy/10 pt-3 mt-3">
-                <span className="text-brand-navy font-medium">Amount</span>
-                <span className="hero-title text-2xl sm:text-3xl font-bold text-brand-orange">Rs. {baseAmount}</span>
-              </div>
-            )}
-          </div>
-
-          {/* Shown to everyone, including premium companies — a PREMIUM_ONLY
-              coupon can offer more than the flat 50% premium discount, and
-              the max-of-both rule above still applies either way. */}
-          <div className="mb-6 sm:mb-8">
-            <label className="hero-body block text-xs font-medium text-brand-navy/60 mb-1.5">Have a coupon code?</label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={couponInput}
-                onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); setCouponError(''); }}
-                disabled={!!couponApplied}
-                placeholder="e.g. ISA10"
-                className="flex-1 px-3 py-2.5 bg-brand-cream border border-brand-navy/15 rounded-lg text-brand-navy placeholder-brand-navy/30 focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition disabled:opacity-60"
-              />
-              {couponApplied ? (
-                <button
-                  type="button"
-                  onClick={() => { setCouponApplied(null); setCouponInput(''); }}
-                  className="px-4 py-2.5 rounded-lg border border-brand-navy/20 text-brand-navy text-sm font-semibold hover:bg-brand-navy/5 transition"
-                >
-                  Remove
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={handleApplyCoupon}
-                  disabled={couponChecking || !couponInput.trim()}
-                  className="px-4 py-2.5 rounded-lg bg-brand-navy text-white text-sm font-semibold hover:opacity-90 transition disabled:opacity-50"
-                >
-                  {couponChecking ? 'Checking...' : 'Apply'}
-                </button>
-              )}
-            </div>
-            {couponError && <p className="text-xs text-red-600 mt-1.5">{couponError}</p>}
-            {couponApplied && <p className="text-xs text-emerald-600 mt-1.5">Coupon applied — {couponApplied.discountPercent}% off.</p>}
-          </div>
-
-          <div className="space-y-3 sm:space-y-4">
-            <button
-              onClick={handlePayCashfree}
-              disabled={paymentLoading}
-              className="w-full py-3 sm:py-4 bg-brand-orange text-white hover:opacity-90 disabled:opacity-50 font-bold rounded-xl transition-all flex items-center justify-center gap-2 text-base sm:text-lg"
-            >
-              {paymentLoading ? 'Redirecting...' : 'Pay Now'}
-            </button>
-            <button
-              onClick={() => { setStep('form'); setError(''); }}
-              disabled={paymentLoading}
-              className="w-full py-3 sm:py-4 border border-brand-navy/20 hover:bg-brand-navy/5 disabled:opacity-50 text-brand-navy font-medium rounded-xl transition-all"
-            >
-              Back to Form
-            </button>
-          </div>
-
-          <p className="hero-body text-xs text-brand-navy/50 text-center mt-5 sm:mt-6">
-            You'll be taken to our secure checkout partner, Cashfree, to complete payment.
-          </p>
-        </div>
-      </div>
-      <Footer />
-      </div>
-    );
-  }
+  // Live pricing preview shown on the form itself, before submitting —
+  // mirrors the discount rule cashfree.ts enforces server-side (max of
+  // premium-company % and coupon %, never both stacked).
+  const previewCategory: CategoryKey = form.category === 'RUN_5K' ? 'RUN_5K' : 'RUN_3K';
+  const previewFee = CATEGORY_FEES[previewCategory];
+  const previewBaseAmount = previewFee.amount;
+  const pickedCompanyForPreview = companies.find((c) => c.id === form.companyId);
+  const isPremiumCompanyPreview = pickedCompanyForPreview?.status === 'PREMIUM';
+  const premiumPercentPreview = isPremiumCompanyPreview ? 50 : 0;
+  const effectivePercentPreview = couponApplied ? Math.max(couponApplied.discountPercent, premiumPercentPreview) : premiumPercentPreview;
+  const discountLabelPreview = couponApplied && couponApplied.discountPercent >= premiumPercentPreview
+    ? `Coupon ${couponApplied.code} (${couponApplied.discountPercent}% off)`
+    : isPremiumCompanyPreview
+      ? 'Premium Member Discount (50% off)'
+      : null;
+  const isSubmitting = loading || paymentLoading;
 
   return (
     <div className="min-h-screen bg-brand-cream flex flex-col relative">
@@ -706,146 +543,99 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <label className="hero-body flex items-center gap-2 mb-3 cursor-pointer"
-            onClick={() => setShowTACModal(true)}
-          >
+          {/* Pricing — always visible, updates live as category/company/coupon
+              change, so there's no surprise before checkout. */}
+          <div className="hero-body bg-brand-cream border border-brand-navy/10 rounded-2xl p-4 sm:p-5 mb-4 space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-brand-navy/60">{previewFee.label}</span>
+              <span className="text-brand-navy">Rs. {previewBaseAmount}</span>
+            </div>
+            {effectivePercentPreview > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-emerald-600">{discountLabelPreview}</span>
+                <span className="text-emerald-600">− Rs. {Math.round(previewBaseAmount * effectivePercentPreview / 100)}</span>
+              </div>
+            )}
+            <div className="flex justify-between items-center border-t border-brand-navy/10 pt-2">
+              <span className="text-brand-navy font-medium text-sm">Total</span>
+              <span className="hero-title text-xl sm:text-2xl font-bold text-brand-orange">
+                Rs. {Math.round(previewBaseAmount * (1 - effectivePercentPreview / 100))}
+              </span>
+            </div>
+
+            <div className="pt-2">
+              {couponApplied ? (
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-emerald-600">Coupon <strong>{couponApplied.code}</strong> applied — {couponApplied.discountPercent}% off.</p>
+                  <button
+                    type="button"
+                    onClick={() => { setCouponApplied(null); setCouponInput(''); }}
+                    className="text-xs font-semibold text-brand-navy/60 hover:text-brand-navy underline"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={couponInput}
+                    onChange={(e) => { setCouponInput(e.target.value.toUpperCase()); setCouponError(''); }}
+                    placeholder="Coupon code (optional)"
+                    className="flex-1 px-3 py-2 bg-white border border-brand-navy/15 rounded-lg text-brand-navy placeholder-brand-navy/30 focus:ring-2 focus:ring-brand-orange focus:border-brand-orange outline-none text-sm transition"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleApplyCoupon}
+                    disabled={couponChecking || !couponInput.trim()}
+                    className="px-4 py-2 rounded-lg bg-brand-navy text-white text-sm font-semibold hover:opacity-90 transition disabled:opacity-50"
+                  >
+                    {couponChecking ? 'Checking...' : 'Apply'}
+                  </button>
+                </div>
+              )}
+              {couponError && <p className="text-xs text-red-600 mt-1.5">{couponError}</p>}
+            </div>
+          </div>
+
+          <label className="hero-body flex items-center gap-2 mb-3 cursor-pointer">
             <input
               type="checkbox"
               checked={tacAccepted}
-              readOnly
+              onChange={(e) => setTacAccepted(e.target.checked)}
               className="w-4 h-4 rounded border-brand-navy/30 text-brand-orange focus:ring-brand-orange"
             />
             <span className="text-xs text-brand-navy/70">
-              I have read and agree to the{' '}
-              <span className="text-brand-orange font-semibold underline">Terms & Conditions</span>
+              I agree to the{' '}
+              <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-brand-orange font-semibold underline">
+                Terms & Conditions
+              </a>
             </span>
           </label>
 
-          <button
-            type="submit"
-            disabled={loading || !tacAccepted}
-            className="w-full py-3 bg-brand-orange text-white hover:opacity-90 font-bold rounded-xl transition-all text-base disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? 'Processing...' : 'Register & Pay'}
-          </button>
+          {result && error ? (
+            <button
+              type="button"
+              onClick={handleRetryPayment}
+              disabled={isSubmitting}
+              className="w-full py-3 bg-brand-orange text-white hover:opacity-90 font-bold rounded-xl transition-all text-base disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {paymentLoading ? 'Redirecting...' : 'Retry Payment'}
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={isSubmitting || !tacAccepted}
+              className="w-full py-3 bg-brand-orange text-white hover:opacity-90 font-bold rounded-xl transition-all text-base disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {paymentLoading ? 'Redirecting to payment...' : loading ? 'Registering...' : 'Register & Pay'}
+            </button>
+          )}
+          <p className="hero-body text-xs text-brand-navy/50 text-center mt-3">
+            You'll be taken to our secure checkout partner, Cashfree, to complete payment.
+          </p>
         </form>
       </div>
-
-      {/* Terms & Conditions Modal */}
-      {showTACModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white border border-brand-navy/10 rounded-3xl w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl relative">
-            <div className="p-6 border-b border-brand-navy/10">
-              <h2 className="hero-title text-2xl font-bold text-brand-navy">Terms & Conditions</h2>
-              <p className="hero-body text-sm text-brand-navy/60 mt-1">Please read carefully before proceeding</p>
-            </div>
-
-            <div
-              className="hero-body flex-1 overflow-y-auto p-6 space-y-5 text-sm text-brand-navy/80"
-            >
-              <div>
-                <h3 className="font-bold text-brand-orange mb-2">Payment Details</h3>
-                <div className="bg-brand-cream border border-brand-navy/10 rounded-xl p-4 space-y-2">
-                  <div className="flex justify-between">
-                    <span className="text-brand-navy/60">3K Fun Run - Registration Fee</span>
-                    <span className="font-bold text-brand-navy">Rs. 299</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-brand-navy/60">5K Challenge - Registration Fee</span>
-                    <span className="font-bold text-brand-navy">Rs. 499</span>
-                  </div>
-                  <div className="border-t border-brand-navy/10 pt-2 mt-2">
-                    <div className="flex justify-between">
-                      <span className="text-brand-navy/60">Payment Method</span>
-                      <span className="text-brand-navy/60">Cashfree (secure external checkout)</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="font-bold text-brand-orange mb-2">Payment Rules</h3>
-                <ul className="space-y-2 list-disc list-inside text-brand-navy/80">
-                  <li>Registration fee is non-refundable and non-transferable once payment is confirmed.</li>
-                  <li>Payment must be completed within 15 minutes of starting the registration process.</li>
-                  <li>Failed or duplicate transactions will be auto-reversed within 5-7 business days.</li>
-                  <li>Each participant can register only once per category.</li>
-                  <li>Multiple registrations for the same person will be cancelled.</li>
-                </ul>
-              </div>
-
-              <div>
-                <h3 className="font-bold text-brand-orange mb-2">Cancellation Policy</h3>
-                <ul className="space-y-2 list-disc list-inside text-brand-navy/80">
-                  <li>Registration fees are strictly non-refundable and non-transferable, including for cancellations, no-shows, or inability to attend.</li>
-                  <li>This applies regardless of when a cancellation request is made.</li>
-                  <li>If the organizers postpone or cancel the event, registered participants will be notified of the applicable arrangements.</li>
-                </ul>
-              </div>
-
-              <div>
-                <h3 className="font-bold text-brand-orange mb-2">Race Day Rules</h3>
-                <ul className="space-y-2 list-disc list-inside text-brand-navy/80">
-                  <li>Valid photo ID is required for check-in on race day.</li>
-                  <li>BIB number must be visible at all times during the race.</li>
-                  <li>Organizers reserve the right to disqualify participants for unsportsmanlike conduct.</li>
-                  <li>Medical assistance will be available at designated points.</li>
-                </ul>
-              </div>
-
-              <div>
-                <h3 className="font-bold text-brand-orange mb-2">Liability Waiver</h3>
-                <p className="text-brand-navy/80">
-                  By registering, I confirm that I am physically fit to participate in the marathon event.
-                  I understand that running involves inherent risks including but not limited to falls,
-                  contact with other participants, effects of weather, traffic, and road conditions.
-                  I hereby release ISA Marathon organizers, sponsors, and volunteers from any and all
-                  claims, damages, or liabilities arising from my participation in this event.
-                </p>
-              </div>
-
-              <div>
-                <h3 className="font-bold text-brand-orange mb-2">Privacy Policy</h3>
-                <p className="text-brand-navy/80">
-                  Your personal information will be used solely for event management purposes.
-                  Your data may be shared with race timing services and medical teams for safety.
-                  Photos and videos taken during the event may be used for promotional purposes.
-                </p>
-              </div>
-
-              <div>
-                <h3 className="font-bold text-brand-orange mb-2">Registered Business Details</h3>
-                <p className="text-brand-navy/80">
-                  Business Name: INDOTECH SOFTWARE ASSOCIATION
-                  <br />
-                  Business Address: 4th Floor, B Zone Business Spaces, Nipania Main Road, Dewas Naka,
-                  Pipliya Kumar, Indore, Madhya Pradesh, India
-                  <br />
-                  Registration Number: 03/27/01/25174/23
-                </p>
-              </div>
-
-            </div>
-
-            <div className="p-6 border-t border-brand-navy/10">
-              <div className="flex gap-4">
-                <button
-                  onClick={() => setShowTACModal(false)}
-                  className="flex-1 py-3 border border-brand-navy/20 hover:bg-brand-navy/5 text-brand-navy rounded-xl font-medium transition-all"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleAcceptTAC}
-                  className="flex-1 py-3 bg-brand-orange text-white hover:opacity-90 rounded-xl font-bold transition-all"
-                >
-                  Accept & Proceed
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
       <Footer />
     </div>

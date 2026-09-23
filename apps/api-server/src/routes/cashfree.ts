@@ -333,7 +333,13 @@ cashfreeRouter.post('/start', async (req: Request, res: Response) => {
       returnBase = returnUrl;
     }
     const returnSeparator = returnBase.includes('?') ? '&' : '?';
-    const expiryTime = new Date(Date.now() + 15 * 60 * 1000).toISOString();
+    // Cashfree requires this to be strictly MORE than 15 minutes out — an
+    // exact 15-minute value was being rejected outright (order_expiry_time_invalid)
+    // because network latency between computing this timestamp and Cashfree
+    // validating it eats into the margin, landing right on or under the
+    // boundary. 20 minutes keeps the "short expiry" intent while staying
+    // safely clear of it.
+    const expiryTime = new Date(Date.now() + 20 * 60 * 1000).toISOString();
 
     const orderResponse = await cashfree.PGCreateOrder({
       order_id: orderId,

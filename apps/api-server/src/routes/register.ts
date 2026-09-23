@@ -46,6 +46,15 @@ registerRouter.post('/', async (req: Request, res: Response) => {
     let isNewUser = false;
     let pin = '';
     if (!user) {
+      // A new email but a phone that's already someone else's account
+      // crashed this as an unhandled P2002 — the same check the "existing
+      // user" branch below already does before touching phone, just never
+      // added here for the brand-new-account path.
+      const phoneOwner = await prisma.user.findUnique({ where: { phone } });
+      if (phoneOwner) {
+        res.status(409).json({ success: false, message: `Phone ${phone} is already registered to a different account.` });
+        return;
+      }
       const passwordHash = await bcrypt.hash('marathon2026', 12);
       pin = String(Math.floor(1000 + Math.random() * 9000));
       const pinHash = await bcrypt.hash(pin, 12);
@@ -237,8 +246,13 @@ registerRouter.post('/', async (req: Request, res: Response) => {
         pin: isNewUser ? pin : undefined,
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     logger.error('Registration error:', error);
+    if (error?.code === 'P2002') {
+      const field = error.meta?.target?.[0] || 'field';
+      res.status(409).json({ success: false, message: `That ${field} is already registered to a different account.` });
+      return;
+    }
     res.status(500).json({ success: false, message: 'Registration failed' });
   }
 });

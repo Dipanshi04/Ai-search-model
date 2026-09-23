@@ -5,6 +5,7 @@ import { logger } from '../config/logger.js';
 import { sendWelcomeEmail } from '../services/email.js';
 import { feeForCategory } from './payment.js';
 import { findRedeemableCoupon } from './coupons.js';
+import { authenticate, requireRole } from '../middleware/auth.js';
 
 // ============================================================================
 // Cashfree — the main, active payment gateway. Has a real signed webhook,
@@ -23,6 +24,210 @@ function getCashfreeClient(): Cashfree | null {
 
 export const cashfreeRouter: Router = Router();
 
+type CashfreeReconcileOutcome = 'COMPLETED' | 'FAILED' | 'PENDING' | 'UNCHANGED';
+
+interface CashfreeReconcileResult {
+  paymentId: string;
+  orderId: string | null;
+  orderStatus?: string;
+  outcome: CashfreeReconcileOutcome;
+  reason?: string;
+}
+
+type CashfreeReconcileItem = CashfreeReconcileResult & { error?: string };
+
+async function completeCashfreePayment(
+  paymentId: string,
+  gatewaySnapshot: unknown,
+  paidAt = new Date(),
+): Promise<boolean> {
+  const participant = await prisma.$transaction(async (tx) => {
+    const payment = await tx.payment.findUnique({ where: { id: paymentId } });
+    if (!payment || payment.status !== 'PENDING') return null;
+
+    // The conditional update makes webhook delivery and API reconciliation
+    // safe to race: only one of them can perform completion side effects.
+    const transitioned = await tx.payment.updateMany({
+      where: { id: payment.id, status: 'PENDING' },
+      data: {
+        status: 'COMPLETED',
+        paidAt,
+        returnParams: gatewaySnapshot as any,
+      },
+    });
+    if (transitioned.count === 0) return null;
+
+    const updatedParticipant = await tx.participant.update({
+      where: { id: payment.participantId },
+      data: { paymentStatus: 'COMPLETED', status: 'REGISTERED' },
+      include: { user: { select: { name: true, email: true } } },
+    });
+
+    if (payment.couponCode) {
+      await tx.coupon.updateMany({
+        where: { code: payment.couponCode },
+        data: { usedCount: { increment: 1 } },
+      });
+    }
+
+    await tx.payment.updateMany({
+      where: { participantId: payment.participantId, status: 'PENDING', id: { not: payment.id } },
+      data: { status: 'FAILED', failureReason: 'Superseded by a completed payment' },
+    });
+
+    return updatedParticipant;
+  });
+
+  if (!participant) return false;
+
+  sendWelcomeEmail(participant.user.email, participant.name || participant.user.name, participant.bibNumber, participant.category)
+    .catch((error) => logger.error('[Payment] Welcome email failed:', error));
+  return true;
+}
+
+async function failCashfreePayment(paymentId: string, reason: string, gatewaySnapshot: unknown): Promise<boolean> {
+  const transitioned = await prisma.payment.updateMany({
+    where: { id: paymentId, status: 'PENDING' },
+    data: { status: 'FAILED', failureReason: reason, returnParams: gatewaySnapshot as any },
+  });
+  return transitioned.count > 0;
+}
+
+async function reconcileCashfreePayment(paymentId: string, cashfree: Cashfree): Promise<CashfreeReconcileResult> {
+  const payment = await prisma.payment.findUnique({ where: { id: paymentId } });
+  if (!payment || payment.provider !== 'CASHFREE') {
+    return { paymentId, orderId: payment?.reference || null, outcome: 'UNCHANGED', reason: 'Cashfree payment not found' };
+  }
+  if (payment.status !== 'PENDING' || !payment.reference) {
+    return { paymentId, orderId: payment.reference, outcome: 'UNCHANGED', reason: `Already ${payment.status}` };
+  }
+
+  const orderResponse = await cashfree.PGFetchOrder(payment.reference);
+  const order = orderResponse.data;
+  const orderStatus = String(order.order_status || '').toUpperCase();
+
+  if (orderStatus === 'PAID') {
+    // Payment details provide the most accurate completion time, but the
+    // order's PAID status remains sufficient if that secondary lookup fails.
+    let gatewayPayments: unknown[] = [];
+    let paidAt = new Date();
+    try {
+      const paymentsResponse = await cashfree.PGOrderFetchPayments(payment.reference);
+      gatewayPayments = paymentsResponse.data;
+      const successful = paymentsResponse.data.find((entry) => entry.payment_status === 'SUCCESS');
+      if (successful?.payment_completion_time) {
+        const completionTime = new Date(successful.payment_completion_time);
+        if (!Number.isNaN(completionTime.getTime())) paidAt = completionTime;
+      }
+    } catch (error) {
+      logger.warn(`[Payment] Could not fetch transaction details for paid Cashfree order ${payment.reference}; using order status`, error);
+    }
+
+    const changed = await completeCashfreePayment(
+      payment.id,
+      { source: 'cashfree_api_reconciliation', order, payments: gatewayPayments },
+      paidAt,
+    );
+    return {
+      paymentId,
+      orderId: payment.reference,
+      orderStatus,
+      outcome: changed ? 'COMPLETED' : 'UNCHANGED',
+      reason: changed ? undefined : 'Payment was reconciled concurrently',
+    };
+  }
+
+  if (orderStatus === 'EXPIRED' || orderStatus === 'TERMINATED') {
+    const reason = `Cashfree order ${orderStatus.toLowerCase()}`;
+    const changed = await failCashfreePayment(
+      payment.id,
+      reason,
+      { source: 'cashfree_api_reconciliation', order },
+    );
+    return {
+      paymentId,
+      orderId: payment.reference,
+      orderStatus,
+      outcome: changed ? 'FAILED' : 'UNCHANGED',
+      reason: changed ? reason : 'Payment was reconciled concurrently',
+    };
+  }
+
+  return { paymentId, orderId: payment.reference, orderStatus, outcome: 'PENDING' };
+}
+
+async function reconcileStaleCashfreePayments(limit = 50): Promise<CashfreeReconcileItem[] | null> {
+  const cashfree = getCashfreeClient();
+  if (!cashfree) return null;
+
+  const staleBefore = new Date(Date.now() - 30 * 60 * 1000);
+  const pending = await prisma.payment.findMany({
+    where: {
+      provider: 'CASHFREE',
+      status: 'PENDING',
+      reference: { not: null },
+      createdAt: { lte: staleBefore },
+    },
+    orderBy: { createdAt: 'asc' },
+    take: limit,
+    select: { id: true, reference: true },
+  });
+
+  const results: CashfreeReconcileItem[] = [];
+  for (const item of pending) {
+    try {
+      results.push(await reconcileCashfreePayment(item.id, cashfree));
+    } catch (error: any) {
+      const message = error?.response?.data?.message || error?.message || 'Cashfree reconciliation failed';
+      logger.warn(`[Payment] Cashfree reconciliation failed for ${item.reference}:`, error?.response?.data || error);
+      results.push({ paymentId: item.id, orderId: item.reference, outcome: 'UNCHANGED', error: message });
+    }
+  }
+  return results;
+}
+
+function summarizeReconciliation(results: CashfreeReconcileItem[]) {
+  return {
+    checked: results.length,
+    completed: results.filter((result) => result.outcome === 'COMPLETED').length,
+    failed: results.filter((result) => result.outcome === 'FAILED').length,
+    stillPending: results.filter((result) => result.outcome === 'PENDING').length,
+    errors: results.filter((result) => result.error).length,
+  };
+}
+
+let reconciliationTimer: NodeJS.Timeout | null = null;
+
+export function startCashfreeReconciliationJob(): void {
+  // Production runs two PM2 cluster workers. Let only worker 0 perform the
+  // sweep. Local development must not unexpectedly reconcile a restored
+  // production database or send real confirmation emails.
+  if (
+    process.env.NODE_ENV !== 'production'
+    || reconciliationTimer
+    || (process.env.NODE_APP_INSTANCE && process.env.NODE_APP_INSTANCE !== '0')
+  ) return;
+
+  const run = async () => {
+    try {
+      const results = await reconcileStaleCashfreePayments();
+      if (!results) return;
+      const summary = summarizeReconciliation(results);
+      if (summary.completed || summary.failed || summary.errors) {
+        logger.info(`[Payment] Scheduled Cashfree reconciliation: ${JSON.stringify(summary)}`);
+      }
+    } catch (error) {
+      logger.error('[Payment] Scheduled Cashfree reconciliation failed:', error);
+    }
+  };
+
+  // Give the API time to finish starting, then sweep every five minutes.
+  const initialTimer = setTimeout(run, 60_000);
+  initialTimer.unref();
+  reconciliationTimer = setInterval(run, 5 * 60 * 1000);
+  reconciliationTimer.unref();
+}
+
 cashfreeRouter.post('/start', async (req: Request, res: Response) => {
   try {
     const { participantId, couponCode, returnUrl } = req.body;
@@ -36,6 +241,26 @@ cashfreeRouter.post('/start', async (req: Request, res: Response) => {
       logger.error('[Payment] Cashfree not configured (CASHFREE_CLIENT_ID / CASHFREE_CLIENT_SECRET missing)');
       res.status(500).json({ success: false, message: 'Payment is not configured yet. Please try again shortly.' });
       return;
+    }
+
+    // Before opening another checkout, reconcile earlier attempts for this
+    // participant. If one actually succeeded after its webhook was missed,
+    // the participant will be loaded as paid below and a duplicate charge is
+    // prevented. Active/expired attempts are handled by their order status.
+    const earlierPending = await prisma.payment.findMany({
+      where: { participantId, provider: 'CASHFREE', status: 'PENDING', reference: { not: null } },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+      select: { id: true, reference: true },
+    });
+    for (const earlier of earlierPending) {
+      try {
+        await reconcileCashfreePayment(earlier.id, cashfree);
+      } catch (error: any) {
+        // Do not block a legitimate retry because an older order can no
+        // longer be fetched. The new attempt still receives its own order.
+        logger.warn(`[Payment] Could not reconcile earlier Cashfree order ${earlier.reference}:`, error?.response?.data || error);
+      }
     }
 
     const participant = await prisma.participant.findUnique({
@@ -108,11 +333,15 @@ cashfreeRouter.post('/start', async (req: Request, res: Response) => {
       returnBase = returnUrl;
     }
     const returnSeparator = returnBase.includes('?') ? '&' : '?';
+    const expiryTime = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
     const orderResponse = await cashfree.PGCreateOrder({
       order_id: orderId,
       order_amount: amount,
       order_currency: 'INR',
+      // Keep abandoned checkout sessions from remaining payable long after
+      // the participant has started a newer payment attempt.
+      order_expiry_time: expiryTime,
       customer_details: {
         customer_id: participant.userId,
         customer_email: participant.user.email,
@@ -159,7 +388,7 @@ cashfreeRouter.get('/status', async (req: Request, res: Response) => {
       return;
     }
 
-    const payment = await prisma.payment.findFirst({
+    let payment = await prisma.payment.findFirst({
       where: { provider: 'CASHFREE', reference: orderId },
       include: {
         participant: {
@@ -177,6 +406,35 @@ cashfreeRouter.get('/status', async (req: Request, res: Response) => {
       return;
     }
 
+    // The return-page poll doubles as a missed-webhook safety net. Cashfree
+    // remains the source of truth; a query-string redirect never decides the
+    // result by itself.
+    if (payment.status === 'PENDING') {
+      const cashfree = getCashfreeClient();
+      if (cashfree) {
+        try {
+          await reconcileCashfreePayment(payment.id, cashfree);
+          payment = (await prisma.payment.findFirst({
+            where: { id: payment.id },
+            include: {
+              participant: {
+                select: {
+                  bibNumber: true,
+                  category: true,
+                  name: true,
+                  user: { select: { name: true, avatarUrl: true } },
+                },
+              },
+            },
+          }))!;
+        } catch (error: any) {
+          // A temporary Cashfree API problem should not turn the status poll
+          // itself into an error. Keep reporting PENDING and try again later.
+          logger.warn(`[Payment] Cashfree status reconciliation failed for ${orderId}:`, error?.response?.data || error);
+        }
+      }
+    }
+
     res.json({
       success: true,
       data: {
@@ -192,6 +450,33 @@ cashfreeRouter.get('/status', async (req: Request, res: Response) => {
     res.status(500).json({ success: false, message: 'Failed to check payment status' });
   }
 });
+
+// Admin/API sweep for abandoned orders whose webhook never provided a final
+// state. Cashfree is queried for every stale PENDING row; ACTIVE orders stay
+// pending, while PAID/EXPIRED/TERMINATED orders are safely applied locally.
+cashfreeRouter.post(
+  '/reconcile-pending',
+  authenticate,
+  requireRole('SUPER_ADMIN', 'RACE_MANAGER'),
+  async (req: Request, res: Response) => {
+    try {
+      const requestedLimit = Number(req.body?.limit);
+      const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(Math.floor(requestedLimit), 1), 100) : 50;
+      const results = await reconcileStaleCashfreePayments(limit);
+      if (!results) {
+        res.status(500).json({ success: false, message: 'Cashfree is not configured' });
+        return;
+      }
+
+      const summary = summarizeReconciliation(results);
+      logger.info(`[Payment] Cashfree pending reconciliation by ${req.user?.email}: ${JSON.stringify(summary)}`);
+      res.json({ success: true, data: { summary, results } });
+    } catch (error) {
+      logger.error('[Payment] Cashfree pending reconciliation failed:', error);
+      res.status(500).json({ success: false, message: 'Failed to reconcile pending Cashfree payments' });
+    }
+  },
+);
 
 // Mounted on express.raw() in index.ts — signature verification needs the
 // exact original bytes, not the JSON-parsed-and-reserialized body.
@@ -243,44 +528,21 @@ cashfreeRouter.post('/webhook', async (req: Request, res: Response) => {
     const isFailed = paymentStatus === 'FAILED' || paymentStatus === 'USER_DROPPED' || paymentStatus === 'CANCELLED' || paymentStatus === 'VOID';
 
     if (isPaid) {
-      await prisma.payment.update({
-        where: { id: payment.id },
-        data: { status: 'COMPLETED', paidAt: new Date(), returnParams: event.object as any },
-      });
-
-      const participant = await prisma.participant.update({
-        where: { id: payment.participantId },
-        data: { paymentStatus: 'COMPLETED', status: 'REGISTERED' },
-        include: { user: { select: { name: true, email: true } } },
-      });
-
-      sendWelcomeEmail(participant.user.email, participant.name || participant.user.name, participant.bibNumber, participant.category)
-        .catch((e) => logger.error('[Payment] Welcome email failed:', e));
-
-      // Credited only once the payment actually completes — not at
-      // checkout start, which can be abandoned or retried.
-      if (payment.couponCode) {
-        prisma.coupon.update({ where: { code: payment.couponCode }, data: { usedCount: { increment: 1 } } })
-          .catch((e) => logger.error('[Payment] Coupon usedCount increment failed:', e));
-      }
-
-      // A fresh order per checkout attempt (see /start above) means a
-      // participant who retried after an abandoned attempt can have several
-      // stray PENDING rows once one of them actually completes. Close those
-      // out here so the admin Payments list doesn't show duplicate pending
-      // entries for someone who's already paid.
-      prisma.payment.updateMany({
-        where: { participantId: payment.participantId, status: 'PENDING', id: { not: payment.id } },
-        data: { status: 'FAILED', failureReason: 'Superseded by a completed payment' },
-      }).catch((e) => logger.error('[Payment] Failed to close out superseded pending payments:', e));
-
-      logger.info(`[Payment] Cashfree order ${orderId} completed`);
+      const paymentCompletionTime: string | undefined = event.object?.data?.payment?.payment_completion_time;
+      const parsedPaidAt = paymentCompletionTime ? new Date(paymentCompletionTime) : new Date();
+      const paidAt = Number.isNaN(parsedPaidAt.getTime()) ? new Date() : parsedPaidAt;
+      const changed = await completeCashfreePayment(payment.id, event.object, paidAt);
+      if (changed) logger.info(`[Payment] Cashfree order ${orderId} completed`);
     } else if (isFailed) {
-      await prisma.payment.update({
-        where: { id: payment.id },
-        data: { status: 'FAILED', failureReason: paymentStatus, returnParams: event.object as any },
+      // FAILED/USER_DROPPED describes one transaction attempt, not
+      // necessarily the order. The same ACTIVE order can still be retried,
+      // so leave it PENDING until API reconciliation sees the order become
+      // EXPIRED or TERMINATED (or PAID after a successful retry).
+      await prisma.payment.updateMany({
+        where: { id: payment.id, status: 'PENDING' },
+        data: { returnParams: event.object as any },
       });
-      logger.info(`[Payment] Cashfree order ${orderId} failed: ${paymentStatus}`);
+      logger.info(`[Payment] Cashfree order ${orderId} attempt ended with ${paymentStatus}; awaiting final order status`);
     }
 
     res.json({ success: true });

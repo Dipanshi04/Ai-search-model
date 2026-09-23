@@ -38,7 +38,7 @@ import { bulkRegistrationRouter } from './routes/bulk-registration.js';
 import { hrRouter } from './routes/hr.js';
 import { settingsRouter } from './routes/settings.js';
 import { adminsRouter } from './routes/admins.js';
-import { cashfreeRouter } from './routes/cashfree.js';
+import { cashfreeRouter, startCashfreeReconciliationJob } from './routes/cashfree.js';
 
 const PORT = parseInt(process.env.PORT || '4000', 10);
 const CORS_ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:3000';
@@ -106,6 +106,7 @@ const io = new SocketIOServer(httpServer, {
 });
 
 setupSocketIO(io);
+startCashfreeReconciliationJob();
 
 async function start() {
   httpServer.listen({ port: PORT, host: '0.0.0.0' }, () => {

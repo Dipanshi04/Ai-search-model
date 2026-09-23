@@ -909,7 +909,7 @@ export default function ParticipantsPage() {
       )}
 
       <div className="glass rounded-[2rem] border border-white/20 p-4 shadow-sm">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-4">
+        <div className="mb-4">
           <input
             type="text"
             placeholder="Search by name, email, phone, BIB, or company..."
@@ -921,8 +921,10 @@ export default function ParticipantsPage() {
                 setPage(1);
               }
             }}
-            className="w-full md:max-w-xl px-4 py-3 bg-white/80 border border-white/60 rounded-3xl text-slate-900 text-sm focus:ring-2 focus:ring-violet-200 outline-none"
+            className="w-full px-4 py-3 bg-white/80 border border-white/60 rounded-3xl text-slate-900 text-sm focus:ring-2 focus:ring-violet-200 outline-none"
           />
+        </div>
+        <div className="flex flex-wrap items-center gap-3 mb-4">
           <select
             value={category}
             onChange={(e) => { setCategory(e.target.value); setPage(1); }}
@@ -974,7 +976,7 @@ export default function ParticipantsPage() {
           <select
             value={companyFilter}
             onChange={(e) => { setCompanyFilter(e.target.value); setPage(1); }}
-            className="px-4 py-3 bg-white/80 border border-white/60 rounded-3xl text-slate-900 text-sm outline-none"
+            className="px-4 py-3 bg-white/80 border border-white/60 rounded-3xl text-slate-900 text-sm outline-none max-w-[200px] truncate"
           >
             <option value="">All Companies</option>
             {companies.map((c) => (

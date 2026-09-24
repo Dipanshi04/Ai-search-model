@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { api } from '../lib/api';
+import { formatTshirtSize } from '../lib/tshirtSize';
 
 interface BulkRegistration {
   id: string;
@@ -247,7 +248,7 @@ export default function BulkRegistrationPage() {
                     <th className="text-center px-4 py-3 text-slate-500 font-semibold">3K</th>
                     <th className="text-center px-4 py-3 text-slate-500 font-semibold">5K</th>
                     {tshirtReport.sizes.map((size) => (
-                      <th key={size} className="text-center px-4 py-3 text-slate-500 font-semibold">{size}</th>
+                      <th key={size} className="text-center px-4 py-3 text-slate-500 font-semibold">{formatTshirtSize(size)}</th>
                     ))}
                     <th className="text-center px-4 py-3 text-slate-700 font-bold">Total</th>
                   </tr>

@@ -671,7 +671,7 @@ participantsRouter.get('/export/csv', authenticate, requireRole('SUPER_ADMIN', '
       orderBy: { createdAt: 'desc' },
     });
 
-    const headers = ['ID', 'Bib Number', 'Name', 'Email', 'Phone', 'Company', 'Category', 'Gender', 'Status', 'Payment Status', 'Checked In', 'Total Distance', 'Finish Time'];
+    const headers = ['ID', 'Bib Number', 'Name', 'Email', 'Phone', 'Company', 'Category', 'Gender', 'T-Shirt Size', 'Status', 'Payment Status', 'Checked In', 'Total Distance', 'Finish Time'];
     const rows = participants.map((p) => [
       p.id,
       p.bibNumber,
@@ -681,6 +681,7 @@ participantsRouter.get('/export/csv', authenticate, requireRole('SUPER_ADMIN', '
       p.company?.name ?? '',
       p.category,
       p.gender,
+      p.tshirtSize ?? '',
       p.status,
       p.paymentStatus,
       p.checkedIn ? 'Yes' : 'No',

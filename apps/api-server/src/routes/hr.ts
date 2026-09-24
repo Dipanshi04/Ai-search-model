@@ -3,7 +3,7 @@ import { prisma } from '../config/database.js';
 import { logger } from '../config/logger.js';
 import { comparePassword, generateAccessToken, hashPassword, verifyToken, generateResetToken, verifyResetToken } from '../utils/jwt.js';
 import { generateQRCode } from '../utils/qrcode.js';
-import { isValidEmail } from '../utils/validation.js';
+import { isValidEmail, normalizeTshirtSize } from '../utils/validation.js';
 import multer from 'multer';
 import { parse } from 'csv-parse/sync';
 import { sendPinEmail, sendWelcomeEmail } from '../services/email.js';
@@ -408,7 +408,7 @@ hrRouter.post('/participants', hrAuth, async (req: Request, res: Response) => {
         emergencyPhone: emergencyPhone || null,
         bloodGroup: bloodGroup || null,
         bloodDonation: bloodDonation === true,
-        tshirtSize: tshirtSize || null,
+        tshirtSize: normalizeTshirtSize(tshirtSize),
       },
       include: {
         user: { select: { name: true, email: true, phone: true } },
@@ -485,7 +485,7 @@ hrRouter.put('/participants/:id', hrAuth, async (req: Request, res: Response) =>
         ...(emergencyPhone !== undefined && { emergencyPhone }),
         ...(bloodGroup !== undefined && { bloodGroup }),
         ...(bloodDonation !== undefined && { bloodDonation: Boolean(bloodDonation) }),
-        ...(tshirtSize !== undefined && { tshirtSize }),
+        ...(tshirtSize !== undefined && { tshirtSize: normalizeTshirtSize(tshirtSize) }),
       },
       include: { user: { select: { name: true, email: true, phone: true } } },
     });
@@ -695,7 +695,7 @@ hrRouter.post('/participants/csv', hrAuth, upload.single('file'), async (req: Re
       const emergencyPhone = norm.emergencyphone?.trim() || null;
       const bloodGroup = norm.bloodgroup?.trim() || null;
       const bloodDonation = norm.blooddonation?.trim().toLowerCase() === 'true';
-      const tshirtSize = norm.tshirtsize?.trim() || null;
+      const tshirtSize = normalizeTshirtSize(norm.tshirtsize);
 
       if (!name || !email || !phone || !gender) {
         results.push({ success: false, name: name || 'N/A', email: email || 'N/A', error: 'Missing required fields' });

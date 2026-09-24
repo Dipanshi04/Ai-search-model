@@ -11,7 +11,7 @@ import { feeForCategory } from './payment.js';
 import { hashPassword } from '../utils/jwt.js';
 import { generateQRCode } from '../utils/qrcode.js';
 import { calculateTreesFromDistance, recalcTreeCounter } from '../services/greenMission.js';
-import { isValidEmail } from '../utils/validation.js';
+import { isValidEmail, normalizeTshirtSize } from '../utils/validation.js';
 
 export const participantsRouter: Router = Router();
 
@@ -366,7 +366,7 @@ participantsRouter.post('/bulk-update-by-bib', authenticate, requireRole('SUPER_
         const name = norm.name?.trim();
         const category = norm.category?.trim().toUpperCase();
         const gender = norm.gender?.trim().toUpperCase();
-        const tshirtSize = norm.tshirtsize?.trim();
+        const tshirtSize = normalizeTshirtSize(norm.tshirtsize);
         const bloodGroup = norm.bloodgroup?.trim();
         const emergencyContact = norm.emergencycontact?.trim();
         // Accept a couple of real-world header spellings for the same
@@ -830,7 +830,7 @@ participantsRouter.post('/', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANA
         emergencyPhone: emergencyPhone || null,
         bloodGroup: bloodGroup || null,
         bloodDonation: bloodDonation === true,
-        tshirtSize: tshirtSize || null,
+        tshirtSize: normalizeTshirtSize(tshirtSize),
         isBoardMember: isBoardMember === true,
       },
       include: { user: true, company: true },
@@ -1046,7 +1046,7 @@ participantsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MA
         ...(emergencyPhone !== undefined && { emergencyPhone }),
         ...(bloodGroup !== undefined && { bloodGroup }),
         ...(bloodDonation !== undefined && { bloodDonation: Boolean(bloodDonation) }),
-        ...(tshirtSize !== undefined && { tshirtSize }),
+        ...(tshirtSize !== undefined && { tshirtSize: normalizeTshirtSize(tshirtSize) }),
         ...(kitDistributed !== undefined && { kitDistributed: Boolean(kitDistributed) }),
         ...(foodDistributed !== undefined && { foodDistributed: Boolean(foodDistributed) }),
         ...(isBoardMember !== undefined && { isBoardMember: Boolean(isBoardMember) }),

@@ -3,7 +3,7 @@ import { prisma } from '../config/database.js';
 import { logger } from '../config/logger.js';
 import bcrypt from 'bcryptjs';
 import { generateQRCode } from '../utils/qrcode.js';
-import { isValidEmail } from '../utils/validation.js';
+import { isValidEmail, normalizeTshirtSize } from '../utils/validation.js';
 import { sendPinEmail } from '../services/email.js';
 import multer from 'multer';
 import { v4 as uuidv4 } from 'uuid';
@@ -155,7 +155,7 @@ registerRouter.post('/', async (req: Request, res: Response) => {
           emergencyContact, emergencyPhone,
           bloodGroup: bloodGroup || null,
           bloodDonation: bloodDonation === true,
-          tshirtSize: tshirtSize || null,
+          tshirtSize: normalizeTshirtSize(tshirtSize),
         },
         include: {
           user: { select: { name: true, email: true } },
@@ -207,7 +207,7 @@ registerRouter.post('/', async (req: Request, res: Response) => {
         emergencyPhone,
         bloodGroup: bloodGroup || null,
         bloodDonation: bloodDonation === true,
-        tshirtSize: tshirtSize || null,
+        tshirtSize: normalizeTshirtSize(tshirtSize),
       },
       include: {
         user: { select: { name: true, email: true } },

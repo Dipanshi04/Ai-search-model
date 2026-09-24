@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import EventsPage from './pages/EventsPage';
 import ParticipantsPage from './pages/ParticipantsPage';
+import OperationalPage from './pages/OperationalPage';
 import CheckinPage from './pages/CheckinPage';
 import RaceControlPage from './pages/RaceControlPage';
 import RouteBuilderPage from './pages/RouteBuilderPage';
@@ -72,6 +73,7 @@ function AppRoutes() {
         <Route index element={<DashboardPage />} />
         <Route path="events" element={<EventsPage />} />
         <Route path="participants" element={<ParticipantsPage />} />
+        <Route path="operational" element={<OperationalPage />} />
         <Route path="companies" element={<CompaniesPage />} />
         <Route path="sponsors" element={<SponsorsPage />} />
         <Route path="sponsor-inquiries" element={<SponsorInquiriesPage />} />

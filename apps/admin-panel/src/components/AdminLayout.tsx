@@ -14,6 +14,7 @@ const navItems = [
   { to: '/', label: 'Dashboard' },
   { to: '/events', label: 'Events' },
   { to: '/participants', label: 'Participants' },
+  { to: '/operational', label: 'Operational' },
   { to: '/companies', label: 'Companies' },
   { to: '/sponsors', label: 'Sponsors' },
   { to: '/sponsor-inquiries', label: 'Sponsor Inquiries' },

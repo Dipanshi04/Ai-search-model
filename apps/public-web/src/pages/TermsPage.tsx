@@ -169,6 +169,7 @@ export default function TermsPage() {
                 items={[
                   'Registration fees are strictly non-refundable and non-transferable once payment is confirmed, including for cancellations, no-shows, or inability to attend, regardless of when the request is made.',
                   'If the organizers postpone or cancel the event, registered participants will be notified of the applicable arrangements.',
+                  'T-shirt size is not guaranteed. While we try to fulfill the size selected at registration, availability is subject to stock, and a different size may be issued if the requested size runs out.',
                 ]}
               />
             </>

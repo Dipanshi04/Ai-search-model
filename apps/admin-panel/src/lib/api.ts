@@ -148,6 +148,13 @@ class ApiClient {
     return this.request<void>(`/api/v1/participants/${id}`, { method: 'DELETE' });
   }
 
+  async bulkUpdateParticipants(params: { participantIds: string[]; tshirtSize?: string; kitDistributed?: boolean }) {
+    return this.request<{ updated: number }>('/api/v1/participants/bulk-update', {
+      method: 'PATCH',
+      body: JSON.stringify(params),
+    });
+  }
+
   async sendPaymentReminder(id: string) {
     return this.request<void>(`/api/v1/participants/${id}/send-payment-reminder`, { method: 'POST' });
   }

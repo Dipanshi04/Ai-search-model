@@ -1079,6 +1079,41 @@ participantsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MA
   }
 });
 
+// Bulk edit for the Operational page — correcting/setting t-shirt size and/or
+// kit-delivered status for many runners at once (e.g. everyone still
+// "Missing" for a company, or marking a whole batch as handed out at the kit
+// counter) instead of clicking into each participant individually.
+participantsRouter.patch('/bulk-update', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANAGER'), async (req, res) => {
+  try {
+    const { participantIds, tshirtSize, kitDistributed } = req.body as {
+      participantIds?: string[]; tshirtSize?: string; kitDistributed?: boolean;
+    };
+
+    if (!Array.isArray(participantIds) || participantIds.length === 0) {
+      res.status(400).json({ success: false, message: 'participantIds must be a non-empty array' });
+      return;
+    }
+    if (tshirtSize === undefined && kitDistributed === undefined) {
+      res.status(400).json({ success: false, message: 'Provide tshirtSize and/or kitDistributed to update' });
+      return;
+    }
+
+    const data: any = {};
+    if (tshirtSize !== undefined) data.tshirtSize = normalizeTshirtSize(tshirtSize);
+    if (kitDistributed !== undefined) data.kitDistributed = Boolean(kitDistributed);
+
+    const result = await prisma.participant.updateMany({
+      where: { id: { in: participantIds } },
+      data,
+    });
+
+    res.json({ success: true, data: { updated: result.count } });
+  } catch (error) {
+    logger.error('Bulk update participants error:', error);
+    res.status(500).json({ success: false, message: 'Failed to bulk update participants' });
+  }
+});
+
 // Admin-only fallback for race day: regenerates the participant's PIN and
 // returns it in plaintext so staff can read it out even if the notification
 // email never arrives (SMTP outage, spam filtering, etc).

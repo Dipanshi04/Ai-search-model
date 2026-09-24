@@ -14,10 +14,12 @@ interface Participant {
   gender: string;
   tshirtSize: string | null;
   status: string;
+  kitDistributed: boolean;
   user: { name: string; email: string; phone: string };
 }
 
 const TSHIRT_SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
+const TSHIRT_SIZE_OPTIONS = ['S', 'M', 'L', 'XL', 'XXL', 'XXXL'];
 
 export default function OperationalPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
@@ -25,6 +27,35 @@ export default function OperationalPage() {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkSize, setBulkSize] = useState('');
+  const [bulkSaving, setBulkSaving] = useState(false);
+  const [bulkMessage, setBulkMessage] = useState('');
+
+  async function loadAll() {
+    if (!companyId) {
+      setParticipants([]);
+      return;
+    }
+    setLoading(true);
+    try {
+      // Companies can have more participants than fit on one page — keep
+      // pulling pages until we actually have all of them, rather than
+      // silently truncating a large company's runner list.
+      let page = 1;
+      let all: Participant[] = [];
+      while (true) {
+        const res = await api.getParticipants({ companyId, page: page.toString(), limit: '100' });
+        if (!res.success || !res.data) break;
+        all = all.concat(res.data as Participant[]);
+        if (!res.pagination || page >= res.pagination.totalPages) break;
+        page += 1;
+      }
+      setParticipants(all);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
     api.getCompanies().then((res) => {
@@ -33,32 +64,67 @@ export default function OperationalPage() {
   }, []);
 
   useEffect(() => {
-    if (!companyId) {
-      setParticipants([]);
-      return;
-    }
-    async function loadAll() {
-      setLoading(true);
-      try {
-        // Companies can have more participants than fit on one page — keep
-        // pulling pages until we actually have all of them, rather than
-        // silently truncating a large company's runner list.
-        let page = 1;
-        let all: Participant[] = [];
-        while (true) {
-          const res = await api.getParticipants({ companyId, page: page.toString(), limit: '100' });
-          if (!res.success || !res.data) break;
-          all = all.concat(res.data as Participant[]);
-          if (!res.pagination || page >= res.pagination.totalPages) break;
-          page += 1;
-        }
-        setParticipants(all);
-      } finally {
-        setLoading(false);
-      }
-    }
+    setSelected(new Set());
+    setBulkMessage('');
     loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId]);
+
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll(rows: Participant[]) {
+    const rowIds = rows.map((p) => p.id);
+    const allSelected = rowIds.every((id) => selected.has(id));
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (allSelected) rowIds.forEach((id) => next.delete(id));
+      else rowIds.forEach((id) => next.add(id));
+      return next;
+    });
+  }
+
+  async function handleBulkSetSize() {
+    if (!bulkSize || selected.size === 0) return;
+    setBulkSaving(true);
+    setBulkMessage('');
+    try {
+      const res = await api.bulkUpdateParticipants({ participantIds: Array.from(selected), tshirtSize: bulkSize });
+      if (res.success) {
+        setBulkMessage(`Updated t-shirt size to ${bulkSize} for ${res.data?.updated ?? selected.size} runner(s).`);
+        setSelected(new Set());
+        await loadAll();
+      } else {
+        setBulkMessage(res.message || 'Failed to bulk update t-shirt size.');
+      }
+    } finally {
+      setBulkSaving(false);
+    }
+  }
+
+  async function handleBulkSetKitDistributed(kitDistributed: boolean) {
+    if (selected.size === 0) return;
+    setBulkSaving(true);
+    setBulkMessage('');
+    try {
+      const res = await api.bulkUpdateParticipants({ participantIds: Array.from(selected), kitDistributed });
+      if (res.success) {
+        setBulkMessage(`Marked kit ${kitDistributed ? 'delivered' : 'not delivered'} for ${res.data?.updated ?? selected.size} runner(s).`);
+        setSelected(new Set());
+        await loadAll();
+      } else {
+        setBulkMessage(res.message || 'Failed to bulk update kit delivery.');
+      }
+    } finally {
+      setBulkSaving(false);
+    }
+  }
 
   const selectedCompany = companies.find((c) => c.id === companyId);
   const runners3k = participants.filter((p) => p.category === 'RUN_3K');
@@ -88,6 +154,7 @@ export default function OperationalPage() {
   }
 
   function RunnerTable({ title, rows }: { title: string; rows: Participant[] }) {
+    const allSelected = rows.length > 0 && rows.every((p) => selected.has(p.id));
     return (
       <div className="glass rounded-[2rem] border border-white/20 shadow-sm">
         <div className="px-6 pt-5 pb-3 flex items-center justify-between">
@@ -99,21 +166,35 @@ export default function OperationalPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-white/60">
+                  <th className="px-6 py-2 w-10">
+                    <input type="checkbox" checked={allSelected} onChange={() => toggleSelectAll(rows)} className="rounded border-slate-300" />
+                  </th>
                   <th className="text-left px-6 py-2 text-xs font-semibold text-slate-500 uppercase">BIB</th>
                   <th className="text-left px-6 py-2 text-xs font-semibold text-slate-500 uppercase">Name</th>
                   <th className="text-left px-6 py-2 text-xs font-semibold text-slate-500 uppercase">Gender</th>
                   <th className="text-left px-6 py-2 text-xs font-semibold text-slate-500 uppercase">T-Shirt</th>
                   <th className="text-left px-6 py-2 text-xs font-semibold text-slate-500 uppercase">Status</th>
+                  <th className="text-left px-6 py-2 text-xs font-semibold text-slate-500 uppercase">Kit Delivered</th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((p) => (
-                  <tr key={p.id} className="border-t border-white/30">
+                  <tr key={p.id} className={`border-t border-white/30 ${selected.has(p.id) ? 'bg-violet-50/50' : ''}`}>
+                    <td className="px-6 py-2.5">
+                      <input type="checkbox" checked={selected.has(p.id)} onChange={() => toggleSelected(p.id)} className="rounded border-slate-300" />
+                    </td>
                     <td className="px-6 py-2.5 hero-tabular font-semibold text-slate-900">{p.bibNumber}</td>
                     <td className="px-6 py-2.5 text-slate-700">{p.name || p.user?.name}</td>
                     <td className="px-6 py-2.5 text-slate-500">{p.gender}</td>
                     <td className="px-6 py-2.5 text-slate-700">{p.tshirtSize || '—'}</td>
                     <td className="px-6 py-2.5 text-slate-500">{p.status}</td>
+                    <td className="px-6 py-2.5">
+                      {p.kitDistributed ? (
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-medium">Yes</span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full bg-slate-50 text-slate-500 border border-slate-200 text-xs font-medium">No</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -182,6 +263,52 @@ export default function OperationalPage() {
               <div className="flex items-center justify-center h-16 text-slate-400 text-sm">No runners for this company yet</div>
             )}
           </div>
+
+          {/* Bulk Update Toolbar */}
+          {selected.size > 0 && (
+            <div className="glass rounded-[2rem] border border-violet-200 bg-violet-50/60 shadow-sm p-4 flex flex-wrap items-center gap-3 sticky top-4 z-10">
+              <span className="text-sm font-semibold text-violet-900">{selected.size} selected</span>
+              <select
+                value={bulkSize}
+                onChange={(e) => setBulkSize(e.target.value)}
+                className="px-4 py-2 bg-white border border-white/60 rounded-3xl text-slate-900 text-sm outline-none"
+              >
+                <option value="">Set t-shirt size...</option>
+                {TSHIRT_SIZE_OPTIONS.map((s) => (
+                  <option key={s} value={s}>{s}</option>
+                ))}
+              </select>
+              <button
+                onClick={handleBulkSetSize}
+                disabled={!bulkSize || bulkSaving}
+                className="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-3xl text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
+              >
+                {bulkSaving ? 'Saving...' : 'Apply Size'}
+              </button>
+              <button
+                onClick={() => handleBulkSetKitDistributed(true)}
+                disabled={bulkSaving}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-3xl text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
+              >
+                Mark Kit Delivered
+              </button>
+              <button
+                onClick={() => handleBulkSetKitDistributed(false)}
+                disabled={bulkSaving}
+                className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-3xl text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
+              >
+                Mark Not Delivered
+              </button>
+              <button
+                onClick={() => setSelected(new Set())}
+                disabled={bulkSaving}
+                className="text-sm font-medium text-violet-700 hover:text-violet-900 underline disabled:opacity-50"
+              >
+                Clear selection
+              </button>
+            </div>
+          )}
+          {bulkMessage && <p className="text-sm text-slate-600 px-2">{bulkMessage}</p>}
 
           <RunnerTable title="3K Runners" rows={runners3k} />
           <RunnerTable title="5K Runners" rows={runners5k} />

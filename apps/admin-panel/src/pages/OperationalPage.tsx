@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
+import { formatTshirtSize } from '../lib/tshirtSize';
 
 interface Company {
   id: string;
@@ -186,7 +187,7 @@ export default function OperationalPage() {
                     <td className="px-6 py-2.5 hero-tabular font-semibold text-slate-900">{p.bibNumber}</td>
                     <td className="px-6 py-2.5 text-slate-700">{p.name || p.user?.name}</td>
                     <td className="px-6 py-2.5 text-slate-500">{p.gender}</td>
-                    <td className="px-6 py-2.5 text-slate-700">{p.tshirtSize || '—'}</td>
+                    <td className="px-6 py-2.5 text-slate-700">{formatTshirtSize(p.tshirtSize)}</td>
                     <td className="px-6 py-2.5 text-slate-500">{p.status}</td>
                     <td className="px-6 py-2.5">
                       {p.kitDistributed ? (
@@ -254,7 +255,7 @@ export default function OperationalPage() {
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-7 gap-3">
                 {tshirtRows.map(([size, count]) => (
                   <div key={size} className={`rounded-2xl px-4 py-3 text-center border ${size === 'Missing' ? 'bg-amber-50 border-amber-200' : 'bg-white/60 border-white/40'}`}>
-                    <p className={`text-xs font-semibold uppercase tracking-wide ${size === 'Missing' ? 'text-amber-700' : 'text-slate-500'}`}>{size}</p>
+                    <p className={`text-xs font-semibold uppercase tracking-wide ${size === 'Missing' ? 'text-amber-700' : 'text-slate-500'}`}>{size === 'Missing' ? size : formatTshirtSize(size)}</p>
                     <p className={`text-2xl font-bold mt-1 ${size === 'Missing' ? 'text-amber-700' : 'text-slate-950'}`}>{count}</p>
                   </div>
                 ))}
@@ -275,7 +276,7 @@ export default function OperationalPage() {
               >
                 <option value="">Set t-shirt size...</option>
                 {TSHIRT_SIZE_OPTIONS.map((s) => (
-                  <option key={s} value={s}>{s}</option>
+                  <option key={s} value={s}>{formatTshirtSize(s)}</option>
                 ))}
               </select>
               <button

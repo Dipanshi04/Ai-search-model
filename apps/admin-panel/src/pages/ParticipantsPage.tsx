@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, type EmailCleanupReport } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
+import { formatTshirtSize } from '../lib/tshirtSize';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -955,12 +956,12 @@ export default function ParticipantsPage() {
             className="px-4 py-3 bg-white/80 border border-white/60 rounded-3xl text-slate-900 text-sm outline-none"
           >
             <option value="">All T-Shirt Sizes</option>
-            <option value="XS">XS</option>
-            <option value="S">S</option>
-            <option value="M">M</option>
-            <option value="L">L</option>
-            <option value="XL">XL</option>
-            <option value="XXL">XXL</option>
+            <option value="XS">{formatTshirtSize('XS')}</option>
+            <option value="S">{formatTshirtSize('S')}</option>
+            <option value="M">{formatTshirtSize('M')}</option>
+            <option value="L">{formatTshirtSize('L')}</option>
+            <option value="XL">{formatTshirtSize('XL')}</option>
+            <option value="XXL">{formatTshirtSize('XXL')}</option>
             <option value="MISSING">Missing / Not Set</option>
           </select>
           <select
@@ -1175,11 +1176,11 @@ export default function ParticipantsPage() {
                       className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
                     >
                       <option value="">Not set</option>
-                      <option value="S">S</option>
-                      <option value="M">M</option>
-                      <option value="L">L</option>
-                      <option value="XL">XL</option>
-                      <option value="XXL">XXL</option>
+                      <option value="S">{formatTshirtSize('S')}</option>
+                      <option value="M">{formatTshirtSize('M')}</option>
+                      <option value="L">{formatTshirtSize('L')}</option>
+                      <option value="XL">{formatTshirtSize('XL')}</option>
+                      <option value="XXL">{formatTshirtSize('XXL')}</option>
                     </select>
                   </div>
                   <div>
@@ -1330,7 +1331,7 @@ export default function ParticipantsPage() {
               </div>
               <div>
                 <p className="text-xs text-slate-400 uppercase tracking-wide">T-Shirt Size</p>
-                <p className="text-slate-800">{viewParticipant.tshirtSize || '—'}</p>
+                <p className="text-slate-800">{formatTshirtSize(viewParticipant.tshirtSize)}</p>
               </div>
               <div>
                 <p className="text-xs text-slate-400 uppercase tracking-wide">Emergency Contact</p>
@@ -1557,11 +1558,11 @@ export default function ParticipantsPage() {
                     className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
                   >
                     <option value="">Not set</option>
-                    <option value="S">S</option>
-                    <option value="M">M</option>
-                    <option value="L">L</option>
-                    <option value="XL">XL</option>
-                    <option value="XXL">XXL</option>
+                    <option value="S">{formatTshirtSize('S')}</option>
+                    <option value="M">{formatTshirtSize('M')}</option>
+                    <option value="L">{formatTshirtSize('L')}</option>
+                    <option value="XL">{formatTshirtSize('XL')}</option>
+                    <option value="XXL">{formatTshirtSize('XXL')}</option>
                   </select>
                 </div>
                 <div>

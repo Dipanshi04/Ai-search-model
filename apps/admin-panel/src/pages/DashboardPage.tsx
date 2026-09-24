@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api';
+import { formatTshirtSize } from '../lib/tshirtSize';
 import {
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
@@ -280,7 +281,7 @@ export default function DashboardPage() {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3">
             {tshirtData.map((t) => (
               <div key={t.size} className="rounded-2xl bg-white/60 border border-white/40 px-4 py-3 text-center">
-                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{t.size}</p>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{formatTshirtSize(t.size)}</p>
                 <p className="text-2xl font-bold text-slate-950 mt-1">{t.value}</p>
               </div>
             ))}

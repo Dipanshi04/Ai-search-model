@@ -1033,11 +1033,29 @@ participantsRouter.put('/:id', authenticate, requireRole('SUPER_ADMIN', 'RACE_MA
     const distanceForTrees = totalDistance !== undefined ? Number(totalDistance) : undefined;
     const willBeFinished = status === 'FINISHED' || (status === undefined && participant.status === 'FINISHED' && finishedAt !== undefined);
 
+    // The manual payment override (cash-at-venue, fixing a mismatch) used to
+    // only touch paymentStatus, leaving status stuck on PENDING_PAYMENT even
+    // after payment was marked COMPLETED — the normal Cashfree webhook path
+    // always sets both together (see cashfree.ts), so this brings the manual
+    // path in line with it. Only kicks in when the caller didn't explicitly
+    // send a status of their own, and only moves between these two specific
+    // states — it never touches a runner who's already checked in, running,
+    // or finished.
+    let impliedStatus: string | undefined;
+    if (status === undefined && paymentStatus !== undefined) {
+      if (paymentStatus === 'COMPLETED' && participant.status === 'PENDING_PAYMENT') {
+        impliedStatus = 'REGISTERED';
+      } else if (paymentStatus !== 'COMPLETED' && participant.status === 'REGISTERED') {
+        impliedStatus = 'PENDING_PAYMENT';
+      }
+    }
+
     const updated = await prisma.participant.update({
       where: { id: req.params.id as string },
       data: {
         ...(name !== undefined && { name: String(name).trim() }),
         ...(status !== undefined && { status }),
+        ...(status === undefined && impliedStatus !== undefined && { status: impliedStatus }),
         ...(category !== undefined && { category }),
         ...(gender !== undefined && { gender }),
         ...(companyId !== undefined && { companyId }),

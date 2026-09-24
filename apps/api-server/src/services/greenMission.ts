@@ -37,6 +37,12 @@ export async function updateParticipantTrees(participantId: string): Promise<voi
 
 export async function recalcTreeCounter(eventId: string): Promise<void> {
   try {
+    // An admin-set manual value takes precedence over the distance-based
+    // calculation until they turn it back off (see PATCH /api/v1/trees) —
+    // otherwise the very next GPS ping would silently overwrite it.
+    const existing = await prisma.treeCounter.findUnique({ where: { eventId } });
+    if (existing?.manualOverride) return;
+
     // Includes runners still mid-race (not just FINISHED) so the counter
     // reflects trees earned in real time as distance accrues, not only at the finish line.
     const stats = await prisma.participant.aggregate({

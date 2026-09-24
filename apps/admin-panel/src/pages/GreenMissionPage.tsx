@@ -6,6 +6,7 @@ interface GreenStats {
   treesPlanted: number;
   co2Saved: number;
   distanceCovered: number;
+  manualOverride: boolean;
 }
 
 const KM_PER_TREE = 5;
@@ -14,29 +15,65 @@ const CO2_PER_TREE_KG = 22;
 export default function GreenMissionPage() {
   const [stats, setStats] = useState<GreenStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [overrideInput, setOverrideInput] = useState('');
+  const [overrideSaving, setOverrideSaving] = useState(false);
+  const [overrideError, setOverrideError] = useState('');
+
+  async function load() {
+    try {
+      const [statsRes, treesRes] = await Promise.all([
+        api.getParticipantStats(),
+        api.getTreeCounter(),
+      ]);
+      const finished = (statsRes.success && statsRes.data?.finished) || 0;
+      if (treesRes.success && treesRes.data) {
+        setStats({
+          totalFinished: finished,
+          treesPlanted: treesRes.data.totalTrees,
+          co2Saved: parseFloat(treesRes.data.totalCO2.toFixed(1)),
+          distanceCovered: parseFloat(treesRes.data.totalKm.toFixed(1)),
+          manualOverride: treesRes.data.manualOverride,
+        });
+        setOverrideInput(String(treesRes.data.totalTrees));
+      }
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function load() {
-      try {
-        const [statsRes, treesRes] = await Promise.all([
-          api.getParticipantStats(),
-          api.getTreeCounter(),
-        ]);
-        const finished = (statsRes.success && statsRes.data?.finished) || 0;
-        if (treesRes.success && treesRes.data) {
-          setStats({
-            totalFinished: finished,
-            treesPlanted: treesRes.data.totalTrees,
-            co2Saved: parseFloat(treesRes.data.totalCO2.toFixed(1)),
-            distanceCovered: parseFloat(treesRes.data.totalKm.toFixed(1)),
-          });
-        }
-      } finally {
-        setLoading(false);
-      }
-    }
     load();
   }, []);
+
+  async function handleSetOverride(e: React.FormEvent) {
+    e.preventDefault();
+    setOverrideError('');
+    const totalTrees = parseInt(overrideInput, 10);
+    if (isNaN(totalTrees) || totalTrees < 0) {
+      setOverrideError('Enter a valid non-negative number.');
+      return;
+    }
+    setOverrideSaving(true);
+    try {
+      const res = await api.setTreeCounterOverride({ totalTrees });
+      if (!res.success) setOverrideError(res.message || 'Failed to set tree count');
+      else await load();
+    } finally {
+      setOverrideSaving(false);
+    }
+  }
+
+  async function handleClearOverride() {
+    setOverrideSaving(true);
+    setOverrideError('');
+    try {
+      const res = await api.clearTreeCounterOverride();
+      if (!res.success) setOverrideError(res.message || 'Failed to resume automatic calculation');
+      else await load();
+    } finally {
+      setOverrideSaving(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -105,6 +142,51 @@ export default function GreenMissionPage() {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Manual Override */}
+      <div className="glass rounded-[2rem] p-6 border border-white/20 shadow-sm">
+        <div className="flex items-center justify-between mb-2">
+          <h2 className="text-sm font-semibold text-slate-950">Manual Tree Count Override</h2>
+          {stats?.manualOverride && (
+            <span className="px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-xs font-medium">
+              Manual override active
+            </span>
+          )}
+        </div>
+        <p className="text-sm text-slate-500 mb-4">
+          By default, trees planted are calculated automatically from total distance covered ({KM_PER_TREE} km = 1 tree). Set a
+          number here to override it — e.g. to match trees actually planted on the ground — and it won't be recalculated until
+          you resume automatic mode.
+        </p>
+        <form onSubmit={handleSetOverride} className="flex flex-wrap items-center gap-3">
+          <input
+            type="number"
+            min={0}
+            value={overrideInput}
+            onChange={(e) => setOverrideInput(e.target.value)}
+            className="w-40 px-4 py-2.5 bg-white/80 border border-white/60 rounded-3xl text-slate-900 text-sm outline-none"
+            placeholder="Total trees"
+          />
+          <button
+            type="submit"
+            disabled={overrideSaving}
+            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-3xl text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
+          >
+            {overrideSaving ? 'Saving...' : 'Set Override'}
+          </button>
+          {stats?.manualOverride && (
+            <button
+              type="button"
+              onClick={handleClearOverride}
+              disabled={overrideSaving}
+              className="px-4 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-3xl text-sm font-medium transition-colors shadow-sm disabled:opacity-50"
+            >
+              Resume Automatic
+            </button>
+          )}
+        </form>
+        {overrideError && <p className="text-xs text-red-600 mt-2">{overrideError}</p>}
       </div>
 
       {/* Mission Statement */}

@@ -241,7 +241,21 @@ class ApiClient {
 
   async getTreeCounter(eventId?: string) {
     const query = eventId ? `?eventId=${eventId}` : '';
-    return this.request<{ totalTrees: number; totalKm: number; totalCO2: number }>(`/api/v1/trees${query}`);
+    return this.request<{ totalTrees: number; totalKm: number; totalCO2: number; manualOverride: boolean }>(`/api/v1/trees${query}`);
+  }
+
+  async setTreeCounterOverride(params: { eventId?: string; totalTrees: number }) {
+    return this.request<{ totalTrees: number; totalKm: number; totalCO2: number; manualOverride: boolean }>('/api/v1/trees', {
+      method: 'PATCH',
+      body: JSON.stringify({ ...params, manualOverride: true }),
+    });
+  }
+
+  async clearTreeCounterOverride(eventId?: string) {
+    return this.request<{ totalTrees: number; totalKm: number; totalCO2: number; manualOverride: boolean }>('/api/v1/trees', {
+      method: 'PATCH',
+      body: JSON.stringify({ eventId, manualOverride: false }),
+    });
   }
 
   async exportParticipantsCSV(params?: Record<string, string>) {

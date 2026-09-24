@@ -44,6 +44,7 @@ export interface Sponsor {
   name: string;
   logoUrl?: string;
   tier?: string;
+  category?: { name: string } | null;
 }
 
 // All the data-fetching, socket wiring, and map-marker plumbing shared by
@@ -281,11 +282,15 @@ export function useLedDashboardData(mapStyle: string) {
         const sponsorData = await sponsorRes.json();
         if (sponsorData.success) setSponsors(sponsorData.data);
 
-        const allLbRes = await fetch(`${API_URL}/api/v1/participants/leaderboard?limit=500&eventId=${eventId}`);
-        const allLbData = await allLbRes.json();
-        if (allLbData.success) {
-          setTotalRunners(allLbData.data.length);
-          setTotalFinished(allLbData.data.filter((p: any) => p.status === 'FINISHED').length);
+        // Actual registration total, not the leaderboard — the leaderboard
+        // fetch used to double as this count via its length, but it's capped
+        // by its own `limit` param, so once registrations passed that cap
+        // this silently froze at the cap instead of the real number.
+        const statsRes = await fetch(`${API_URL}/api/v1/participants/stats/summary?eventId=${eventId}`);
+        const statsData = await statsRes.json();
+        if (statsData.success) {
+          setTotalRunners(statsData.data.total);
+          setTotalFinished(statsData.data.finished);
         }
       } catch (error) {
         console.error('LED: Initial load error:', error);
@@ -364,6 +369,10 @@ export function useLedDashboardData(mapStyle: string) {
     socket.on('race:start', (data: any) => {
       raceStartRef.current = new Date(data.startedAt);
       setTotalRunners(data.totalParticipants);
+    });
+
+    socket.on('stats:update', (data: any) => {
+      if (typeof data.total === 'number') setTotalRunners(data.total);
     });
 
     socket.on('runner:update', (data: any) => {

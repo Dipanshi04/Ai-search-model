@@ -11,7 +11,14 @@ interface Props {
 export function SponsorTicker({ sponsors, theme }: Props) {
   const validSponsors = sponsors.filter(s => (s.name && s.name !== 'null' && s.name !== 'undefined') || s.logoUrl);
   if (validSponsors.length === 0) return null;
+  // Associate Sponsors stay put in a fixed strip instead of scrolling with
+  // everyone else — they're lower-tier by design, but still deserve to be
+  // visible at all times rather than only when the ticker happens to loop
+  // past them.
+  const associateSponsors = validSponsors.filter(s => s.category?.name === 'Associate Sponsor');
+  const scrollingSponsors = validSponsors.filter(s => s.category?.name !== 'Associate Sponsor');
   const labelClass = theme === 'dark' ? 'text-slate-500' : 'text-[#1B2A5B]/50';
+  const borderClass = theme === 'dark' ? 'border-slate-800/40' : 'border-[#1B2A5B]/10';
   const renderItem = (s: Sponsor, i: number) => {
     const imgUrl = getImageUrl(s.logoUrl);
     const label = (s.name && s.name !== 'null' && s.name !== 'undefined') ? s.name : 'Sponsor';
@@ -32,16 +39,25 @@ export function SponsorTicker({ sponsors, theme }: Props) {
   return (
     <div className="overflow-hidden flex-1 min-w-0 flex items-center">
       <span className={`text-sm font-extrabold uppercase tracking-[0.3em] shrink-0 pr-6 ${labelClass}`}>SPONSORS</span>
-      <div className="overflow-hidden flex-1 min-w-0">
-        <div className="sponsor-ticker" style={{ display: 'flex', width: 'max-content' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4rem', paddingRight: '4rem', flexShrink: 0 }}>
-            {validSponsors.map((s, i) => renderItem(s, i))}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4rem', flexShrink: 0 }}>
-            {validSponsors.map((s, i) => renderItem(s, i + validSponsors.length))}
+      {scrollingSponsors.length > 0 ? (
+        <div className="overflow-hidden flex-1 min-w-0">
+          <div className="sponsor-ticker" style={{ display: 'flex', width: 'max-content' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4rem', paddingRight: '4rem', flexShrink: 0 }}>
+              {scrollingSponsors.map((s, i) => renderItem(s, i))}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4rem', flexShrink: 0 }}>
+              {scrollingSponsors.map((s, i) => renderItem(s, i + scrollingSponsors.length))}
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex-1 min-w-0" />
+      )}
+      {associateSponsors.length > 0 && (
+        <div className={`flex items-center gap-6 shrink-0 pl-6 ml-6 border-l ${borderClass}`}>
+          {associateSponsors.map((s, i) => renderItem(s, i))}
+        </div>
+      )}
     </div>
   );
 }

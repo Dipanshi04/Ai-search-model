@@ -301,14 +301,18 @@ model Announcement {
 }
 
 model TreeCounter {
-  id         String   @id @default(cuid())
-  eventId    String   @unique @map("event_id")
-  totalTrees Int      @default(0) @map("total_trees")
-  totalKm    Float    @default(0) @map("total_km")
-  totalCO2   Float    @default(0) @map("total_co2")
-  updatedAt  DateTime @updatedAt
+  id             String   @id @default(cuid())
+  eventId        String   @unique @map("event_id")
+  totalTrees     Int      @default(0) @map("total_trees")
+  totalKm        Float    @default(0) @map("total_km")
+  totalCO2       Float    @default(0) @map("total_co2")
+  // When true, an admin has manually set totalTrees/totalCO2 below and the
+  // automatic distance-based recalculation (see recalcTreeCounter in
+  // greenMission.ts) skips this event entirely until it's turned back off.
+  manualOverride Boolean  @default(false) @map("manual_override")
+  updatedAt      DateTime @updatedAt
 
-  event      Event    @relation(fields: [eventId], references: [id])
+  event          Event    @relation(fields: [eventId], references: [id])
 
   @@map("tree_counter")
 }

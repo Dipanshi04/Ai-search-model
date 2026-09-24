@@ -10,6 +10,7 @@ import { v4 as uuidv4 } from 'uuid';
 import fs from 'fs';
 import path from 'path';
 import { PACKAGE_ROOT } from '../config/paths.js';
+import { getSocketIO } from '../config/socket.js';
 
 export const registerRouter: Router = Router();
 
@@ -222,6 +223,16 @@ registerRouter.post('/', async (req: Request, res: Response) => {
     });
 
     logger.info(`New registration: ${bibNumber} - ${name}`);
+
+    // Live registration count for the LED dashboard — without this it only
+    // ever refreshes on page load or at race:start, so it sits stale/wrong
+    // through the whole registration window leading up to the race.
+    try {
+      const total = await prisma.participant.count({ where: { eventId: event.id } });
+      getSocketIO().to(`event:${event.id}`).emit('stats:update', { eventId: event.id, total });
+    } catch (e) {
+      logger.error('Failed to emit stats:update:', e);
+    }
 
     // Send the PIN immediately — it's their login credential and doesn't
     // depend on payment. The "Registration Confirmed" welcome email is

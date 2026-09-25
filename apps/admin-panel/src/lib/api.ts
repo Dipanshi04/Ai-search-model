@@ -436,13 +436,14 @@ class ApiClient {
     return this.request<any[]>('/api/v1/bulk-registration');
   }
 
-  async getBulkTshirtReport() {
+  async getBulkTshirtReport(excludeDistributed?: boolean) {
+    const query = excludeDistributed ? '?excludeDistributed=true' : '';
     return this.request<{
       sizes: string[];
       rows: { companyName: string; counts: Record<string, number>; categories: Record<string, number>; total: number }[];
       grandTotal: Record<string, number>;
       categoryGrandTotal: Record<string, number>;
-    }>('/api/v1/bulk-registration/tshirt-report');
+    }>(`/api/v1/bulk-registration/tshirt-report${query}`);
   }
 
   async createBulkRegistration(data: {

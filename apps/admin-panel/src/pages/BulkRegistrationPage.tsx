@@ -46,6 +46,7 @@ export default function BulkRegistrationPage() {
     categoryGrandTotal: Record<string, number>;
   } | null>(null);
   const [tshirtReportLoading, setTshirtReportLoading] = useState(false);
+  const [excludeDistributed, setExcludeDistributed] = useState(false);
 
   useEffect(() => { fetchRegistrations(); }, []);
 
@@ -79,6 +80,17 @@ export default function BulkRegistrationPage() {
     }
   }
 
+  async function loadTshirtReport(exclude: boolean) {
+    setTshirtReportLoading(true);
+    try {
+      const res = await api.getBulkTshirtReport(exclude);
+      if (res.success && res.data) setTshirtReport(res.data);
+    } catch (e) {
+      console.error('Failed to fetch t-shirt report:', e);
+    }
+    setTshirtReportLoading(false);
+  }
+
   async function toggleTshirtReport() {
     if (showTshirtReport) {
       setShowTshirtReport(false);
@@ -86,14 +98,12 @@ export default function BulkRegistrationPage() {
     }
     setShowTshirtReport(true);
     if (tshirtReport) return; // already loaded once this session
-    setTshirtReportLoading(true);
-    try {
-      const res = await api.getBulkTshirtReport();
-      if (res.success && res.data) setTshirtReport(res.data);
-    } catch (e) {
-      console.error('Failed to fetch t-shirt report:', e);
-    }
-    setTshirtReportLoading(false);
+    await loadTshirtReport(excludeDistributed);
+  }
+
+  async function handleToggleExcludeDistributed(checked: boolean) {
+    setExcludeDistributed(checked);
+    await loadTshirtReport(checked);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -225,8 +235,21 @@ export default function BulkRegistrationPage() {
       {showTshirtReport && (
         <div className="glass rounded-[2rem] border border-white/20 overflow-hidden shadow-sm">
           <div className="px-6 py-4 border-b border-slate-100">
-            <h3 className="text-sm font-semibold text-slate-700">T-Shirt Sizes by Company</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Bulk (HR-registered) participants only</p>
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-700">T-Shirt Sizes by Company</h3>
+                <p className="text-xs text-slate-500 mt-0.5">Bulk (HR-registered) participants only</p>
+              </div>
+              <label className="flex items-center gap-2 text-xs font-medium text-slate-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={excludeDistributed}
+                  onChange={(e) => handleToggleExcludeDistributed(e.target.checked)}
+                  className="rounded border-slate-300"
+                />
+                Exclude kit already distributed
+              </label>
+            </div>
             {tshirtReport && (
               <p className="text-xs text-slate-600 font-medium mt-2">
                 3K: <span className="text-violet-700 font-bold">{tshirtReport.categoryGrandTotal['3K'] || 0}</span>

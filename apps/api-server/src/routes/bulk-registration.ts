@@ -45,10 +45,17 @@ bulkRegistrationRouter.get('/', async (_req: Request, res: Response) => {
 // T-shirt size breakdown per company, for bulk (HR-registered) participants
 // only — kit ordering needs "how many of each size for company X", not a
 // site-wide total (that's already on the Dashboard).
-bulkRegistrationRouter.get('/tshirt-report', async (_req: Request, res: Response) => {
+bulkRegistrationRouter.get('/tshirt-report', async (req: Request, res: Response) => {
   try {
+    // Lets kit-distribution staff see only what's still left to hand out —
+    // without this, the report keeps counting sizes for people who already
+    // got their kit, which isn't what "how many more do we need" means.
+    const excludeDistributed = req.query.excludeDistributed === 'true';
     const participants = await prisma.participant.findMany({
-      where: { bulkRegistrationId: { not: null } },
+      where: {
+        bulkRegistrationId: { not: null },
+        ...(excludeDistributed && { kitDistributed: false }),
+      },
       select: {
         tshirtSize: true,
         category: true,

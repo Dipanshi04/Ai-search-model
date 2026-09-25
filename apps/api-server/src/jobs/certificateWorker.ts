@@ -3,6 +3,7 @@ import { prisma } from '../config/database.js';
 import { logger } from '../config/logger.js';
 import puppeteer from 'puppeteer';
 import path from 'path';
+import os from 'os';
 import fs from 'fs/promises';
 import { PACKAGE_ROOT } from '../config/paths.js';
 
@@ -14,11 +15,18 @@ const connection = {
 const CERT_DIR = path.join(PACKAGE_ROOT, 'certificates');
 fs.mkdir(CERT_DIR, { recursive: true }).catch(() => {});
 
-function formatFinishTime(seconds: number): string {
-  const h = Math.floor(seconds / 3600);
-  const m = Math.floor((seconds % 3600) / 60);
-  const s = Math.floor(seconds % 60);
-  return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+const ASSETS_DIR = path.join(PACKAGE_ROOT, 'assets');
+const CERT_BG_PATH = path.join(ASSETS_DIR, 'certificate-bg.jpg');
+const FONT_REGULAR_PATH = path.join(ASSETS_DIR, 'fonts', 'Poppins-Regular.ttf');
+const FONT_MEDIUM_PATH = path.join(ASSETS_DIR, 'fonts', 'Poppins-Medium.ttf');
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 export async function generateCertificate(participantId: string): Promise<string> {
@@ -37,86 +45,70 @@ export async function generateCertificate(participantId: string): Promise<string
       throw new Error(`Participant ${participantId} not eligible for certificate`);
     }
 
-    const trees = participant.treesCount;
+    const runnerName = escapeHtml(participant.name || participant.user.name);
 
+    // Design is a single flattened background image (see
+    // scripts/rasterize-cert-bg.mjs — the branded artwork was a 3MB SVG with
+    // an embedded 4800px photo; baking it down to one JPEG once means every
+    // certificate render (2000+ at a time) only has to load ~570KB instead
+    // of re-parsing that SVG). The only dynamic element is the runner's name,
+    // overlaid at the same position the artwork's own placeholder occupied —
+    // a white patch covers "RUNNER-1" and a redrawn underline/name sit on top.
     const html = `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <style>
+    @font-face {
+      font-family: 'Poppins';
+      font-weight: 400;
+      src: url('file://${FONT_REGULAR_PATH}') format('truetype');
+    }
+    @font-face {
+      font-family: 'Poppins';
+      font-weight: 500;
+      src: url('file://${FONT_MEDIUM_PATH}') format('truetype');
+    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      width: 1120px; height: 790px;
-      font-family: 'Georgia', serif;
-      background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
-      color: white;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 60px;
-    }
-    .border-frame {
-      border: 3px solid #10b981;
-      padding: 40px;
-      width: 100%;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
+    body { font-family: 'Poppins', Arial, sans-serif; }
+    #cert {
       position: relative;
+      width: 1684px;
+      height: 1191px;
+      background: url('file://${CERT_BG_PATH}') no-repeat center/contain;
     }
-    .title { font-size: 20px; color: #10b981; letter-spacing: 6px; text-transform: uppercase; margin-bottom: 8px; }
-    .event-name { font-size: 42px; font-weight: bold; color: white; margin-bottom: 30px; }
-    .cert-text { font-size: 16px; color: #94a3b8; margin-bottom: 20px; }
-    .runner-name { font-size: 52px; font-weight: bold; color: #10b981; margin-bottom: 20px; text-align: center; }
-    .details { display: flex; gap: 40px; margin-bottom: 30px; }
-    .detail-item { text-align: center; }
-    .detail-value { font-size: 28px; font-weight: bold; color: white; }
-    .detail-label { font-size: 12px; color: #94a3b8; text-transform: uppercase; letter-spacing: 2px; }
-    .green-impact {
-      background: rgba(16, 185, 129, 0.1);
-      border: 1px solid rgba(16, 185, 129, 0.3);
-      padding: 15px 30px;
-      border-radius: 8px;
-      margin-bottom: 30px;
+    #patch {
+      position: absolute;
+      left: 490px; top: 744px;
+      width: 505px; height: 64px;
+      background: #ffffff;
     }
-    .green-text { font-size: 14px; color: #10b981; }
-    .footer { font-size: 11px; color: #64748b; margin-top: auto; }
-    .bib { position: absolute; top: 20px; right: 30px; font-size: 14px; color: #64748b; font-family: monospace; }
+    #line {
+      position: absolute;
+      left: 278px; top: 807px;
+      width: 707px; height: 2px;
+      background: #8e8e8e;
+    }
+    #runnerName {
+      position: absolute;
+      left: 490px; top: 744px;
+      width: 505px; height: 64px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 38px;
+      font-weight: 500;
+      letter-spacing: 5px;
+      color: #7d7d7d;
+      white-space: nowrap;
+      overflow: hidden;
+    }
   </style>
 </head>
 <body>
-  <div class="border-frame">
-    <div class="bib">${participant.bibNumber}</div>
-    <div class="title">Certificate of Completion</div>
-    <div class="event-name">${participant.event.name}</div>
-    <div class="cert-text">This is to certify that</div>
-    <div class="runner-name">${participant.name || participant.user.name}</div>
-    <div class="cert-text">successfully completed the ${participant.category.replace('RUN_', '').replace('_', ' ')} on ${new Date(participant.event.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
-    <div class="details">
-      <div class="detail-item">
-        <div class="detail-value">${formatFinishTime(participant.finishTime)}</div>
-        <div class="detail-label">Finish Time</div>
-      </div>
-      <div class="detail-item">
-        <div class="detail-value">${participant.totalDistance.toFixed(2)} km</div>
-        <div class="detail-label">Distance</div>
-      </div>
-      <div class="detail-item">
-        <div class="detail-value">${participant.pace ? `${Math.floor(participant.pace)}:${String(Math.floor((participant.pace % 1) * 60)).padStart(2, '0')}` : '--:--'}</div>
-        <div class="detail-label">Pace /km</div>
-      </div>
-    </div>
-    <div class="green-impact">
-      <div class="green-text">Green Impact: ${trees} trees planted - ${(trees * 22).toLocaleString()} kg CO2 offset per year</div>
-    </div>
-    <div class="footer">
-      ${participant.company?.name ? `Representing ${participant.company.name} - ` : ''}
-      3 KM = 1 Tree - Run for a Greener Tomorrow
-    </div>
+  <div id="cert">
+    <div id="patch"></div>
+    <div id="line"></div>
+    <div id="runnerName">${runnerName}</div>
   </div>
 </body>
 </html>`;
@@ -128,20 +120,45 @@ export async function generateCertificate(participantId: string): Promise<string
         args: ['--no-sandbox', '--disable-setuid-sandbox'],
       });
 
+      // A page.setContent() document's origin can't load local file://
+      // resources (the background image and fonts here) — writing to a real
+      // file and navigating to it with page.goto() gives it an actual
+      // file:// origin, which can.
+      const tmpHtmlPath = path.join(os.tmpdir(), `cert-${participantId}-${Date.now()}.html`);
+      await fs.writeFile(tmpHtmlPath, html);
+
       const page = await browser.newPage();
-      await page.setContent(html, { waitUntil: 'networkidle0' });
+      await page.goto(`file://${tmpHtmlPath}`, { waitUntil: 'networkidle0' });
+
+      // Long names shrink to fit the same box the artwork sized for
+      // "RUNNER-1" — mirrors the auto-fit behavior in the original reference
+      // page, just run once server-side instead of on every keystroke.
+      await page.evaluate(() => {
+        // Runs in the browser page, not this Node process — `document`
+        // isn't in this file's TS lib config, hence the cast.
+        const doc = (globalThis as any).document;
+        const el = doc.getElementById('runnerName');
+        if (!el) return;
+        let size = 38;
+        el.style.fontSize = size + 'px';
+        while (el.scrollWidth > el.clientWidth && size > 14) {
+          size -= 1;
+          el.style.fontSize = size + 'px';
+        }
+      });
 
       const filename = `${participant.bibNumber}.pdf`;
       const filepath = path.join(CERT_DIR, filename);
 
       await page.pdf({
         path: filepath,
-        width: '1120px',
-        height: '790px',
+        width: '1684px',
+        height: '1191px',
         printBackground: true,
       });
 
       await browser.close();
+      await fs.unlink(tmpHtmlPath).catch(() => {});
 
       const certificateUrl = `/certificates/${filename}`;
       await prisma.participant.update({

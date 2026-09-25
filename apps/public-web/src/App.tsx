@@ -20,10 +20,7 @@ import { useEffect, useState } from "react";
 // lazy-loaded, so a homepage visitor's initial JS payload doesn't include
 // the Register form, HR portal, payment confirmation page, etc. Each
 // becomes its own chunk fetched only when that route is actually visited.
-// Registration is closed — commented out (not deleted) rather than removed,
-// so reopening registration is just uncommenting this and the matching
-// route below instead of restoring the file from git history.
-// const RegisterPage = lazy(() => import('./pages/RegisterPage'));
+const RegisterPage = lazy(() => import('./pages/RegisterPage'));
 const RegistrationClosedPage = lazy(() => import('./pages/RegistrationClosedPage'));
 const HRPortalPage = lazy(() => import('./pages/HRPortalPage'));
 const HRForgotPasswordPage = lazy(() => import('./pages/HRForgotPasswordPage').then((m) => ({ default: m.HRForgotPasswordPage })));
@@ -201,8 +198,9 @@ function HomePage() {
           </div>
 
           <div className="hero-anim flex flex-wrap items-center gap-3 mb-6 sm:mb-7" style={{ animationDelay: '320ms' }}>
-            <span className="hero-body inline-flex items-center gap-2 px-5 py-2 sm:px-6 sm:py-2.5 rounded-full text-sm sm:text-base font-bold text-white" style={{ background: '#94A3B8' }}>
-              Registration Closed
+            <span className="hero-body inline-flex items-center gap-2 px-5 py-2 sm:px-6 sm:py-2.5 rounded-full text-sm sm:text-base font-bold text-white" style={{ background: '#F5821F' }}>
+              <span className="hero-live-dot w-1.5 h-1.5 rounded-full bg-white" />
+              Registration Open
             </span>
             <span className="hero-kicker text-xs sm:text-sm font-bold" style={{ color: '#1B2A5B' }}>
               280+ IT Companies. One Run.
@@ -217,9 +215,10 @@ function HomePage() {
             <a
               href="/register"
               className="hero-body inline-flex items-center gap-2 px-6 py-2.5 sm:px-7 sm:py-3 rounded-full text-sm sm:text-base font-bold text-white hover:opacity-90 transition"
-              style={{ background: '#94A3B8' }}
+              style={{ background: '#1B2A5B' }}
             >
-              Registration Closed
+              Register Now
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
             </a>
             <button
               onClick={() => setShowSponsorModal(true)}
@@ -340,9 +339,10 @@ function HomePage() {
         <a
           href="/register"
           className="hero-body inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-full text-sm font-bold text-white hover:opacity-90 transition"
-          style={{ background: '#94A3B8' }}
+          style={{ background: '#F5821F' }}
         >
-          Registration Closed
+          Register Now
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M13 6l6 6-6 6" /></svg>
         </a>
       </div>
     </div>
@@ -366,11 +366,9 @@ export default function App() {
     <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route path="/" element={<HomePage />} />
-        {/* Registration is closed — swapped from RegisterPage to
-            RegistrationClosedPage. To reopen registration, comment the line
-            below back out and uncomment the RegisterPage line above it. */}
-        {/* <Route path="/register" element={<RegisterPage />} /> */}
-        <Route path="/register" element={<RegistrationClosedPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        {/* Hidden for now — not linked from nav. Preview at /registration-closed;
+            swap the /register route above to this page when ready to actually close registration. */}
         <Route path="/registration-closed" element={<RegistrationClosedPage />} />
         <Route path="/hr-portal" element={<HRPortalPage />} />
         <Route path="/hr-forgot-password" element={<HRForgotPasswordPage />} />

@@ -203,8 +203,16 @@ authRouter.post(
         data: { pinHash },
       });
 
+      // A user can have participants across multiple events — the most
+      // recently created one is the one they'd actually expect to see here.
+      const latestParticipant = await prisma.participant.findFirst({
+        where: { userId: user.id },
+        orderBy: { createdAt: 'desc' },
+        select: { bibNumber: true },
+      });
+
       // Send PIN email
-      await sendPinEmail(user.email, user.name, pin);
+      await sendPinEmail(user.email, user.name, pin, latestParticipant?.bibNumber);
 
       logger.info(`PIN reset for: ${email}`);
 
@@ -250,10 +258,16 @@ authRouter.post(
       const pinHash = await bcrypt.hash(newPin, 12);
       await prisma.user.update({ where: { id: user.id }, data: { pinHash } });
 
+      const latestParticipant = await prisma.participant.findFirst({
+        where: { userId: user.id },
+        orderBy: { createdAt: 'desc' },
+        select: { bibNumber: true },
+      });
+
       // A PIN change is a credential change — email it the same way a reset
       // does, so the account owner has a record of it (and a heads-up if
       // they didn't make the change themselves).
-      sendPinEmail(user.email, user.name, newPin).catch((e) => logger.error('PIN change email failed:', e));
+      sendPinEmail(user.email, user.name, newPin, latestParticipant?.bibNumber).catch((e) => logger.error('PIN change email failed:', e));
 
       logger.info(`PIN changed for user: ${req.user!.email}`);
 

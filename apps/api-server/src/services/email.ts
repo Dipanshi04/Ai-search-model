@@ -163,7 +163,8 @@ function wrapEmailTemplate(bodyHtml: string): string {
 export async function sendPinEmail(
   to: string,
   name: string,
-  pin: string
+  pin: string,
+  bibNumber?: string
 ): Promise<boolean> {
   console.log('[EMAIL] Sending PIN email to:', to);
 
@@ -177,6 +178,7 @@ export async function sendPinEmail(
         ${pin}
       </div>
     </div>
+    ${bibNumber ? `<p style="margin: 16px 0 0; font-size: 13px; color: ${BRAND_NAVY}; text-align: center;">Your BIB Number: <strong style="letter-spacing: 1px;">${bibNumber}</strong></p>` : ''}
     <p style="margin: 20px 0 0; font-size: 12px; color: rgba(27,42,91,0.45); text-align: center;">This PIN is valid until you reset it. Do not share it with anyone.</p>
   `);
 

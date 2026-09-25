@@ -144,16 +144,16 @@ export default function ParticipantsPage() {
   async function handleAddParticipant(e: React.FormEvent) {
     e.preventDefault();
     setAddError('');
-    if (!addForm.name.trim() || !addForm.email.trim() || !addForm.phone.trim()) {
-      setAddError('Name, email, and phone are required.');
+    if (!addForm.name.trim()) {
+      setAddError('Name is required.');
       return;
     }
     setAddSaving(true);
     try {
       const payload = {
         name: addForm.name.trim(),
-        email: addForm.email.trim(),
-        phone: addForm.phone.trim(),
+        email: addForm.email.trim() || undefined,
+        phone: addForm.phone.trim() || undefined,
         category: addForm.category,
         gender: addForm.gender,
         companyId: addForm.companyId || undefined,
@@ -173,6 +173,11 @@ export default function ParticipantsPage() {
       setShowAddModal(false);
       resetAddForm();
       loadParticipants();
+      // No email on file means this PIN was never emailed anywhere — the
+      // admin has to read it off screen and hand it to the walk-in directly.
+      if (!payload.email && res.data?.pin) {
+        alert(`No email was given, so the PIN couldn't be sent automatically.\n\nBIB: ${res.data.bibNumber}\nPIN: ${res.data.pin}\n\nWrite this down — it won't be shown again.`);
+      }
     } catch (e: any) {
       setAddError(e.message || 'Failed to add participant');
     }
@@ -1505,24 +1510,29 @@ export default function ParticipantsPage() {
                 />
               </div>
               <div>
-                <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Email</label>
+                <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Email (optional)</label>
                 <input
                   type="email"
                   value={addForm.email}
                   onChange={(e) => setAddForm({ ...addForm, email: e.target.value })}
-                  required
+                  placeholder="Leave blank for a walk-in with no email"
                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
                 />
               </div>
               <div>
-                <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Phone</label>
+                <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Phone (optional)</label>
                 <input
                   value={addForm.phone}
                   onChange={(e) => setAddForm({ ...addForm, phone: e.target.value })}
-                  required
+                  placeholder="Leave blank for a walk-in with no phone"
                   className="w-full px-3 py-2 bg-white border border-slate-200 rounded-2xl text-sm outline-none"
                 />
               </div>
+              {!addForm.email.trim() && (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                  No email on file means the PIN can't be emailed — you'll need to read it off screen and hand it to them directly after saving.
+                </p>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-slate-500 uppercase tracking-wide mb-1">Category</label>

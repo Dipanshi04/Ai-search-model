@@ -743,21 +743,30 @@ participantsRouter.post('/', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANA
       emergencyContact, emergencyPhone, bloodGroup, bloodDonation, tshirtSize,
       paymentStatus, isBoardMember,
     } = req.body as {
-      name: string; email: string; phone: string; category: string; gender: string;
+      name: string; email?: string; phone?: string; category: string; gender: string;
       companyId?: string; eventId?: string;
       emergencyContact?: string; emergencyPhone?: string; bloodGroup?: string;
       bloodDonation?: boolean; tshirtSize?: string; paymentStatus?: 'COMPLETED' | 'PENDING';
       isBoardMember?: boolean;
     };
 
-    if (!name || !email || !phone || !category || !gender) {
-      res.status(400).json({ success: false, message: 'Missing required fields: name, email, phone, category, gender' });
+    if (!name || !category || !gender) {
+      res.status(400).json({ success: false, message: 'Missing required fields: name, category, gender' });
       return;
     }
-    if (!isValidEmail(email)) {
+    if (email && !isValidEmail(email)) {
       res.status(400).json({ success: false, message: `Invalid email: ${email}` });
       return;
     }
+    // Email/phone are optional here (unlike public registration) — a
+    // walk-in or VIP who doesn't want to share contact info still needs a
+    // User row (email/phone are unique+required on that model), so we mint
+    // a placeholder that satisfies the constraint without colliding with a
+    // real address. They can still be checked in and log in by BIB+PIN;
+    // they just won't receive PIN/confirmation emails.
+    const { randomUUID } = await import('crypto');
+    const effectiveEmail = email ? String(email).toLowerCase().trim() : `no-email+${randomUUID()}@isa.internal`;
+    const effectivePhone = phone ? String(phone).trim() : `NOPHONE-${randomUUID()}`;
 
     let event;
     if (reqEventId) {
@@ -773,11 +782,11 @@ participantsRouter.post('/', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANA
       return;
     }
 
-    let user = await prisma.user.findUnique({ where: { email: String(email).toLowerCase().trim() } });
+    let user = await prisma.user.findUnique({ where: { email: effectiveEmail } });
     let isNewUser = false;
     let pin = '';
     if (!user) {
-      const phoneUser = await prisma.user.findUnique({ where: { phone: String(phone).trim() } });
+      const phoneUser = await prisma.user.findUnique({ where: { phone: effectivePhone } });
       if (phoneUser) {
         res.status(409).json({ success: false, message: `Phone ${phone} is already registered to another account` });
         return;
@@ -786,7 +795,7 @@ participantsRouter.post('/', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANA
       pin = String(Math.floor(1000 + Math.random() * 9000));
       const pinHash = await hashPassword(pin);
       user = await prisma.user.create({
-        data: { email: String(email).toLowerCase().trim(), phone: String(phone).trim(), name, passwordHash, pinHash },
+        data: { email: effectiveEmail, phone: effectivePhone, name, passwordHash, pinHash },
       });
       isNewUser = true;
     } else if (!user.pinHash) {
@@ -847,14 +856,22 @@ participantsRouter.post('/', authenticate, requireRole('SUPER_ADMIN', 'RACE_MANA
 
     logger.info(`Admin manually added participant ${bibNumber} (${name}) by ${req.user?.email}`);
 
-    if (isNewUser && pin) {
-      sendPinEmail(user.email, name, pin).catch((e) => logger.error('PIN email failed:', e));
+    if (isNewUser && pin && email) {
+      sendPinEmail(user.email, name, pin, bibNumber).catch((e) => logger.error('PIN email failed:', e));
     }
-    if (completed) {
+    if (completed && email) {
       sendWelcomeEmail(user.email, name, bibNumber, category).catch((e) => logger.error('Welcome email failed:', e));
     }
 
-    res.status(201).json({ success: true, data: participant });
+    res.status(201).json({
+      success: true,
+      data: participant,
+      // Only ever available in this one response, same as the public
+      // register endpoint — the plaintext is discarded right after this.
+      // No email on file means this is the only way the admin can hand the
+      // walk-in their PIN at all, so it's included even when one was sent.
+      pin: isNewUser ? pin : undefined,
+    });
   } catch (error: any) {
     if (error?.code === 'P2002') {
       res.status(409).json({ success: false, message: 'An account with this email or phone already exists' });
@@ -1160,7 +1177,7 @@ participantsRouter.post('/:id/reset-pin', authenticate, requireRole('SUPER_ADMIN
       data: { pinHash },
     });
 
-    sendPinEmail(participant.user.email, participant.name || participant.user.name, pin).catch((err) =>
+    sendPinEmail(participant.user.email, participant.name || participant.user.name, pin, participant.bibNumber).catch((err) =>
       logger.error('Failed to email reset PIN:', err)
     );
 
@@ -1226,7 +1243,7 @@ participantsRouter.post('/bulk-reset-pins', authenticate, requireRole('SUPER_ADM
     // a backup so each account also has it in their inbox as usual.
     for (const userId of uniqueUserIds) {
       const owner = participants.find((p) => p.userId === userId)!;
-      sendPinEmail(owner.user.email, owner.name || owner.user.name, pinByUserId.get(userId)!)
+      sendPinEmail(owner.user.email, owner.name || owner.user.name, pinByUserId.get(userId)!, owner.bibNumber)
         .catch((err) => logger.error('Bulk PIN reset email failed:', err));
     }
 

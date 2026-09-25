@@ -21,6 +21,7 @@ import { useEffect, useState } from "react";
 // the Register form, HR portal, payment confirmation page, etc. Each
 // becomes its own chunk fetched only when that route is actually visited.
 const RegisterPage = lazy(() => import('./pages/RegisterPage'));
+const RegistrationClosedPage = lazy(() => import('./pages/RegistrationClosedPage'));
 const HRPortalPage = lazy(() => import('./pages/HRPortalPage'));
 const HRForgotPasswordPage = lazy(() => import('./pages/HRForgotPasswordPage').then((m) => ({ default: m.HRForgotPasswordPage })));
 const HRResetPasswordPage = lazy(() => import('./pages/HRForgotPasswordPage').then((m) => ({ default: m.HRResetPasswordPage })));
@@ -366,6 +367,9 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/register" element={<RegisterPage />} />
+        {/* Hidden for now — not linked from nav. Preview at /registration-closed;
+            swap the /register route above to this page when ready to actually close registration. */}
+        <Route path="/registration-closed" element={<RegistrationClosedPage />} />
         <Route path="/hr-portal" element={<HRPortalPage />} />
         <Route path="/hr-forgot-password" element={<HRForgotPasswordPage />} />
         <Route path="/hr-reset-password" element={<HRResetPasswordPage />} />

@@ -640,6 +640,9 @@ function buildParticipantWhere(query: Record<string, unknown>) {
   const eventId = typeof query.eventId === 'string' ? query.eventId : undefined;
   const companyId = typeof query.companyId === 'string' ? query.companyId : undefined;
   const isBoardMember = query.isBoardMember === 'true' ? true : undefined;
+  // RETAIL = registered directly on the public site (no bulkRegistrationId);
+  // BULK = came in through an HR bulk-registration slot.
+  const registrationType = typeof query.registrationType === 'string' ? query.registrationType : undefined;
 
   const where: any = {};
   if (eventId) where.eventId = eventId;
@@ -650,6 +653,8 @@ function buildParticipantWhere(query: Record<string, unknown>) {
   else if (tshirtSize) where.tshirtSize = tshirtSize;
   if (companyId) where.companyId = companyId;
   if (isBoardMember !== undefined) where.isBoardMember = isBoardMember;
+  if (registrationType === 'RETAIL') where.bulkRegistrationId = null;
+  else if (registrationType === 'BULK') where.bulkRegistrationId = { not: null };
   if (search) {
     where.OR = [
       { bibNumber: { contains: search, mode: 'insensitive' } },

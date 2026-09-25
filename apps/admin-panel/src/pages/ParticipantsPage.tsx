@@ -27,6 +27,7 @@ export default function ParticipantsPage() {
   const [boardOnly, setBoardOnly] = useState(false);
   const [eventId, setEventId] = useState('');
   const [companyFilter, setCompanyFilter] = useState('');
+  const [registrationType, setRegistrationType] = useState('');
   const [events, setEvents] = useState<any[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -106,6 +107,7 @@ export default function ParticipantsPage() {
     if (eventId) params.eventId = eventId;
     if (boardOnly) params.isBoardMember = 'true';
     if (companyFilter) params.companyId = companyFilter;
+    if (registrationType) params.registrationType = registrationType;
 
     const res = await api.getParticipants(params);
     if (res.success && res.data) {
@@ -128,7 +130,7 @@ export default function ParticipantsPage() {
 
   useEffect(() => {
     loadParticipants();
-  }, [page, category, status, tshirtSize, eventId, boardOnly, companyFilter, debouncedSearch]);
+  }, [page, category, status, tshirtSize, eventId, boardOnly, companyFilter, registrationType, debouncedSearch]);
 
   function resetAddForm() {
     setAddForm({
@@ -571,6 +573,7 @@ export default function ParticipantsPage() {
               if (eventId) params.eventId = eventId;
               if (boardOnly) params.isBoardMember = 'true';
               if (companyFilter) params.companyId = companyFilter;
+              if (registrationType) params.registrationType = registrationType;
               api.exportParticipantsCSV(params);
             }}
             className="px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-3xl text-sm font-medium transition-colors shadow-sm"
@@ -983,6 +986,15 @@ export default function ParticipantsPage() {
             {companies.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
+          </select>
+          <select
+            value={registrationType}
+            onChange={(e) => { setRegistrationType(e.target.value); setPage(1); }}
+            className="px-4 py-3 bg-white/80 border border-white/60 rounded-3xl text-slate-900 text-sm outline-none"
+          >
+            <option value="">All Registration Types</option>
+            <option value="RETAIL">Retail (direct) only</option>
+            <option value="BULK">Bulk (HR) only</option>
           </select>
           <label className="flex items-center gap-2 px-4 py-3 bg-white/80 border border-white/60 rounded-3xl text-slate-900 text-sm cursor-pointer">
             <input

@@ -18,6 +18,10 @@ const FAQS = [
     a: 'Click Register Now on the homepage, fill in your details, choose your race category, and complete payment online. You’ll receive a confirmation email with your BIB number.',
   },
   {
+    q: 'How do I log in to the Runner App?',
+    a: 'Use your registered email (or BIB number) along with the 4-digit PIN sent to you after registration. If you don’t have your PIN, use "Forgot PIN" on the login screen to get a new one by email. If that still doesn’t work, visit the help desk on race day and our team will give you your PIN.',
+  },
+  {
     q: 'When and where do I collect my race kit?',
     a: 'Race kits can be collected on 26th September 2026, the day before the event, at the designated collection point in Indore. Details are shared via email after registration.',
   },
